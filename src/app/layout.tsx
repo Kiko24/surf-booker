@@ -1,18 +1,27 @@
-import './global.css'
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import "./global.css";
 
-export const metadata = {
-  title: 'Surf Booker',
-  description: 'Plataforma de marcações para escolas de surf',
-}
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+});
+
+export const metadata: Metadata = {
+  title: "SurfBooker",
+  description: "Plataforma de marcações para escolas de surf",
+};
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode
-}>) {
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="pt">
-      <body>{children}</body>
+      <body className={`${inter.variable} font-sans antialiased`}>
+        {children}
+      </body>
     </html>
-  )
+  );
 }
