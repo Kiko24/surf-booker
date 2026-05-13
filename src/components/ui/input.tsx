@@ -1,13 +1,14 @@
-import { InputHTMLAttributes, forwardRef } from "react";
+import { InputHTMLAttributes, forwardRef } from 'react';
+import { cn } from '@/lib/utils/cn';
 
-type Props = InputHTMLAttributes<HTMLInputElement> & {
+interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
-  error?: string;
   hint?: string;
-};
+  error?: string;
+}
 
-const Input = forwardRef<HTMLInputElement, Props>(
-  ({ label, error, hint, className = "", id, ...props }, ref) => {
+export const Input = forwardRef<HTMLInputElement, InputProps>(
+  ({ label, hint, error, className, id, ...props }, ref) => {
     const inputId = id || props.name;
 
     return (
@@ -15,7 +16,7 @@ const Input = forwardRef<HTMLInputElement, Props>(
         {label && (
           <label
             htmlFor={inputId}
-            className="block text-sm font-medium text-slate-700 mb-1.5"
+            className="block mb-2 text-sm font-medium text-[var(--color-foreground)]"
           >
             {label}
           </label>
@@ -23,27 +24,33 @@ const Input = forwardRef<HTMLInputElement, Props>(
         <input
           ref={ref}
           id={inputId}
-          className={`
-            w-full px-3 py-2
-            bg-white
-            border rounded-lg
-            text-slate-900 placeholder:text-slate-400
-            focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500
-            disabled:bg-slate-50 disabled:text-slate-500
-            ${error ? "border-red-500" : "border-slate-200"}
-            ${className}
-          `}
+          className={cn(
+            'w-full h-11 px-4',
+            'bg-[var(--color-surface)] text-[var(--color-foreground)]',
+            'border rounded-[var(--radius-pill)]',
+            'transition-colors',
+            error
+              ? 'border-[var(--color-error)]'
+              : 'border-[var(--color-border)]',
+            'focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:ring-offset-2 focus:ring-offset-[var(--color-background)]',
+            'disabled:opacity-50 disabled:cursor-not-allowed',
+            className
+          )}
           {...props}
         />
         {hint && !error && (
-          <p className="mt-1 text-xs text-slate-500">{hint}</p>
+          <p className="mt-1.5 text-xs text-[var(--color-muted)] font-body">
+            {hint}
+          </p>
         )}
-        {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+        {error && (
+          <p className="mt-1.5 text-xs text-[var(--color-error)] font-body">
+            {error}
+          </p>
+        )}
       </div>
     );
   }
 );
 
-Input.displayName = "Input";
-
-export default Input;
+Input.displayName = 'Input';

@@ -1,41 +1,33 @@
-import { HTMLAttributes, ReactNode } from "react";
+import { HTMLAttributes, forwardRef } from 'react';
+import { cn } from '@/lib/utils/cn';
 
-type Props = HTMLAttributes<HTMLDivElement> & {
-  children: ReactNode;
-};
-
-export default function Card({ className = "", children, ...props }: Props) {
-  return (
+export const Card = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
+  ({ className, ...props }, ref) => (
     <div
-      className={`
-        bg-white
-        border border-slate-200
-        rounded-xl
-        shadow-sm
-        ${className}
-      `}
+      ref={ref}
+      className={cn(
+        'bg-[var(--color-background)] rounded-2xl shadow-2xl',
+        'border border-white/5',
+        className
+      )}
       {...props}
-    >
-      {children}
-    </div>
-  );
-}
+    />
+  )
+);
+Card.displayName = 'Card';
 
-export function CardHeader({ className = "", children, ...props }: Props) {
-  return (
-    <div
-      className={`px-6 py-4 border-b border-slate-200 ${className}`}
-      {...props}
-    >
-      {children}
-    </div>
-  );
-}
+export const CardHeader = forwardRef<
+  HTMLDivElement,
+  HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div ref={ref} className={cn('p-6 pb-2', className)} {...props} />
+));
+CardHeader.displayName = 'CardHeader';
 
-export function CardBody({ className = "", children, ...props }: Props) {
-  return (
-    <div className={`p-6 ${className}`} {...props}>
-      {children}
-    </div>
-  );
-}
+export const CardBody = forwardRef<
+  HTMLDivElement,
+  HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div ref={ref} className={cn('p-6', className)} {...props} />
+));
+CardBody.displayName = 'CardBody';
