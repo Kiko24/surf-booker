@@ -9,20 +9,33 @@ create table profiles (
   user_id uuid primary key references auth.users(id) on delete cascade,
   full_name text not null,
   phone text not null,
+  country text not null default 'PT',
+  role text not null default 'client',
   accepted_terms_at timestamptz not null,
   accepted_privacy_at timestamptz not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
 
   constraint profiles_full_name_check
-    check (char_length(btrim(full_name)) between 1 and 120),
+  check (
+    char_length(btrim(full_name)) between 2 and 80
+    and full_name ~ '\S+\s+\S+'
+  ),
 
   constraint profiles_phone_check
     check (
       char_length(btrim(phone)) between 6 and 20
       and phone ~ '^[0-9+() /.\-]+$'
-    )
+    ),
+
+  constraint profiles_country_check
+    check (country ~ '^[A-Z]{2}$'),
+
+  constraint profiles_role_check
+    check (role in ('owner', 'client', 'staff'))
 );
+
+create index profiles_role_idx on profiles(role);
 
 create trigger profiles_updated_at
   before update on profiles
@@ -76,7 +89,7 @@ alter table schools
     check (logo_url is null or char_length(logo_url) <= 500);
 
 -- ============================================================
--- SESSIONS — class_type_id (snapshot mantém-se em price_cents)
+-- SESSIONS — class_type_id
 -- ============================================================
 alter table sessions
   add column class_type_id uuid;
@@ -90,14 +103,14 @@ alter table sessions
 create index sessions_class_type_id_idx on sessions(class_type_id);
 
 -- ============================================================
--- RLS
+-- RLS — enable
 -- ============================================================
 alter table profiles enable row level security;
 alter table class_types enable row level security;
 
--- ----------------------------
--- profiles
--- ----------------------------
+-- ============================================================
+-- RLS — profiles
+-- ============================================================
 drop policy if exists profiles_select_own on profiles;
 drop policy if exists profiles_insert_own on profiles;
 drop policy if exists profiles_update_own on profiles;
@@ -114,16 +127,21 @@ create policy profiles_insert_own
   to authenticated
   with check (user_id = auth.uid());
 
+-- Update permitido apenas para dados pessoais.
+-- Role NÃO pode ser alterado pelo próprio user (só via service role).
 create policy profiles_update_own
   on profiles
   for update
   to authenticated
   using (user_id = auth.uid())
-  with check (user_id = auth.uid());
+  with check (
+    user_id = auth.uid()
+    and role = (select p.role from profiles p where p.user_id = auth.uid())
+  );
 
--- ----------------------------
--- class_types
--- ----------------------------
+-- ============================================================
+-- RLS — class_types
+-- ============================================================
 drop policy if exists class_types_select_owner on class_types;
 drop policy if exists class_types_insert_owner on class_types;
 drop policy if exists class_types_update_owner on class_types;

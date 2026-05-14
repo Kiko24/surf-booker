@@ -1,6 +1,16 @@
-export function AuthFooter() {
+type AuthFooterProps = {
+  variant?: "default" | "inline";
+};
+
+export function AuthFooter({ variant = "default" }: AuthFooterProps) {
   return (
-    <footer className="flex items-center justify-center gap-3 py-6 text-sm text-accent">
+    <footer
+      className={
+        variant === "inline"
+          ? "flex items-center justify-center gap-3 text-sm text-accent"
+          : "flex items-center justify-center gap-3 py-6 text-sm text-accent"
+      }
+    >
       <button
         type="button"
         className="flex items-center gap-1 hover:opacity-80 transition-opacity"

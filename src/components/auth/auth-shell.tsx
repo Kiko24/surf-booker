@@ -1,10 +1,15 @@
+"use client";
+
+import Image from "next/image";
 import Link from "next/link";
+import surfImage from "@/components/images/transferir.webp";
 import { AuthFooter } from "./auth-footer";
 
 type AuthShellProps = {
   children: React.ReactNode;
   backHref?: string;
   onBack?: () => void;
+  showLogo?: boolean;
 };
 
 function ArrowLeftIcon({ className }: { className?: string }) {
@@ -26,38 +31,119 @@ function ArrowLeftIcon({ className }: { className?: string }) {
   );
 }
 
-export function AuthShell({ children, backHref, onBack }: AuthShellProps) {
+export function AuthShell({
+  children,
+  backHref,
+  onBack,
+  showLogo = true,
+}: AuthShellProps) {
   const backButtonClasses =
-    "inline-flex h-9 w-9 items-center justify-center rounded-full border border-border text-accent hover:bg-surface transition-colors";
+    "inline-flex h-8 w-8 items-center justify-center rounded-full border border-foreground text-foreground hover:bg-surface active:bg-surface transition-colors touch-manipulation cursor-pointer select-none";
+
+  const hasBack = Boolean(backHref || onBack);
+  const showTopBar = hasBack || showLogo;
 
   return (
-    <div className="min-h-dvh flex flex-col bg-background text-foreground font-body">
-      <main className="flex-1 flex items-center justify-center px-4 py-8">
-        <div className="w-full max-w-md">
-          <div className="relative rounded-2xl bg-surface p-6 sm:p-8">
-            {(backHref || onBack) && (
-              <div className="absolute left-4 top-4">
-                {backHref ? (
-                  <Link href={backHref} aria-label="Voltar" className={backButtonClasses}>
-                    <ArrowLeftIcon className="h-4 w-4" />
-                  </Link>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={onBack}
-                    aria-label="Voltar"
-                    className={backButtonClasses}
-                  >
-                    <ArrowLeftIcon className="h-4 w-4" />
-                  </button>
+    <div className="relative min-h-svh min-h-dvh bg-background text-foreground font-body lg:h-svh lg:overflow-hidden">
+      <div
+        className="
+          relative z-10 flex min-h-svh min-h-dvh flex-col
+          lg:h-svh lg:grid lg:grid-cols-[3fr_2fr] lg:gap-6 lg:p-6
+        "
+      >
+        {/* === Imagem esquerda (só desktop) — 60% === */}
+        <div className="hidden lg:block relative h-full w-full overflow-hidden rounded-3xl">
+          <Image
+            src={surfImage}
+            alt=""
+            fill
+            priority
+            quality={90}
+            placeholder="blur"
+            sizes="(min-width: 1024px) 60vw, 0px"
+            className="object-cover"
+          />
+        </div>
+
+        {/* === Painel direito — 40% === */}
+        <div
+          className="
+            flex flex-1 flex-col
+            lg:flex-none lg:h-full lg:min-h-0 lg:bg-surface lg:rounded-3xl lg:overflow-hidden
+          "
+        >
+          <main
+            className="
+              flex-1 flex justify-center px-3 pb-8
+              lg:px-4 lg:pt-6 lg:pb-0 lg:overflow-y-auto
+            "
+            style={{
+              paddingTop: "max(1rem, env(safe-area-inset-top))",
+              paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
+            }}
+          >
+            <div className="w-full max-w-md lg:max-w-sm lg:h-full lg:flex lg:flex-col lg:mx-auto">
+              <div
+                className="
+                  relative rounded-2xl bg-background px-5 pt-3 pb-5
+                  sm:px-6 sm:pt-4 sm:pb-6
+                  lg:bg-transparent lg:p-0 lg:rounded-none
+                  lg:flex lg:flex-1 lg:flex-col
+                "
+              >
+                {showTopBar && (
+                  <div className="mb-4 flex items-center justify-between lg:mb-6">
+                    {hasBack ? (
+                      backHref ? (
+                        <Link
+                          href={backHref}
+                          aria-label="Voltar"
+                          className={backButtonClasses}
+                        >
+                          <ArrowLeftIcon className="h-3.5 w-3.5 pointer-events-none" />
+                        </Link>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={onBack}
+                          onTouchEnd={(e) => {
+                            e.preventDefault();
+                            onBack?.();
+                          }}
+                          aria-label="Voltar"
+                          className={backButtonClasses}
+                        >
+                          <ArrowLeftIcon className="h-3.5 w-3.5 pointer-events-none" />
+                        </button>
+                      )
+                    ) : (
+                      <span aria-hidden />
+                    )}
+
+                    {showLogo && (
+                      <Link
+                        href="/"
+                        className="font-heading text-lg font-medium tracking-wide text-foreground hover:opacity-80 transition-opacity touch-manipulation lg:hidden"
+                      >
+                        SurfBooker
+                      </Link>
+                    )}
+                  </div>
                 )}
+                {children}
               </div>
-            )}
-            {children}
+            </div>
+          </main>
+
+          <div className="hidden lg:block lg:px-8 lg:pb-6">
+            <AuthFooter variant="inline" />
           </div>
         </div>
-      </main>
-      <AuthFooter />
+
+        <div className="lg:hidden">
+          <AuthFooter />
+        </div>
+      </div>
     </div>
   );
 }

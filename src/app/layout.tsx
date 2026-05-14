@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Oswald, Lato } from 'next/font/google';
 import './global.css';
 
@@ -21,6 +21,15 @@ export const metadata: Metadata = {
   description: 'Marca sessões facilmente.',
 };
 
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: 'cover',
+  themeColor: '#1E1E1E',
+};
+
 export default function RootLayout({
   children,
 }: {
@@ -28,7 +37,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-PT" className={`${oswald.variable} ${lato.variable}`}>
-      <body>{children}</body>
+      <body className="bg-background text-foreground antialiased">
+        {children}
+      </body>
     </html>
   );
 }
