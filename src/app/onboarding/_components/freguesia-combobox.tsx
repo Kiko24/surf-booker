@@ -17,7 +17,7 @@ export function FreguesiaCombobox({
   onChange,
   error,
   label = "Localização",
-  placeholder = "Pesquisa a tua freguesia",
+  placeholder = "Pesquisa a tua localização",
 }: Props) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState(value);

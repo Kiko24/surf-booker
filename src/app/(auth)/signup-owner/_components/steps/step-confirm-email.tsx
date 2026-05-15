@@ -69,7 +69,7 @@ export function StepConfirmEmail({ email }: Props) {
 
   return (
     <div className="flex flex-col gap-6 text-center">
-      <header className="mt-2">
+      <header className="mt-2 lg:mt-12">
         <h1 className="font-heading text-2xl font-medium">
           Confirma o teu email
         </h1>
@@ -110,7 +110,7 @@ export function StepConfirmEmail({ email }: Props) {
             ? `Reenviar email (${cooldown}s)`
             : pending
               ? "A reenviar..."
-              : "Reenviar email"}
+              : "Não recebeste? Reenviar email"}
         </button>
 
         {feedback && (

@@ -88,7 +88,7 @@ export function OnboardingForm({ ownerName }: Props) {
           </p>
         </header>
 
-        <form onSubmit={handleSubmit} noValidate className="mt-4 flex flex-col gap-5">
+        <form onSubmit={handleSubmit} noValidate className="mt-4 flex flex-col gap-5 lg:mt-4">
           <Input
             label="Nome do negócio"
             name="name"
@@ -105,22 +105,26 @@ export function OnboardingForm({ ownerName }: Props) {
           />
 
           <div>
-            <label className="mb-2 block text-sm font-medium text-foreground">
-              Sobre <span className="text-text-muted">(opcional)</span>
-            </label>
-            <textarea
-              name="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Conta-nos um pouco sobre a tua escola..."
-              rows={4}
-              maxLength={1000}
-              className="w-full rounded-lg border border-border bg-surface px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-background"
-            />
-            {errors.description && (
-              <p className="mt-1.5 text-xs text-error">{errors.description}</p>
-            )}
-          </div>
+  <label className="mb-2 block text-sm font-medium text-foreground">
+    Sobre <span className="text-text-muted">(opcional)</span>
+  </label>
+
+  <div className="rounded-lg border border-border bg-surface px-4 py-3 focus-within:ring-2 focus-within:ring-accent focus-within:ring-offset-2 focus-within:ring-offset-background">
+    <textarea
+      name="description"
+      value={description}
+      onChange={(e) => setDescription(e.target.value)}
+      placeholder="Conta-nos um pouco sobre a tua escola..."
+      rows={3}
+      maxLength={1000}
+      className="w-full resize-none bg-transparent leading-relaxed text-foreground focus:outline-none"
+    />
+  </div>
+
+  {errors.description && (
+    <p className="mt-1.5 text-xs text-error">{errors.description}</p>
+  )}
+</div>
 
           <LogoUploader onChange={setLogoFile} error={errors.logo} />
 

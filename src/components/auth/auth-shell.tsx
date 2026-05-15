@@ -1,8 +1,8 @@
 "use client";
 
-import Image from "next/image";
+import Image, { type StaticImageData } from "next/image";
 import Link from "next/link";
-import surfImage from "@/components/images/transferir.webp";
+import defaultImage from "@/components/images/transferir.webp";
 import { AuthFooter } from "./auth-footer";
 
 type AuthShellProps = {
@@ -10,6 +10,7 @@ type AuthShellProps = {
   backHref?: string;
   onBack?: () => void;
   showLogo?: boolean;
+  image?: StaticImageData;
 };
 
 function ArrowLeftIcon({ className }: { className?: string }) {
@@ -36,6 +37,7 @@ export function AuthShell({
   backHref,
   onBack,
   showLogo = true,
+  image = defaultImage,
 }: AuthShellProps) {
   const backButtonClasses =
     "inline-flex h-8 w-8 items-center justify-center rounded-full border border-foreground text-foreground hover:bg-surface active:bg-surface transition-colors touch-manipulation cursor-pointer select-none";
@@ -54,7 +56,7 @@ export function AuthShell({
         {/* === Imagem esquerda (só desktop) — 60% === */}
         <div className="hidden lg:block relative h-full w-full overflow-hidden rounded-3xl">
           <Image
-            src={surfImage}
+            src={image}
             alt=""
             fill
             priority
@@ -65,24 +67,48 @@ export function AuthShell({
           />
         </div>
 
-        {/* === Painel direito — 40% === */}
+        {/* === Painel direito — 40% (scroll inclui footer) === */}
         <div
           className="
             flex flex-1 flex-col
-            lg:flex-none lg:h-full lg:min-h-0 lg:bg-surface lg:rounded-3xl lg:overflow-hidden
+            lg:flex-none lg:h-full lg:min-h-0 lg:bg-surface lg:rounded-3xl lg:overflow-y-auto
           "
         >
           <main
             className="
               flex-1 flex justify-center px-3 pb-8
-              lg:px-4 lg:pt-6 lg:pb-0 lg:overflow-y-auto
+              lg:relative lg:px-10 lg:pt-6 lg:pb-0
             "
             style={{
               paddingTop: "max(1rem, env(safe-area-inset-top))",
               paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
             }}
           >
-            <div className="w-full max-w-md lg:max-w-sm lg:h-full lg:flex lg:flex-col lg:mx-auto">
+            {/* Back button absolute SÓ em desktop */}
+            {hasBack && (
+              <div className="hidden lg:block lg:absolute lg:top-6 lg:left-6 lg:z-10">
+                {backHref ? (
+                  <Link
+                    href={backHref}
+                    aria-label="Voltar"
+                    className={backButtonClasses}
+                  >
+                    <ArrowLeftIcon className="h-3.5 w-3.5 pointer-events-none" />
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={onBack}
+                    aria-label="Voltar"
+                    className={backButtonClasses}
+                  >
+                    <ArrowLeftIcon className="h-3.5 w-3.5 pointer-events-none" />
+                  </button>
+                )}
+              </div>
+            )}
+
+            <div className="w-full max-w-md lg:max-w-md lg:h-full lg:flex lg:flex-col">
               <div
                 className="
                   relative rounded-2xl bg-background px-5 pt-3 pb-5
@@ -91,8 +117,9 @@ export function AuthShell({
                   lg:flex lg:flex-1 lg:flex-col
                 "
               >
+                {/* Top bar SÓ em mobile */}
                 {showTopBar && (
-                  <div className="mb-4 flex items-center justify-between lg:mb-6">
+                  <div className="mb-4 flex items-center justify-between lg:hidden">
                     {hasBack ? (
                       backHref ? (
                         <Link
@@ -123,7 +150,7 @@ export function AuthShell({
                     {showLogo && (
                       <Link
                         href="/"
-                        className="font-heading text-lg font-medium tracking-wide text-foreground hover:opacity-80 transition-opacity touch-manipulation lg:hidden"
+                        className="font-heading text-lg font-medium tracking-wide text-foreground hover:opacity-80 transition-opacity touch-manipulation"
                       >
                         SurfBooker
                       </Link>
@@ -135,7 +162,7 @@ export function AuthShell({
             </div>
           </main>
 
-          <div className="hidden lg:block lg:px-8 lg:pb-6">
+          <div className="hidden lg:block lg:px-8 lg:py-6">
             <AuthFooter variant="inline" />
           </div>
         </div>

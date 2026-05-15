@@ -6,6 +6,7 @@ import { StepTransition } from "@/components/auth/step-transition";
 import { StepEmail } from "./steps/step-email";
 import { StepPersonal } from "./steps/step-personal";
 import { StepConfirmEmail } from "./steps/step-confirm-email";
+import bgPros from "@/components/images/bg_pros.png";
 
 type Step = "email" | "personal" | "confirm-email";
 
@@ -31,28 +32,27 @@ export function SignupOwnerWizard() {
     }
   }
 
-  // Step 1: navegação real → usa backHref (funciona sempre em mobile)
-  // Step 2/3: navegação interna → usa onBack
   const isFirstStep = step === "email";
 
   return (
     <AuthShell
       backHref={isFirstStep ? "/user-flow" : undefined}
       onBack={isFirstStep ? undefined : handleBackInternal}
+      image={bgPros}
     >
       <StepTransition stepKey={step} direction={direction}>
         {step === "email" && (
-  <StepEmail
-    defaultEmail={email}
-    onSubmit={(value) => {
-      console.log("[Wizard] received email:", value);
-      setEmail(value);
-      console.log("[Wizard] calling goTo personal");
-      goTo("personal");
-      console.log("[Wizard] step should be personal now");
-    }}
-  />
-)}
+          <StepEmail
+            defaultEmail={email}
+            onSubmit={(value) => {
+              console.log("[Wizard] received email:", value);
+              setEmail(value);
+              console.log("[Wizard] calling goTo personal");
+              goTo("personal");
+              console.log("[Wizard] step should be personal now");
+            }}
+          />
+        )}
         {step === "personal" && (
           <StepPersonal
             email={email}
