@@ -77,10 +77,10 @@ export async function createSchool(
   const logoFile = formData.get("logo") as File | null;
 
   const parsed = onboardingSchema.safeParse({
-    name: rawName,
-    location: rawLocation,
-    description: rawDescription,
-  });
+  name: typeof rawName === "string" ? rawName : "",
+  location: typeof rawLocation === "string" ? rawLocation : "",
+  description: typeof rawDescription === "string" ? rawDescription : undefined,
+});
 
   if (!parsed.success) {
     const issue = parsed.error.issues[0];

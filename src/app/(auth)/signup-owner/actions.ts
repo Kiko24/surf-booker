@@ -37,9 +37,33 @@ function normalizeAuthError(message?: string) {
     };
   }
 
-  if (msg.includes("rate limit")) {
+  if (msg.includes("rate limit") || msg.includes("too many requests")) {
     return {
       error: "Já enviámos um email há pouco. Tenta novamente dentro de alguns minutos.",
+    };
+  }
+
+  if (msg.includes("invalid login credentials") || msg.includes("invalid email or password")) {
+    return {
+      error: "Email ou password incorretos",
+    };
+  }
+
+  if (msg.includes("email not confirmed")) {
+    return {
+      error: "Confirma o teu email antes de iniciar sessão",
+    };
+  }
+
+  if (msg.includes("expired") || msg.includes("invalid token")) {
+    return {
+      error: "Este link expirou. Pede um novo.",
+    };
+  }
+
+  if (msg.includes("network") || msg.includes("fetch")) {
+    return {
+      error: "Erro de ligação. Verifica a tua internet e tenta novamente.",
     };
   }
 
@@ -83,6 +107,7 @@ export async function signupOwner(
   console.log("[signupOwner] signUp result", {
     hasUser: !!signUpData.user,
     userId: signUpData.user?.id,
+    identitiesCount: signUpData.user?.identities?.length ?? 0,
     error: signUpError?.message,
   });
 
@@ -93,6 +118,20 @@ export async function signupOwner(
       ok: false,
       error: normalized.error,
       field: normalized.field,
+    };
+  }
+
+  // 🔒 Email já registado: Supabase mascara devolvendo user com identities vazio
+  // (proteção anti-enumeration deles). Detectamos para mostrar UI correcta no Step 2.
+  const identities = signUpData.user?.identities ?? [];
+  if (identities.length === 0) {
+    console.warn("[signupOwner] email already registered (masked by Supabase)", {
+      email,
+    });
+    return {
+      ok: false,
+      error: "Já existe uma conta com este email",
+      field: "email",
     };
   }
 
@@ -126,6 +165,19 @@ export async function signupOwner(
 
   if (profileError) {
     console.error("[signupOwner] profile insert failed", profileError);
+
+    const isDuplicate =
+      profileError.code === "23505" ||
+      profileError.message?.toLowerCase().includes("duplicate key") ||
+      profileError.message?.toLowerCase().includes("unique constraint");
+
+    if (isDuplicate) {
+      return {
+        ok: false,
+        error: "Já existe uma conta com este email",
+        field: "email" as const,
+      };
+    }
 
     const { error: deleteError } = await admin.auth.admin.deleteUser(userId);
 

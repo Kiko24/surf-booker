@@ -16,7 +16,6 @@ export const onboardingSchema = z.object({
     .trim()
     .max(1000, "Descrição demasiado longa")
     .optional()
-    .or(z.literal("")),
 });
 
 export type OnboardingInput = z.infer<typeof onboardingSchema>;

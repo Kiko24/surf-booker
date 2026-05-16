@@ -84,7 +84,7 @@ export function LoginForm({ nextPath }: Props) {
 
   return (
     <AuthShell backHref="/user-flow">
-      <header className="mt-2 text-center">
+      <header className="mt-2 text-center lg:mt-12">
         <h1 className="font-heading text-2xl font-medium">Bem-vindo de volta!</h1>
         <p className="mt-2 text-sm text-text-secondary">
           Inicia sessão para continuar.

@@ -23,12 +23,12 @@ const options: Option[] = [
 export default function UserFlowPage() {
   return (
     <AuthShell backHref="/">
-      <div className="mt-2 lg:mt-0 lg:flex lg:flex-1 lg:flex-col lg:justify-start lg:pt-20">
+      <div className="mt-2 lg:flex lg:flex-1 lg:flex-col lg:justify-start lg:mt-12">
         <h1 className="text-center text-2xl font-heading font-medium lg:text-2xl">
           Registe-se / Iniciar sessão
         </h1>
 
-        <div className="mt-10 flex flex-col gap-6 lg:mt-8 lg:gap-3">
+        <div className="mt-10 flex flex-col gap-6 lg:mt-8 lg:gap-6">
           {options.map((opt) => (
             <Link
               key={opt.title}

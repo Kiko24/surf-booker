@@ -22,14 +22,17 @@ function normalizeLoginError(message?: string): {
     };
   }
 
-  if (msg.includes("invalid login credentials") || msg.includes("invalid")) {
+  if (
+    msg.includes("invalid login credentials") ||
+    msg.includes("invalid email or password")
+  ) {
     return {
       error: "Email ou password incorretos.",
       code: "invalid_credentials",
     };
   }
 
-  if (msg.includes("rate limit")) {
+  if (msg.includes("rate limit") || msg.includes("too many")) {
     return {
       error: "Demasiadas tentativas. Tenta novamente daqui a uns minutos.",
       code: "rate_limit",
@@ -116,12 +119,21 @@ export async function resendConfirmationFromLogin(
 
   if (error) {
     const msg = error.message.toLowerCase();
-    if (msg.includes("rate limit")) {
+
+    if (msg.includes("rate limit") || msg.includes("too many")) {
       return {
         ok: false,
         error: "Já enviámos um email há pouco. Tenta novamente dentro de alguns minutos.",
       };
     }
+
+    if (msg.includes("already confirmed")) {
+      return {
+        ok: false,
+        error: "Esta conta já está confirmada. Faz login normalmente.",
+      };
+    }
+
     return { ok: false, error: "Erro ao reenviar email." };
   }
 

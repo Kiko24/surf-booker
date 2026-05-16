@@ -30,7 +30,7 @@ export function StepEmail({ defaultEmail = "", onSubmit }: Props) {
   }
 
   return (
-    <div>
+    <div className="lg:mt-12">
       <header className="mt-2 text-center">
         <h1 className="font-heading text-2xl font-medium">Marca sessões facilmente</h1>
         <p className="mt-2 text-sm text-text-secondary">
@@ -38,7 +38,7 @@ export function StepEmail({ defaultEmail = "", onSubmit }: Props) {
         </p>
       </header>
 
-      <div className="mt-8">
+      <div className="mt-10 lg:mt-6">
         <Input
           type="email"
           name="email"
@@ -59,7 +59,7 @@ export function StepEmail({ defaultEmail = "", onSubmit }: Props) {
           error={error}
         />
 
-        <div className="mt-10">
+        <div className="mt-10 lg:mt-6">
           <Button type="button" onClick={handleContinue} fullWidth>
             Continuar
           </Button>
