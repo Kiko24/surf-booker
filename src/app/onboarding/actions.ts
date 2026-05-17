@@ -3,8 +3,23 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { onboardingSchema } from "@/lib/validation/onboarding";
 import { slugify } from "@/lib/utils/slug";
+import { validateImageContent } from "@/lib/utils/validate-image";
+
+const ALLOWED_LOGO_MIMES = ["image/png", "image/jpeg", "image/webp"];
+
+async function ensureBucketExists(admin: SupabaseClient) {
+  const { data: buckets } = await admin.storage.listBuckets();
+  if (buckets?.find((b) => b.name === "school-logos")) return;
+
+  await admin.storage.createBucket("school-logos", {
+    public: true,
+    allowedMimeTypes: ALLOWED_LOGO_MIMES,
+    fileSizeLimit: 2 * 1024 * 1024,
+  });
+}
 
 export type CreateSchoolInput = {
   name: string;
@@ -77,10 +92,13 @@ export async function createSchool(
   const logoFile = formData.get("logo") as File | null;
 
   const parsed = onboardingSchema.safeParse({
-  name: typeof rawName === "string" ? rawName : "",
-  location: typeof rawLocation === "string" ? rawLocation : "",
-  description: typeof rawDescription === "string" ? rawDescription : undefined,
-});
+    name: typeof rawName === "string" ? rawName : "",
+    location: typeof rawLocation === "string" ? rawLocation : "",
+    description:
+      typeof rawDescription === "string" && rawDescription.length > 0
+        ? rawDescription
+        : undefined,
+  });
 
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
@@ -105,18 +123,17 @@ export async function createSchool(
 
   const slug = await ensureUniqueSlug(admin, baseSlug);
 
+  // ============================================================
+  // Validação e upload de logo
+  // ============================================================
   let logoUrl: string | null = null;
+  let logoExt: string | null = null;
 
   if (logoFile && logoFile.size > 0) {
-    const allowedTypes = ["image/png", "image/jpeg", "image/webp"];
-    if (!allowedTypes.includes(logoFile.type)) {
-      return {
-        ok: false,
-        error: "Formato de imagem inválido (usa PNG, JPG ou WEBP)",
-        field: "logo",
-      };
-    }
+    // 0. Garante que o bucket existe
+    await ensureBucketExists(admin);
 
+    // 1. Tamanho primeiro (validação barata)
     if (logoFile.size > 2 * 1024 * 1024) {
       return {
         ok: false,
@@ -125,14 +142,34 @@ export async function createSchool(
       };
     }
 
-    const ext = logoFile.type.split("/")[1].replace("jpeg", "jpg");
-    const path = `${user.id}/logo.${ext}`;
+    // 2. Valida conteúdo real (magic bytes)
+    // Não confiar no MIME type vindo do browser — pode ser forjado
+    // (ex: renomear texto.txt → logo.png envia type: "image/png" falso)
+    let validation;
+    try {
+      validation = await validateImageContent(logoFile);
+    } catch (err) {
+      console.error("[createSchool] validateImageContent threw", err);
+      return { ok: false, error: "Erro ao validar a imagem.", field: "logo" };
+    }
+    if (!validation.ok) {
+      return {
+        ok: false,
+        error: validation.reason,
+        field: "logo",
+      };
+    }
+
+    // 3. Usa o MIME REAL detectado (não o vindo do browser)
+    const realMime = validation.mime;
+    logoExt = realMime.split("/")[1].replace("jpeg", "jpg");
+    const path = `${user.id}/logo.${logoExt}`;
 
     const { error: uploadError } = await admin.storage
       .from("school-logos")
       .upload(path, logoFile, {
         upsert: true,
-        contentType: logoFile.type,
+        contentType: realMime, // força MIME validado, não confia no browser
       });
 
     if (uploadError) {
@@ -147,6 +184,9 @@ export async function createSchool(
     logoUrl = publicUrl.publicUrl;
   }
 
+  // ============================================================
+  // Insert da escola
+  // ============================================================
   const { error: insertError } = await admin.from("schools").insert({
     owner_user_id: user.id,
     name,
@@ -161,11 +201,11 @@ export async function createSchool(
   if (insertError) {
     console.error("[createSchool] insert failed", insertError);
 
-    if (logoUrl) {
-      const ext = logoFile?.type.split("/")[1].replace("jpeg", "jpg");
+    // Cleanup do logo se insert falhar
+    if (logoUrl && logoExt) {
       await admin.storage
         .from("school-logos")
-        .remove([`${user.id}/logo.${ext}`]);
+        .remove([`${user.id}/logo.${logoExt}`]);
     }
 
     return { ok: false, error: "Erro ao criar a escola. Tenta novamente." };

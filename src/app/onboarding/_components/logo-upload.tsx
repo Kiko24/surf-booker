@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef, useState } from "react";
-import Image from "next/image";
 import { cn } from "@/lib/utils/cn";
 
 type Props = {
@@ -50,7 +49,7 @@ export function LogoUploader({ onChange, error, label = "Logo" }: Props) {
   )}
 >
   {preview ? (
-    <Image
+    <img
       src={preview}
       alt="Preview do logo"
       width={80}
