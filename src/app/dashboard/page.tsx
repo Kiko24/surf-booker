@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { DashboardView } from "./_components/dashboard-view";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -9,10 +10,11 @@ export default async function DashboardPage() {
 
   if (!user) redirect("/login");
 
-  return (
-    <div className="min-h-svh bg-background p-8 text-foreground font-body">
-      <h1 className="font-heading text-3xl font-medium">Dashboard</h1>
-      <p className="mt-2 text-text-secondary">Em construção.</p>
-    </div>
-  );
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name")
+    .eq("user_id", user.id)
+    .single();
+
+  return <DashboardView fullName={profile?.full_name ?? "Utilizador"} />;
 }

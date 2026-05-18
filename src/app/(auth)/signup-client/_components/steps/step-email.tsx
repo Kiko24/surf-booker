@@ -30,7 +30,7 @@ export function StepEmail({ defaultEmail = "", onSubmit }: Props) {
   }
 
   return (
-    <div className="lg:mt-12">
+    <div className="lg:mt-8">
       <header className="mt-2 text-center">
         <h1 className="font-heading text-2xl font-medium">Marca sessões facilmente</h1>
         <p className="mt-2 text-sm text-text-secondary">

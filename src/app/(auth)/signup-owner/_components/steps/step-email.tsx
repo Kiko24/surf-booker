@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Divider } from "@/components/auth/divider";
@@ -16,25 +16,32 @@ type Props = {
 export function StepEmail({ defaultEmail = "", onSubmit }: Props) {
   const [email, setEmail] = useState(defaultEmail);
   const [error, setError] = useState<string | undefined>();
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const emailRef = useRef(email);
+  const onSubmitRef = useRef(onSubmit);
+  emailRef.current = email;
+  onSubmitRef.current = onSubmit;
 
-  function handleContinue() {
-    console.log("[StepEmail] submit, email:", email);
+  useEffect(() => {
+    const btn = buttonRef.current;
+    if (!btn) return;
 
-    const result = emailStepSchema.safeParse({ email });
-    console.log("[StepEmail] validation:", result.success);
-
-    if (!result.success) {
-      setError(result.error.issues[0]?.message ?? "Email inválido");
-      return;
+    function handleClick() {
+      const result = emailStepSchema.safeParse({ email: emailRef.current });
+      if (!result.success) {
+        setError(result.error.issues[0]?.message ?? "Email inválido");
+        return;
+      }
+      setError(undefined);
+      onSubmitRef.current(result.data.email);
     }
 
-    setError(undefined);
-    console.log("[StepEmail] calling onSubmit with:", result.data.email);
-    onSubmit(result.data.email);
-  }
+    btn.addEventListener("click", handleClick);
+    return () => btn.removeEventListener("click", handleClick);
+  }, []);
 
   return (
-    <div className="lg:mt-12">
+    <div className="lg:mt-8">
       <header className="text-center">
         <h1 className="font-heading text-2xl font-medium">Tem o seu negócio?</h1>
         <p className="mt-2 text-sm text-text-secondary">
@@ -57,14 +64,20 @@ export function StepEmail({ defaultEmail = "", onSubmit }: Props) {
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
-              handleContinue();
+              const result = emailStepSchema.safeParse({ email: emailRef.current });
+              if (!result.success) {
+                setError(result.error.issues[0]?.message ?? "Email inválido");
+                return;
+              }
+              setError(undefined);
+              onSubmitRef.current(result.data.email);
             }
           }}
           error={error}
         />
 
         <div className="mt-10 lg:mt-6">
-          <Button type="button" onClick={handleContinue} fullWidth>
+          <Button type="button" ref={buttonRef} fullWidth>
             Continuar
           </Button>
         </div>

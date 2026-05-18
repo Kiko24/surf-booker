@@ -8,7 +8,7 @@ export function AuthFooter({ variant = "default" }: AuthFooterProps) {
       className={
         variant === "inline"
           ? "flex items-center justify-center gap-3 text-sm text-accent"
-          : "flex items-center justify-center gap-3 py-6 text-sm text-accent"
+          : "flex items-center justify-center gap-3 pt-2 pb-4 text-sm text-accent"
       }
     >
       <button

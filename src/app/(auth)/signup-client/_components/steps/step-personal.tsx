@@ -93,7 +93,7 @@ export function StepPersonal({ email, onSuccess, onEmailConflict }: Props) {
   }
 
   return (
-    <div className="flex flex-col gap-6 lg:mt-12 lg:gap-2">
+    <div className="flex flex-col gap-6 lg:mt-8 lg:gap-2">
       <header className="mt-2">
         <h1 className="font-heading text-2xl font-medium">Falta só um pouco!</h1>
         <p className="mt-1 text-sm text-text-secondary">
@@ -173,7 +173,7 @@ export function StepPersonal({ email, onSuccess, onEmailConflict }: Props) {
             type="checkbox"
             checked={acceptedTerms}
             onChange={(e) => setAcceptedTerms(e.target.checked)}
-            className="mt-1 h-4 w-4 cursor-pointer accent-accent"
+            className="mt-[1px] h-4 w-4 cursor-pointer accent-accent"
           />
           <span>
             Confirmo que aceito os{" "}

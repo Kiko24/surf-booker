@@ -4,6 +4,7 @@ import Image, { type StaticImageData } from "next/image";
 import Link from "next/link";
 import defaultImage from "@/components/images/transferir.webp";
 import { AuthFooter } from "./auth-footer";
+import { cn } from "@/lib/utils/cn";
 
 type AuthShellProps = {
   children: React.ReactNode;
@@ -11,6 +12,7 @@ type AuthShellProps = {
   onBack?: () => void;
   showLogo?: boolean;
   image?: StaticImageData;
+  mainClassName?: string;
 };
 
 function ArrowLeftIcon({ className }: { className?: string }) {
@@ -38,6 +40,7 @@ export function AuthShell({
   onBack,
   showLogo = true,
   image = defaultImage,
+  mainClassName,
 }: AuthShellProps) {
   const backButtonClasses =
     "inline-flex h-8 w-8 items-center justify-center rounded-full border border-foreground text-foreground hover:bg-surface active:bg-surface transition-colors touch-manipulation cursor-pointer select-none";
@@ -75,13 +78,14 @@ export function AuthShell({
           "
         >
           <main
-            className="
-              flex-1 flex justify-center px-3 pb-8
-              lg:relative lg:px-10 lg:pt-6 lg:pb-0
-            "
+            className={cn(
+              "flex-1 flex justify-center px-3 pb-8",
+              "lg:relative lg:px-10 lg:pt-6 lg:pb-0",
+              mainClassName
+            )}
             style={{
-              paddingTop: "max(1rem, env(safe-area-inset-top))",
-              paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
+              paddingTop: "max(0.5rem, env(safe-area-inset-top))",
+              paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))",
             }}
           >
             {/* Back button absolute SÓ em desktop */}
@@ -119,7 +123,7 @@ export function AuthShell({
               >
                 {/* Top bar SÓ em mobile */}
                 {showTopBar && (
-                  <div className="mb-4 flex items-center justify-between lg:hidden">
+                  <div className="mb-2 flex items-center justify-between lg:hidden">
                     {hasBack ? (
                       backHref ? (
                         <Link
@@ -150,7 +154,7 @@ export function AuthShell({
                     {showLogo && (
                       <Link
                         href="/"
-                        className="font-heading text-lg font-medium tracking-wide text-foreground hover:opacity-80 transition-opacity touch-manipulation"
+                        className="font-heading text-lg font-medium tracking-wide text-foreground hover:opacity-80 transition-opacity touch-manipulation hidden"
                       >
                         SurfBooker
                       </Link>
@@ -162,7 +166,7 @@ export function AuthShell({
             </div>
           </main>
 
-          <div className="hidden lg:block lg:px-8 lg:py-6">
+          <div className="hidden lg:block lg:px-8 lg:pt-2 lg:pb-4">
             <AuthFooter variant="inline" />
           </div>
         </div>

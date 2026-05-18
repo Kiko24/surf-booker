@@ -83,15 +83,12 @@ export function LoginForm({ nextPath }: Props) {
   }
 
   return (
-    <AuthShell backHref="/user-flow">
-      <header className="mt-2 text-center lg:mt-12">
+      <AuthShell backHref="/user-flow" mainClassName="pb-0">
+      <header className="mt-2 text-center lg:mt-8">
         <h1 className="font-heading text-2xl font-medium">Bem-vindo de volta!</h1>
-        <p className="mt-2 text-sm text-text-secondary">
-          Inicia sessão para continuar.
-        </p>
       </header>
 
-      <form onSubmit={handleSubmit} noValidate className="mt-8 flex flex-col gap-4">
+      <form onSubmit={handleSubmit} noValidate className="mt-4 flex flex-col gap-4">
         <Input
           label="Email"
           type="email"
@@ -178,7 +175,7 @@ export function LoginForm({ nextPath }: Props) {
         />
       </div>
 
-      <div className="mt-6 text-center text-sm">
+      <div className="mt-3 text-center text-sm">
         <p className="text-text-secondary">Ainda não tens conta?</p>
         <Link
           href="/user-flow"
