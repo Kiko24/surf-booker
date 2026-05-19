@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AlunosView } from "./_components/alunos-view";
+import { getSchoolId, getStudents } from "./actions";
 
 export default async function AlunosPage() {
   const supabase = await createClient();
@@ -16,5 +17,8 @@ export default async function AlunosPage() {
     .eq("user_id", user.id)
     .single();
 
-  return <AlunosView fullName={profile?.full_name ?? "Utilizador"} />;
+  const schoolId = await getSchoolId();
+  const students = schoolId ? await getStudents(schoolId) : [];
+
+  return <AlunosView fullName={profile?.full_name ?? "Utilizador"} students={students} />;
 }

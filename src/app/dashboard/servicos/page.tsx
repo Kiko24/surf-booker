@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { DashboardView } from "./_components/dashboard-view";
-import { getSchoolId, getTodaySessions } from "./actions";
+import { ServicosView } from "./_components/servicos-view";
+import { getSchoolId, getServicos } from "./actions";
 
-export default async function DashboardPage() {
+export default async function ServicosPage() {
   const supabase = await createClient();
   const {
     data: { user },
@@ -18,12 +18,7 @@ export default async function DashboardPage() {
     .single();
 
   const schoolId = await getSchoolId();
-  const todaySessions = schoolId ? await getTodaySessions(schoolId) : [];
+  const sessions = schoolId ? await getServicos(schoolId) : [];
 
-  return (
-    <DashboardView
-      fullName={profile?.full_name ?? "Utilizador"}
-      todaySessions={todaySessions}
-    />
-  );
+  return <ServicosView fullName={profile?.full_name ?? "Utilizador"} sessions={sessions} schoolId={schoolId} />;
 }

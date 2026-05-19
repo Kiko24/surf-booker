@@ -7,41 +7,20 @@ import {
   HomeIcon,
   CalendarIcon,
   GroupIcon,
-  SurfingIcon,
+  SessionsIcon,
   DotsIcon,
 } from "@/app/dashboard/_components/icons";
 
+import { deleteStudent, type StudentRecord } from "../actions";
+
 type Props = {
   fullName: string;
+  students: StudentRecord[];
 };
 
-type Student = {
-  initials: string;
-  name: string;
-  lastClass: string;
-  lastClassDate: string;
-  packsLeft: number;
-  recentClasses: number;
-};
-
-const PLACEHOLDER_STUDENTS: Student[] = [
-  { initials: "MC", name: "Mário Campos", lastClass: "18 Maio 2026", lastClassDate: "2026-05-18", packsLeft: 3, recentClasses: 6 },
-  { initials: "ZG", name: "Zé Gouveia", lastClass: "18 Maio 2026", lastClassDate: "2026-05-18", packsLeft: 1, recentClasses: 4 },
-  { initials: "AF", name: "Ana Ferreira", lastClass: "15 Maio 2026", lastClassDate: "2026-05-15", packsLeft: 10, recentClasses: 8 },
-  { initials: "RS", name: "Rui Silva", lastClass: "14 Maio 2026", lastClassDate: "2026-05-14", packsLeft: 5, recentClasses: 3 },
-  { initials: "JP", name: "Joana Pereira", lastClass: "12 Maio 2026", lastClassDate: "2026-05-12", packsLeft: 2, recentClasses: 5 },
-  { initials: "TM", name: "Tiago Martins", lastClass: "10 Maio 2026", lastClassDate: "2026-05-10", packsLeft: 0, recentClasses: 2 },
-  { initials: "SC", name: "Sofia Costa", lastClass: "8 Maio 2026", lastClassDate: "2026-05-08", packsLeft: 8, recentClasses: 7 },
-  { initials: "LM", name: "Luis Mendes", lastClass: "5 Maio 2026", lastClassDate: "2026-05-05", packsLeft: 1, recentClasses: 1 },
-  { initials: "CR", name: "Catarina Reis", lastClass: "3 Maio 2026", lastClassDate: "2026-05-03", packsLeft: 6, recentClasses: 5 },
-  { initials: "PN", name: "Pedro Nunes", lastClass: "1 Maio 2026", lastClassDate: "2026-05-01", packsLeft: 4, recentClasses: 3 },
-  { initials: "IS", name: "Inês Santos", lastClass: "28 Abril 2026", lastClassDate: "2026-04-28", packsLeft: 12, recentClasses: 9 },
-  { initials: "BF", name: "Bruno Faria", lastClass: "25 Abril 2026", lastClassDate: "2026-04-25", packsLeft: 0, recentClasses: 2 },
-  { initials: "MP", name: "Mónica Pinto", lastClass: "22 Abril 2026", lastClassDate: "2026-04-22", packsLeft: 7, recentClasses: 6 },
-  { initials: "DM", name: "Diogo Marques", lastClass: "20 Abril 2026", lastClassDate: "2026-04-20", packsLeft: 3, recentClasses: 4 },
-  { initials: "AR", name: "Ana Rocha", lastClass: "18 Abril 2026", lastClassDate: "2026-04-18", packsLeft: 9, recentClasses: 5 },
-  { initials: "JC", name: "João Carlos", lastClass: "15 Abril 2026", lastClassDate: "2026-04-15", packsLeft: 2, recentClasses: 2 },
-];
+function getInitials(name: string): string {
+  return name.split(" ").map(p => p[0]).join("").substring(0, 2).toUpperCase();
+}
 
 const FILTERS = ["Todos", "Com pack", "Recorrente", "Inativo"];
 
@@ -49,7 +28,7 @@ const NAV_ITEMS = [
   { href: "/dashboard", label: "Home", icon: HomeIcon },
   { href: "/dashboard/calendario", label: "Calendário", icon: CalendarIcon },
   { href: "/dashboard/alunos", label: "Alunos", icon: GroupIcon },
-  { href: "/dashboard/equipamento", label: "Equipamento", icon: SurfingIcon },
+  { href: "/dashboard/servicos", label: "Serviços", icon: SessionsIcon },
   { href: "/dashboard/mais", label: "Mais", icon: DotsIcon },
 ];
 
@@ -63,18 +42,19 @@ function StatusDot({ active }: { active: boolean }) {
   );
 }
 
-function isInactive(student: Student): boolean {
+function isInactive(student: StudentRecord): boolean {
+  if (!student.classDateRaw) return false;
   const twoMonthsAgo = new Date();
   twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
-  return new Date(student.lastClassDate) < twoMonthsAgo;
+  return new Date(student.classDateRaw) < twoMonthsAgo;
 }
 
-function filterStudents(students: Student[], filter: string): Student[] {
+function filterStudents(students: StudentRecord[], filter: string): StudentRecord[] {
   switch (filter) {
     case "Com pack":
-      return students.filter((s) => s.packsLeft >= 1);
+      return students; // packs not implemented yet
     case "Recorrente":
-      return students.filter((s) => s.recentClasses >= 5);
+      return students; // attendance tracking not implemented yet
     case "Inativo":
       return students.filter((s) => isInactive(s));
     default:
@@ -82,7 +62,7 @@ function filterStudents(students: Student[], filter: string): Student[] {
   }
 }
 
-function searchStudents(students: Student[], query: string): Student[] {
+function searchStudents(students: StudentRecord[], query: string): StudentRecord[] {
   if (!query.trim()) return students;
   const q = query.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   return students.filter((s) =>
@@ -90,14 +70,16 @@ function searchStudents(students: Student[], query: string): Student[] {
   );
 }
 
-export function AlunosView(_props: Props) {
+export function AlunosView({ students }: Props) {
   const pathname = usePathname();
   const [activeFilter, setActiveFilter] = useState("Todos");
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedStudent, setSelectedStudent] = useState<StudentRecord | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  const filteredByFilter = filterStudents(PLACEHOLDER_STUDENTS, activeFilter);
+  const filteredByFilter = filterStudents(students, activeFilter);
   const filtered = searchStudents(filteredByFilter, searchQuery);
 
   useEffect(() => {
@@ -188,11 +170,11 @@ export function AlunosView(_props: Props) {
             <div className="divide-y divide-foreground/10">
               {filtered.map((s) => (
                 <div
-                  key={s.name}
+                  key={s.id}
                   className="flex items-center gap-4 py-3"
                 >
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-background text-lg font-bold text-accent">
-                    {s.initials}
+                    {getInitials(s.name)}
                   </div>
 
                   <div className="flex-1 min-w-0">
@@ -200,38 +182,133 @@ export function AlunosView(_props: Props) {
                       {s.name}
                     </h3>
                     <div className="mt-0.5 text-xs text-text-secondary">
-                      Última aula: {s.lastClass}
+                      {s.classLabel && s.classDate ? `${s.classLabel}: ${s.classDate}` : "Sem aulas"}
                     </div>
                     <div className="text-xs">
-                      Packs:{" "}
-                      {s.packsLeft === 0 ? (
-                        <span className="text-error">Não</span>
-                      ) : s.packsLeft <= 2 ? (
-                        <span className="text-error">{s.packsLeft} {s.packsLeft === 1 ? "aula" : "aulas"} restantes</span>
+                      {s.isGuest ? (
+                        <span className="text-text-muted">Convidado</span>
                       ) : (
-                        <span className="text-foreground">{s.packsLeft} aulas restantes</span>
+                        <span className="text-success">Registado</span>
                       )}
                     </div>
                   </div>
 
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="h-4 w-4 shrink-0 text-text-secondary"
+                  <button
+                    type="button"
+                    onClick={() => setSelectedStudent(s)}
+                    className="flex h-8 w-8 items-center justify-center rounded-full text-text-secondary hover:text-foreground transition-colors"
                   >
-                    <path d="m9 18 6-6-6-6" />
-                  </svg>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="h-4 w-4"
+                    >
+                      <path d="m9 18 6-6-6-6" />
+                    </svg>
+                  </button>
                 </div>
               ))}
             </div>
           </div>
         </div>
       </main>
+
+      {/* Student popup */}
+      {selectedStudent && !showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50">
+          <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-10">
+            <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted" />
+
+            <div className="flex items-center gap-4 mb-6">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-background text-xl font-bold text-accent">
+                {getInitials(selectedStudent.name)}
+              </div>
+              <div>
+                <h3 className="font-heading text-xl font-bold text-foreground">{selectedStudent.name}</h3>
+                <p className="font-body text-sm text-text-secondary">
+                  {selectedStudent.isGuest ? "Convidado" : "Registado"}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {selectedStudent.email && (
+                <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
+                  <p className="font-body text-xs text-text-secondary">Email</p>
+                  <p className="font-body text-sm text-foreground">{selectedStudent.email}</p>
+                </div>
+              )}
+              {selectedStudent.phone && (
+                <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
+                  <p className="font-body text-xs text-text-secondary">Telemóvel</p>
+                  <p className="font-body text-sm text-foreground">{selectedStudent.phone}</p>
+                </div>
+              )}
+              <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
+                <p className="font-body text-xs text-text-secondary">{selectedStudent.classLabel ?? "Aulas"}</p>
+                <p className="font-body text-sm text-foreground">{selectedStudent.classDate ?? "Nenhuma"}</p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowDeleteConfirm(true)}
+              className="mt-6 w-full rounded-xl bg-error/20 py-3 font-body text-sm font-semibold text-error transition-colors hover:bg-error/30"
+            >
+              Eliminar aluno
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedStudent(null)}
+              className="mt-3 w-full rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirmation */}
+      {selectedStudent && showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-5">
+          <div className="w-full max-w-sm rounded-2xl bg-surface p-6 text-center">
+            <p className="font-heading text-xl font-bold text-foreground mb-2">Eliminar aluno</p>
+            <p className="font-body text-sm text-text-secondary mb-6">
+              Tens a certeza que queres eliminar <strong>{selectedStudent.name}</strong>?
+              Esta ação remove o aluno de todas as aulas e não pode ser desfeita.
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const res = await deleteStudent(selectedStudent.id);
+                  if (res.ok) {
+                    setSelectedStudent(null);
+                    setShowDeleteConfirm(false);
+                    window.location.reload();
+                  }
+                }}
+                className="flex-1 rounded-xl bg-error py-3 font-body text-sm font-semibold text-error-foreground transition-transform active:scale-95"
+              >
+                Sim, eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Scroll shadow */}
       <div className="pointer-events-none fixed bottom-[calc(1.75rem+env(safe-area-inset-bottom))] left-0 right-0 z-40 h-16 bg-gradient-to-t from-background to-transparent" />

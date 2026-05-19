@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { HomeIcon, CalendarIcon, GroupIcon, SurfingIcon, DotsIcon, PlusIcon, ArrowRightIcon } from "./icons";
+import { HomeIcon, CalendarIcon, GroupIcon, SessionsIcon, DotsIcon, PlusIcon, ArrowRightIcon } from "./icons";
+import type { TodaySession } from "../actions";
 
 type Props = {
   fullName: string;
+  todaySessions: TodaySession[];
 };
 
 const weekdays = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
@@ -17,18 +19,7 @@ function todayLabel(): string {
   return `${weekdays[d.getDay()]}, ${d.getDate()} de ${months[d.getMonth()]}`;
 }
 
-const TODAY_SESSIONS = [
-  { time: "9:00", title: "Aula iniciantes", inscritos: 8, capacidade: 8 },
-];
-
-type SessionCardProps = {
-  time: string;
-  title: string;
-  inscritos: number;
-  capacidade: number;
-};
-
-function SessionCard({ time, title, inscritos, capacidade }: SessionCardProps) {
+function SessionCard({ time, title, inscritos, capacidade }: TodaySession) {
   const pct = capacidade > 0 ? (inscritos / capacidade) * 100 : 0;
 
   let tag: { label: string; className: string } | null = null;
@@ -61,11 +52,11 @@ const NAV_ITEMS = [
   { href: "/dashboard", label: "Home", icon: HomeIcon },
   { href: "/dashboard/calendario", label: "Calendário", icon: CalendarIcon },
   { href: "/dashboard/alunos", label: "Alunos", icon: GroupIcon },
-  { href: "/dashboard/equipamento", label: "Equipamento", icon: SurfingIcon },
+  { href: "/dashboard/servicos", label: "Serviços", icon: SessionsIcon },
   { href: "/dashboard/mais", label: "Mais", icon: DotsIcon },
 ];
 
-export function DashboardView({ fullName }: Props) {
+export function DashboardView({ fullName, todaySessions }: Props) {
   const pathname = usePathname();
   const [dark, setDark] = useState(true);
   const firstName = fullName.split(" ")[0];
@@ -82,7 +73,7 @@ export function DashboardView({ fullName }: Props) {
               Bom dia, {firstName}
             </h2>
             <p className="mt-1 text-sm text-text-secondary">
-              {todayLabel()} &nbsp;&middot; {TODAY_SESSIONS.length} {TODAY_SESSIONS.length === 1 ? "sessão hoje" : "sessões hoje"}
+              {todayLabel()} &nbsp;&middot; {todaySessions.length} {todaySessions.length === 1 ? "sessão hoje" : "sessões hoje"}
             </p>
           </div>
           <button
@@ -109,18 +100,14 @@ export function DashboardView({ fullName }: Props) {
           <h3 className="font-heading text-2xl text-foreground">Sessões de hoje</h3>
 
           <div className="space-y-3">
-            {TODAY_SESSIONS.map((s) => (
-              <SessionCard key={s.time} {...s} />
-            ))}
+            {todaySessions.length > 0 ? todaySessions.map((s) => (
+              <SessionCard key={s.id} {...s} />
+            )) : (
+              <p className="rounded-xl bg-surface px-5 py-8 text-center font-body text-base text-text-secondary">
+                Hoje não há aulas marcadas
+              </p>
+            )}
           </div>
-
-          <Link
-            href="/dashboard/calendario?nova=true"
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-4 font-body text-lg font-semibold text-primary-foreground shadow-lg transition-transform active:scale-95"
-          >
-            <PlusIcon className="h-5 w-5" />
-            Adicionar aula
-          </Link>
         </section>
 
         {/* Metrics */}

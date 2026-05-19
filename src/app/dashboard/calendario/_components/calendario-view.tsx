@@ -3,12 +3,12 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
-import { getSessionsForMonth, createSession, updateSession, deleteSession, type SessionData } from "../actions";
+import { getSessionsForMonth, createSession, updateSession, deleteSession, getSchoolStudents, createBooking, addGuestToSession, type SessionData } from "../actions";
 import {
   HomeIcon,
   CalendarIcon,
   GroupIcon,
-  SurfingIcon,
+  SessionsIcon,
   DotsIcon,
   PlusIcon,
   ArrowRightIcon,
@@ -23,7 +23,7 @@ const NAV_ITEMS = [
   { href: "/dashboard", label: "Home", icon: HomeIcon },
   { href: "/dashboard/calendario", label: "Calendário", icon: CalendarIcon },
   { href: "/dashboard/alunos", label: "Alunos", icon: GroupIcon },
-  { href: "/dashboard/equipamento", label: "Equipamento", icon: SurfingIcon },
+  { href: "/dashboard/servicos", label: "Serviços", icon: SessionsIcon },
   { href: "/dashboard/mais", label: "Mais", icon: DotsIcon },
 ];
 
@@ -93,6 +93,14 @@ export function CalendarioView({ schoolId }: Props) {
   const [editingSession, setEditingSession] = useState<number | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingSession, setDeletingSession] = useState<number | null>(null);
+  const [addingToSession, setAddingToSession] = useState<number | null>(null);
+  const [studentSearch, setStudentSearch] = useState("");
+  const [schoolStudents, setSchoolStudents] = useState<{ id: string; name: string }[]>([]);
+  const [showGuestModal, setShowGuestModal] = useState(false);
+  const [guestSessionId, setGuestSessionId] = useState("");
+  const [guestName, setGuestName] = useState("");
+  const [guestPhone, setGuestPhone] = useState("");
+  const [guestError, setGuestError] = useState("");
 
   useEffect(() => {
     if (searchParams.get("nova") === "true") {
@@ -249,31 +257,117 @@ export function CalendarioView({ schoolId }: Props) {
                               </div>
                             ))}
                           </div>
-                          <div className="mt-4 flex gap-3 pt-3 border-t border-foreground/10">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingSession(i);
-                                setNomeAula(s.nome);
-                                setDataAula(selectedDay ? `${year}-${String(month + 1).padStart(2, "0")}-${String(selectedDay).padStart(2, "0")}` : "");
-                                const [h, m] = s.time.split(":");
-                                setHorario(`${h.padStart(2, "0")}:${(m ?? "00").padStart(2, "0")}`);
-                                setDuracao("90");
-                                setCapacidade(String(s.capacidade));
-                                setInstrutores("");
-                                setShowModal(true);
-                              }}
-                              className="flex-1 rounded-lg bg-accent/20 py-2 font-body text-sm font-semibold text-accent transition-colors hover:bg-accent/30"
-                            >
-                              Editar
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => { setDeletingSession(i); setShowDeleteConfirm(true); }}
-                              className="flex-1 rounded-lg bg-error/20 py-2 font-body text-sm font-semibold text-error transition-colors hover:bg-error/30"
-                            >
-                              Eliminar
-                            </button>
+                          <div className="mt-4 pt-3 border-t border-foreground/10">
+                            <div className="mb-3">
+                            {addingToSession === i ? (
+                              <div className="space-y-3">
+                                <div className="flex gap-3">
+                                  <input
+                                    type="text"
+                                    value={studentSearch}
+                                    onChange={async (e) => {
+                                      setStudentSearch(e.target.value);
+                                      if (!schoolStudents.length && schoolId) {
+                                        const list = await getSchoolStudents(schoolId);
+                                        setSchoolStudents(list);
+                                      }
+                                    }}
+                                    placeholder="Procurar aluno..."
+                                    className="min-w-0 flex-[3] rounded-lg bg-surface px-3 py-2 text-sm text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => { setAddingToSession(null); setStudentSearch(""); }}
+                                    className="flex-1 rounded-lg bg-surface px-3 py-2 text-sm text-text-secondary hover:text-foreground transition-colors"
+                                  >
+                                    Cancelar
+                                  </button>
+                                </div>
+                                {studentSearch.trim() && (
+                                  <div className="max-h-48 overflow-y-auto space-y-1">
+                                    {schoolStudents
+                                      .filter((st) => st.name.toLowerCase().includes(studentSearch.toLowerCase()))
+                                      .map((st) => (
+                                        <button
+                                          key={st.id}
+                                          type="button"
+                                          onClick={async () => {
+                                            if (!schoolId) return;
+                                            await createBooking(s.id, st.id, schoolId);
+                                            setSessions((prev) => {
+                                              const next = { ...prev };
+                                              for (const day of Object.keys(next)) {
+                                                const dayNum = Number(day);
+                                                next[dayNum] = next[dayNum].map((sess) =>
+                                                  sess.id === s.id
+                                                    ? { ...sess, alunos: sess.alunos + 1, alunosList: [...sess.alunosList, st.name] }
+                                                    : sess
+                                                );
+                                              }
+                                              return next;
+                                            });
+                                            setAddingToSession(null);
+                                            setStudentSearch("");
+                                            fetchSessions(year, month);
+                                          }}
+                                          className="w-full rounded-lg bg-surface px-3 py-2 text-left text-sm text-foreground hover:bg-white/10 transition-colors"
+                                        >
+                                          {st.name}
+                                        </button>
+                                      ))}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (!schoolId || !studentSearch.trim()) return;
+                                        setGuestName(studentSearch.trim());
+                                        setGuestPhone("");
+                                        setGuestSessionId(s.id);
+                                        setGuestError("");
+                                        setShowGuestModal(true);
+                                      }}
+                                      className="w-full rounded-lg bg-accent/20 px-3 py-2 text-left text-sm text-accent hover:bg-accent/30 transition-colors"
+                                    >
+                                      + Novo convidado
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => { setAddingToSession(i); setStudentSearch(""); setSchoolStudents([]); }}
+                                className="w-full rounded-lg bg-accent/20 py-2 font-body text-sm font-semibold text-accent transition-colors hover:bg-accent/30"
+                              >
+                                + Adicionar aluno
+                              </button>
+                            )}
+                            </div>
+                            <div className="flex gap-3">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingSession(i);
+                                  setNomeAula(s.nome);
+                                  setDataAula(selectedDay ? `${year}-${String(month + 1).padStart(2, "0")}-${String(selectedDay).padStart(2, "0")}` : "");
+                                  const [h, m] = s.time.split(":");
+                                  setHorario(`${h.padStart(2, "0")}:${(m ?? "00").padStart(2, "0")}`);
+                                  setDuracao("90");
+                                  setCapacidade(String(s.capacidade));
+                                  setInstrutores("");
+                                  setShowModal(true);
+                                }}
+                                className="flex-1 rounded-lg bg-accent/20 py-2 font-body text-sm font-semibold text-accent transition-colors hover:bg-accent/30"
+                              >
+                                Editar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => { setDeletingSession(i); setShowDeleteConfirm(true); }}
+                                className="flex-1 rounded-lg bg-error/20 py-2 font-body text-sm font-semibold text-error transition-colors hover:bg-error/30"
+                              >
+                                Eliminar
+                              </button>
+                            </div>
                           </div>
                         </div>
                       )}
@@ -366,6 +460,93 @@ export function CalendarioView({ schoolId }: Props) {
               >
                 Sim, eliminar
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Guest modal */}
+      {showGuestModal && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50">
+          <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-10">
+            <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted" />
+
+            <h3 className="font-heading text-2xl font-bold text-foreground mb-6">
+              Novo convidado
+            </h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+                  Nome <span className="text-error">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={guestName}
+                  onChange={(e) => setGuestName(e.target.value)}
+                  placeholder="Nome do aluno"
+                  className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+                />
+              </div>
+
+              <div>
+                <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+                  Telemóvel <span className="text-text-muted">(opcional)</span>
+                </label>
+                <input
+                  type="tel"
+                  value={guestPhone}
+                  onChange={(e) => setGuestPhone(e.target.value)}
+                  placeholder="Ex: 912 345 678"
+                  className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+                />
+              </div>
+
+              {guestError && (
+                <p className="font-body text-sm text-error">{guestError}</p>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowGuestModal(false)}
+                  className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!schoolId || !guestName.trim()) return;
+                    setGuestError("");
+                    const res = await addGuestToSession(guestName.trim(), guestPhone.trim() || undefined, guestSessionId, schoolId);
+                    if (!res.ok) { setGuestError(res.error ?? "Erro ao adicionar convidado"); return; }
+                    setShowGuestModal(false);
+                    setStudentSearch(guestName);
+                    // update local session count immediately
+                    setSessions((prev) => {
+                      const next = { ...prev };
+                      for (const day of Object.keys(next)) {
+                        const dayNum = Number(day);
+                        next[dayNum] = next[dayNum].map((sess) =>
+                          sess.id === guestSessionId
+                            ? { ...sess, alunos: sess.alunos + 1, alunosList: [...sess.alunosList, guestName] }
+                            : sess
+                        );
+                      }
+                      return next;
+                    });
+                    if (schoolId) {
+                      const list = await getSchoolStudents(schoolId);
+                      setSchoolStudents(list);
+                    }
+                    fetchSessions(year, month);
+                  }}
+                  className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95"
+                >
+                  Adicionar
+                </button>
+              </div>
             </div>
           </div>
         </div>
