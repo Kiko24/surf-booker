@@ -1,38 +1,22 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname, useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
-import { getSessionsForMonth, createSession, updateSession, deleteSession, getSchoolStudents, createBooking, addGuestToSession, getAvulsoServicos, type SessionData, type AvulsoServico } from "../actions";
+import { getSessionsForMonth, createSession, updateSession, deleteSession, getSchoolStudents, createBooking, addGuestToSession, addGroupBooking, getAvulsoServicos, getStudentProfile, togglePaymentStatus, type SessionData, type AvulsoServico, type StudentProfile, type StudentProfilePack } from "../actions";
 import {
-  HomeIcon,
-  CalendarIcon,
-  GroupIcon,
-  SessionsIcon,
-  DotsIcon,
   PlusIcon,
   ArrowRightIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
 } from "@/app/dashboard/_components/icons";
+import { WEEKDAYS, MONTHS } from "@/app/dashboard/_components/constants";
 
 type Props = {
   fullName: string;
   schoolId: string | null;
 };
 
-const NAV_ITEMS = [
-  { href: "/dashboard", label: "Home", icon: HomeIcon },
-  { href: "/dashboard/calendario", label: "Calendário", icon: CalendarIcon },
-  { href: "/dashboard/alunos", label: "Alunos", icon: GroupIcon },
-  { href: "/dashboard/servicos", label: "Serviços", icon: SessionsIcon },
-  { href: "/dashboard/mais", label: "Mais", icon: DotsIcon },
-];
-
-const WEEKDAYS = ["D", "S", "T", "Q", "Q", "S", "S"];
-
-const MONTHS = [
-  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
-];
+type AlunoInscrito = { id: string; name: string; paymentStatus: string };
 
 type DaySession = {
   id: string;
@@ -40,30 +24,13 @@ type DaySession = {
   time: string;
   capacidade: number;
   alunos: number;
-  alunosList: string[];
+  alunosList: AlunoInscrito[];
   class_type_id: string | null;
 };
 
 const EMPTY_SESSIONS: Record<number, DaySession[]> = {};
 
-function ChevronLeft({ className }: { className?: string }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="m15 18-6-6 6-6" />
-    </svg>
-  );
-}
-
-function ChevronRight({ className }: { className?: string }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="m9 18 6-6-6-6" />
-    </svg>
-  );
-}
-
 export function CalendarioView({ schoolId }: Props) {
-  const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
   const now = new Date();
@@ -81,6 +48,8 @@ export function CalendarioView({ schoolId }: Props) {
   const [selectedServicoId, setSelectedServicoId] = useState("");
   const [expandedSession, setExpandedSession] = useState<number | null>(null);
   const [loadingSessions, setLoadingSessions] = useState(false);
+  const [profileStudent, setProfileStudent] = useState<StudentProfile | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(false);
 
   const fetchSessions = useCallback(async (y: number, m: number) => {
     if (!schoolId) return;
@@ -106,11 +75,18 @@ export function CalendarioView({ schoolId }: Props) {
   const [addingToSession, setAddingToSession] = useState<number | null>(null);
   const [studentSearch, setStudentSearch] = useState("");
   const [schoolStudents, setSchoolStudents] = useState<{ id: string; name: string }[]>([]);
+  const [pendingPackStudent, setPendingPackStudent] = useState<{ sessionId: string; studentId: string; studentName: string } | null>(null);
+  const [studentPacksForBooking, setStudentPacksForBooking] = useState<StudentProfilePack[]>([]);
   const [showGuestModal, setShowGuestModal] = useState(false);
   const [guestSessionId, setGuestSessionId] = useState("");
   const [guestName, setGuestName] = useState("");
   const [guestPhone, setGuestPhone] = useState("");
   const [guestError, setGuestError] = useState("");
+  const [showGroupModal, setShowGroupModal] = useState(false);
+  const [groupSessionId, setGroupSessionId] = useState("");
+  const [groupName, setGroupName] = useState("");
+  const [groupPeople, setGroupPeople] = useState("2");
+  const [groupError, setGroupError] = useState("");
 
   useEffect(() => {
     if (searchParams.get("nova") === "true") {
@@ -137,9 +113,8 @@ export function CalendarioView({ schoolId }: Props) {
   const eventCount = daySessions.length;
   const monthLabel = `${MONTHS[month]} ${year}`;
   return (
-    <div className="h-dvh overflow-hidden bg-background text-foreground font-body flex flex-col">
-
-      <main className="flex-1 flex flex-col overflow-y-auto px-5 pb-24 [&::-webkit-scrollbar]:hidden">
+    <>
+      <main className="px-5 pt-4">
 
         {/* Header */}
         <div className="mt-6 mb-6">
@@ -159,7 +134,7 @@ export function CalendarioView({ schoolId }: Props) {
                 className="flex h-9 w-9 items-center justify-center rounded-full text-text-secondary hover:text-foreground transition-colors"
                 aria-label="Mês anterior"
               >
-                <ChevronLeft className="h-5 w-5" />
+                <ChevronLeftIcon className="h-5 w-5" />
               </button>
               <h2 className="font-heading text-lg font-bold uppercase tracking-widest text-foreground">
                 {monthLabel}
@@ -170,7 +145,7 @@ export function CalendarioView({ schoolId }: Props) {
                 className="flex h-9 w-9 items-center justify-center rounded-full text-text-secondary hover:text-foreground transition-colors"
                 aria-label="Mês seguinte"
               >
-                <ChevronRight className="h-5 w-5" />
+                <ChevronRightIcon className="h-5 w-5" />
               </button>
             </div>
 
@@ -258,12 +233,15 @@ export function CalendarioView({ schoolId }: Props) {
                           <p className="font-heading text-base font-bold text-foreground mb-1">{s.nome}</p>
                           <p className="font-body text-xs font-semibold uppercase text-text-secondary mb-3">Alunos inscritos</p>
                           <div className="space-y-2">
-                            {s.alunosList.map((nome) => (
-                              <div key={nome} className="flex items-center gap-3">
+                            {s.alunosList.map((aluno, idx) => (
+                              <div key={`${aluno.id}-${idx}`} className="flex items-center gap-3">
+                                <button type="button" onClick={async () => { if (!schoolId) return; const r = await togglePaymentStatus(s.id, aluno.id, schoolId); if (r.ok && r.newStatus) { const next = { ...sessions }; for (const d of Object.keys(next)) { const dn = Number(d); next[dn] = next[dn].map(sess => sess.id === s.id ? { ...sess, alunosList: sess.alunosList.map(a => a.id === aluno.id ? { ...a, paymentStatus: r.newStatus! } : a) } : sess); } setSessions(next); } }} className="shrink-0">
+                                  <span className={`h-2.5 w-2.5 rounded-full ${aluno.paymentStatus === 'paid_offline' ? 'bg-success' : 'bg-error'}`} />
+                                </button>
                                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface text-xs font-bold text-accent">
-                                  {nome.split(" ").map(p => p[0]).join("").substring(0, 2).toUpperCase()}
+                                  {aluno.name.split(" ").map(p => p[0]).join("").substring(0, 2).toUpperCase()}
                                 </div>
-                                <span className="font-body text-sm text-foreground">{nome}</span>
+                                <button type="button" onClick={async () => { if (!schoolId) return; setLoadingProfile(true); const p = await getStudentProfile(schoolId, aluno.id); if (p) setProfileStudent(p); setLoadingProfile(false); }} className="font-body text-sm text-foreground hover:text-accent text-left transition-colors">{aluno.name}</button>
                               </div>
                             ))}
                           </div>
@@ -298,32 +276,39 @@ export function CalendarioView({ schoolId }: Props) {
                                     {schoolStudents
                                       .filter((st) => st.name.toLowerCase().includes(studentSearch.toLowerCase()))
                                       .map((st) => (
-                                        <button
-                                          key={st.id}
-                                          type="button"
-                                          onClick={async () => {
-                                            if (!schoolId) return;
-                                            await createBooking(s.id, st.id, schoolId);
-                                            setSessions((prev) => {
-                                              const next = { ...prev };
-                                              for (const day of Object.keys(next)) {
-                                                const dayNum = Number(day);
-                                                next[dayNum] = next[dayNum].map((sess) =>
-                                                  sess.id === s.id
-                                                    ? { ...sess, alunos: sess.alunos + 1, alunosList: [...sess.alunosList, st.name] }
-                                                    : sess
-                                                );
+                                        <div key={st.id} className="flex gap-2">
+                                          <button
+                                            type="button"
+                                            onClick={async () => {
+                                              if (!schoolId) return;
+                                              const profile = await getStudentProfile(schoolId, st.id);
+                                              if (profile && profile.packs.length > 0) {
+                                                setPendingPackStudent({ sessionId: s.id, studentId: st.id, studentName: st.name });
+                                                setStudentPacksForBooking(profile.packs);
+                                              } else {
+                                                await createBooking(s.id, st.id, schoolId);
+                                                setSessions((prev) => {
+                                                  const next = { ...prev };
+                                                  for (const day of Object.keys(next)) {
+                                                    const dayNum = Number(day);
+                                                    next[dayNum] = next[dayNum].map((sess) =>
+                                                      sess.id === s.id
+                                                        ? { ...sess, alunos: sess.alunos + 1, alunosList: [...sess.alunosList, { id: st.id, name: st.name, paymentStatus: 'unpaid' }] }
+                                                        : sess
+                                                    );
+                                                  }
+                                                  return next;
+                                                });
+                                                setAddingToSession(null);
+                                                setStudentSearch("");
+                                                fetchSessions(year, month);
                                               }
-                                              return next;
-                                            });
-                                            setAddingToSession(null);
-                                            setStudentSearch("");
-                                            fetchSessions(year, month);
-                                          }}
-                                          className="w-full rounded-lg bg-surface px-3 py-2 text-left text-sm text-foreground hover:bg-white/10 transition-colors"
-                                        >
-                                          {st.name}
-                                        </button>
+                                            }}
+                                            className="flex-1 rounded-lg bg-surface px-3 py-2 text-left text-sm text-foreground hover:bg-white/10 transition-colors"
+                                          >
+                                            {st.name}
+                                          </button>
+                                        </div>
                                       ))}
                                     <button
                                       type="button"
@@ -340,9 +325,91 @@ export function CalendarioView({ schoolId }: Props) {
                                       + Novo convidado
                                     </button>
                                   </div>
-                                )}
+      )}
+
+      {/* Pack choice modal */}
+      {pendingPackStudent && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50">
+          <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-24">
+            <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted" />
+            <h3 className="font-heading text-lg font-bold text-foreground mb-1">Método de pagamento</h3>
+            <p className="font-body text-sm text-text-secondary mb-4">{pendingPackStudent.studentName}</p>
+
+            <button
+              type="button"
+              onClick={async () => {
+                if (!schoolId) return;
+                const { sessionId, studentId, studentName } = pendingPackStudent;
+                await createBooking(sessionId, studentId, schoolId);
+                setSessions((prev) => {
+                  const next = { ...prev };
+                  for (const day of Object.keys(next)) {
+                    const dayNum = Number(day);
+                    next[dayNum] = next[dayNum].map((sess) =>
+                      sess.id === sessionId
+                        ? { ...sess, alunos: sess.alunos + 1, alunosList: [...sess.alunosList, { id: studentId, name: studentName, paymentStatus: 'unpaid' }] }
+                        : sess
+                    );
+                  }
+                  return next;
+                });
+                setPendingPackStudent(null);
+                setAddingToSession(null);
+                setStudentSearch("");
+                fetchSessions(year, month);
+              }}
+              className="w-full rounded-xl bg-surface py-3 font-body text-sm font-semibold text-foreground transition-colors hover:bg-[#2A2A2A] mb-2"
+            >
+              Pagamento único
+            </button>
+
+            {studentPacksForBooking.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={async () => {
+                  if (!schoolId) return;
+                  const { sessionId, studentId, studentName } = pendingPackStudent;
+                  await createBooking(sessionId, studentId, schoolId, {
+                    paymentMethod: "pack",
+                    packPurchaseId: p.id,
+                  });
+                  setSessions((prev) => {
+                    const next = { ...prev };
+                    for (const day of Object.keys(next)) {
+                      const dayNum = Number(day);
+                      next[dayNum] = next[dayNum].map((sess) =>
+                        sess.id === sessionId
+                          ? { ...sess, alunos: sess.alunos + 1, alunosList: [...sess.alunosList, { id: studentId, name: studentName, paymentStatus: 'unpaid' }] }
+                          : sess
+                      );
+                    }
+                    return next;
+                  });
+                  setPendingPackStudent(null);
+                  setAddingToSession(null);
+                  setStudentSearch("");
+                  fetchSessions(year, month);
+                }}
+                className="w-full rounded-xl bg-accent/20 py-3 font-body text-sm font-semibold text-accent transition-colors hover:bg-accent/30 mb-2"
+              >
+                Usar pack — {p.name} ({p.remaining} {p.remaining === 1 ? "restante" : "restantes"})
+              </button>
+            ))}
+
+            <button
+              type="button"
+              onClick={() => { setPendingPackStudent(null); }}
+              className="w-full rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
                               </div>
                             ) : (
+                              <div className="space-y-2">
                               <button
                                 type="button"
                                 onClick={() => { setAddingToSession(i); setStudentSearch(""); setSchoolStudents([]); }}
@@ -350,6 +417,20 @@ export function CalendarioView({ schoolId }: Props) {
                               >
                                 + Adicionar aluno
                               </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setGroupSessionId(s.id);
+                                  setGroupName("");
+                                  setGroupPeople("2");
+                                  setGroupError("");
+                                  setShowGroupModal(true);
+                                }}
+                                className="w-full rounded-lg bg-surface py-2 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
+                              >
+                                + Adicionar grupo
+                              </button>
+                              </div>
                             )}
                             </div>
                             <div className="flex gap-3">
@@ -396,33 +477,6 @@ export function CalendarioView({ schoolId }: Props) {
         </div>
 
       </main>
-
-      {/* Scroll shadow */}
-      <div className="pointer-events-none fixed bottom-[calc(1.75rem+env(safe-area-inset-bottom))] left-0 right-0 z-40 h-16 bg-gradient-to-t from-background to-transparent" />
-
-      {/* Bottom Navigation */}
-      <nav
-        className="fixed left-1/2 z-50 flex w-[90%] max-w-md -translate-x-1/2 items-center justify-around rounded-full border border-accent/10 bg-surface-container-high px-2 py-2 shadow-lg backdrop-blur-md"
-        style={{ bottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
-      >
-        {NAV_ITEMS.map((item) => {
-          const isActive = pathname === item.href;
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={
-                isActive
-                  ? "flex h-12 w-12 scale-90 items-center justify-center rounded-full bg-accent text-primary-foreground transition-all duration-200"
-                  : "flex h-12 w-12 items-center justify-center rounded-full text-text-secondary transition-all hover:bg-accent/10"
-              }
-            >
-              <Icon className="h-5 w-5" />
-            </Link>
-          );
-        })}
-      </nav>
 
       {/* FAB */}
       <button
@@ -481,7 +535,7 @@ export function CalendarioView({ schoolId }: Props) {
       {/* Guest modal */}
       {showGuestModal && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-10">
+          <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-24">
             <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted" />
 
             <h3 className="font-heading text-2xl font-bold text-foreground mb-6">
@@ -543,7 +597,7 @@ export function CalendarioView({ schoolId }: Props) {
                         const dayNum = Number(day);
                         next[dayNum] = next[dayNum].map((sess) =>
                           sess.id === guestSessionId
-                            ? { ...sess, alunos: sess.alunos + 1, alunosList: [...sess.alunosList, guestName] }
+                            ? { ...sess, alunos: sess.alunos + 1, alunosList: [...sess.alunosList, { id: res.studentId!, name: res.studentName!, paymentStatus: 'unpaid' }] }
                             : sess
                         );
                       }
@@ -565,10 +619,105 @@ export function CalendarioView({ schoolId }: Props) {
         </div>
       )}
 
+      {/* Group modal */}
+      {showGroupModal && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50">
+          <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-24">
+            <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted" />
+
+            <h3 className="font-heading text-2xl font-bold text-foreground mb-6">
+              Adicionar grupo
+            </h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+                  Nome do responsável <span className="text-error">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={groupName}
+                  onChange={(e) => setGroupName(e.target.value)}
+                  placeholder="Ex: João Silva"
+                  className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+                />
+              </div>
+
+              <div>
+                <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+                  Número de pessoas <span className="text-error">*</span>
+                </label>
+                <input
+                  type="number"
+                  min="2"
+                  max="100"
+                  value={groupPeople}
+                  onChange={(e) => setGroupPeople(e.target.value)}
+                  placeholder="Ex: 5"
+                  className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+                />
+              </div>
+
+              {groupError && (
+                <p className="font-body text-sm text-error">{groupError}</p>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowGroupModal(false)}
+                  className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!schoolId || !groupName.trim()) return;
+                    const num = parseInt(groupPeople, 10);
+                    if (isNaN(num) || num < 2) {
+                      setGroupError("O número mínimo de pessoas é 2");
+                      return;
+                    }
+                    setGroupError("");
+                    const res = await addGroupBooking(groupSessionId, groupName.trim(), num, schoolId);
+                    if (!res.ok) { setGroupError(res.error ?? "Erro ao adicionar grupo"); return; }
+                    setShowGroupModal(false);
+                    setSessions((prev) => {
+                      const next = { ...prev };
+                      for (const day of Object.keys(next)) {
+                        const dayNum = Number(day);
+                        next[dayNum] = next[dayNum].map((sess) =>
+                          sess.id === groupSessionId
+                            ? {
+                                ...sess,
+                                alunos: sess.alunos + num,
+                                alunosList: [
+                                  ...sess.alunosList,
+                                  ...(res.students ?? []),
+                                ],
+                              }
+                            : sess
+                        );
+                      }
+                      return next;
+                    });
+                    fetchSessions(year, month);
+                  }}
+                  className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95"
+                >
+                  Adicionar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-10">
+          <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-24">
             <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted" />
 
             <h3 className="font-heading text-2xl font-bold text-foreground mb-6">
@@ -713,6 +862,79 @@ export function CalendarioView({ schoolId }: Props) {
         </div>
       )}
 
-    </div>
+      {/* Student profile popup */}
+      {profileStudent && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50">
+          <div className="flex max-h-[70vh] w-full max-w-md flex-col rounded-t-2xl bg-surface">
+            <div className="mx-auto mt-6 mb-2 h-1 w-10 shrink-0 rounded-full bg-text-muted" />
+            <div className="overflow-y-auto px-6 pb-24 [&::-webkit-scrollbar]:hidden">
+              {loadingProfile ? (
+                <div className="flex items-center justify-center py-12">
+                  <p className="font-body text-sm text-text-muted">A carregar...</p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-4 mb-6">
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-background text-xl font-bold text-accent">
+                      {profileStudent.name.split(" ").map(p => p[0]).join("").substring(0, 2).toUpperCase()}
+                    </div>
+                    <div>
+                      <h3 className="font-heading text-xl font-bold text-foreground">{profileStudent.name}</h3>
+                      <p className="font-body text-sm text-text-secondary">
+                        {profileStudent.isGuest ? "Convidado" : "Registado"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    {profileStudent.email && (
+                      <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
+                        <p className="font-body text-xs text-text-secondary">Email</p>
+                        <p className="font-body text-sm text-foreground">{profileStudent.email}</p>
+                      </div>
+                    )}
+                    {profileStudent.phone && (
+                      <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
+                        <p className="font-body text-xs text-text-secondary">Telemóvel</p>
+                        <p className="font-body text-sm text-foreground">{profileStudent.phone}</p>
+                      </div>
+                    )}
+                    <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
+                      <p className="font-body text-xs text-text-secondary">{profileStudent.classLabel ?? "Aulas"}</p>
+                      <p className="font-body text-sm text-foreground">{profileStudent.classDate ?? "Nenhuma"}</p>
+                    </div>
+                    {!profileStudent.isGuest && (
+                      <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
+                        <p className="font-body text-xs text-text-secondary mb-2">Packs</p>
+                        {profileStudent.packs.length === 0 ? (
+                          <p className="font-body text-sm text-text-muted">Não tem packs ativos</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {profileStudent.packs.map((p, i) => (
+                              <div key={i} className="flex items-center justify-between">
+                                <span className="font-body text-sm text-foreground">{p.name}</span>
+                                <span className="font-body text-xs text-text-secondary">{p.remaining} restantes</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setProfileStudent(null)}
+                    className="mt-5 mb-4 w-full rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
+                  >
+                    Fechar
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

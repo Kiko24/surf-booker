@@ -1,6 +1,27 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { rateLimitByUser } from "@/lib/rate-limit";
+import { logAudit } from "@/lib/audit";
+import { getSchoolId } from "@/lib/school";
+import { z } from "zod";
+
+const packSchema = z.object({
+  id: z.string().uuid().optional(),
+  nome: z.string().min(1, "Nome do pack é obrigatório").max(80),
+  numeroAulas: z.number().int().min(1, "Mínimo 1 aula").max(100, "Máximo 100 aulas"),
+  preco: z.number().int().min(0).max(500000),
+});
+
+const servicoBaseSchema = z.object({
+  nome: z.string().min(1, "Nome é obrigatório").max(80),
+  modalidade: z.string().min(1, "Modalidade é obrigatória").max(50),
+  duracao: z.number().int().min(15, "Mínimo 15 minutos").max(240, "Máximo 240 minutos"),
+  sobre: z.string().max(1000).optional(),
+  avulsoDisponivel: z.boolean(),
+  avulsoPreco: z.number().int().min(0).max(500000),
+  packs: z.array(packSchema).max(20),
+});
 
 export type PackOption = {
   id: string;
@@ -20,20 +41,6 @@ export type ServicoRecord = {
   packs: PackOption[];
   vezesUsado: number;
 };
-
-export async function getSchoolId(): Promise<string | null> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const { data } = await supabase
-    .from("schools")
-    .select("id")
-    .eq("owner_user_id", user.id)
-    .maybeSingle();
-
-  return data?.id ?? null;
-}
 
 export async function getServicos(schoolId: string): Promise<ServicoRecord[]> {
   const supabase = await createClient();
@@ -148,9 +155,17 @@ export async function addServico(
     packs: { nome: string; numeroAulas: number; preco: number }[];
   }
 ): Promise<{ ok: boolean; error?: string }> {
+  const parsed = servicoBaseSchema.safeParse(data);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
+  }
+
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Não autenticado" };
+
+  const rl = await rateLimitByUser(user.id, "addServico");
+  if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
 
   const { data: created, error: ctErr } = await supabase
     .from("class_types")
@@ -181,6 +196,15 @@ export async function addServico(
     if (pErr) return { ok: false, error: pErr.message };
   }
 
+  logAudit({
+    schoolId,
+    userId: user.id,
+    action: "add_servico",
+    entityType: "class_type",
+    entityId: created.id,
+    metadata: { nome: data.nome, packsCount: data.packs.length },
+  });
+
   return { ok: true };
 }
 
@@ -189,8 +213,28 @@ export async function deleteServico(id: string): Promise<{ ok: boolean; error?: 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Não autenticado" };
 
+  const rl = await rateLimitByUser(user.id, "deleteServico");
+  if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
+
+  // Nullify class_type_id on sessions first (FK has on delete restrict)
+  const { error: nullifyErr } = await supabase
+    .from("sessions")
+    .update({ class_type_id: null })
+    .eq("class_type_id", id);
+
+  if (nullifyErr) return { ok: false, error: nullifyErr.message };
+
+  // Also delete associated packs (they cascade from class_types)
   const { error } = await supabase.from("class_types").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
+
+  logAudit({
+    schoolId: null,
+    userId: user.id,
+    action: "delete_servico",
+    entityType: "class_type",
+    entityId: id,
+  });
 
   return { ok: true };
 }
@@ -207,9 +251,17 @@ export async function updateServico(
     packs: { id?: string; nome: string; numeroAulas: number; preco: number }[];
   }
 ): Promise<{ ok: boolean; error?: string }> {
+  const parsed = servicoBaseSchema.safeParse(data);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
+  }
+
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Não autenticado" };
+
+  const rl = await rateLimitByUser(user.id, "updateServico");
+  if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
 
   const { error: ctErr } = await supabase
     .from("class_types")
@@ -267,6 +319,17 @@ export async function updateServico(
       }))
     );
     if (pErr) return { ok: false, error: pErr.message };
+  }
+
+  if (ct) {
+    logAudit({
+      schoolId: ct.school_id,
+      userId: user.id,
+      action: "update_servico",
+      entityType: "class_type",
+      entityId: id,
+      metadata: { nome: data.nome, packsCount: data.packs.length },
+    });
   }
 
   return { ok: true };

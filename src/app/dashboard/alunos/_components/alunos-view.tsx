@@ -1,20 +1,14 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
-import {
-  HomeIcon,
-  CalendarIcon,
-  GroupIcon,
-  SessionsIcon,
-  DotsIcon,
-} from "@/app/dashboard/_components/icons";
 
 import { deleteStudent, type StudentRecord } from "../actions";
+import { getAvailablePacks, buyPack, type AvailablePack } from "../../calendario/actions";
 
 type Props = {
   fullName: string;
+  schoolId: string;
   students: StudentRecord[];
 };
 
@@ -23,14 +17,6 @@ function getInitials(name: string): string {
 }
 
 const FILTERS = ["Todos", "Com pack", "Recorrente", "Inativo"];
-
-const NAV_ITEMS = [
-  { href: "/dashboard", label: "Home", icon: HomeIcon },
-  { href: "/dashboard/calendario", label: "Calendário", icon: CalendarIcon },
-  { href: "/dashboard/alunos", label: "Alunos", icon: GroupIcon },
-  { href: "/dashboard/servicos", label: "Serviços", icon: SessionsIcon },
-  { href: "/dashboard/mais", label: "Mais", icon: DotsIcon },
-];
 
 function StatusDot({ active }: { active: boolean }) {
   return (
@@ -52,9 +38,7 @@ function isInactive(student: StudentRecord): boolean {
 function filterStudents(students: StudentRecord[], filter: string): StudentRecord[] {
   switch (filter) {
     case "Com pack":
-      return students; // packs not implemented yet
-    case "Recorrente":
-      return students; // attendance tracking not implemented yet
+      return students.filter((s) => s.hasActivePack);
     case "Inativo":
       return students.filter((s) => isInactive(s));
     default:
@@ -70,13 +54,16 @@ function searchStudents(students: StudentRecord[], query: string): StudentRecord
   );
 }
 
-export function AlunosView({ students }: Props) {
-  const pathname = usePathname();
+export function AlunosView({ fullName, schoolId, students }: Props) {
+  const router = useRouter();
   const [activeFilter, setActiveFilter] = useState("Todos");
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStudent, setSelectedStudent] = useState<StudentRecord | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showBuyPack, setShowBuyPack] = useState(false);
+  const [availablePacks, setAvailablePacks] = useState<AvailablePack[]>([]);
+  const [buyingPackId, setBuyingPackId] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const filteredByFilter = filterStudents(students, activeFilter);
@@ -96,8 +83,8 @@ export function AlunosView({ students }: Props) {
   }
 
   return (
-    <div className="h-dvh overflow-hidden bg-background text-foreground font-body flex flex-col">
-      <main className="flex-1 flex flex-col overflow-hidden px-5 pt-0 pb-24">
+    <>
+      <main className="px-5 pt-4">
         <section className="mt-6 mb-6 flex items-end justify-between">
           {searchOpen ? (
               <div className="flex w-full items-center gap-4">
@@ -221,55 +208,89 @@ export function AlunosView({ students }: Props) {
       {/* Student popup */}
       {selectedStudent && !showDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-10">
-            <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted" />
+          <div className="flex max-h-[85vh] w-full max-w-md flex-col rounded-t-2xl bg-surface">
+            <div className="mx-auto mt-6 mb-2 h-1 w-10 shrink-0 rounded-full bg-text-muted" />
 
-            <div className="flex items-center gap-4 mb-6">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-background text-xl font-bold text-accent">
-                {getInitials(selectedStudent.name)}
+            <div className="overflow-y-auto px-6 pb-24 [&::-webkit-scrollbar]:hidden">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-background text-xl font-bold text-accent">
+                  {getInitials(selectedStudent.name)}
+                </div>
+                <div>
+                  <h3 className="font-heading text-xl font-bold text-foreground">{selectedStudent.name}</h3>
+                  <p className="font-body text-sm text-text-secondary">
+                    {selectedStudent.isGuest ? "Convidado" : "Registado"}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-heading text-xl font-bold text-foreground">{selectedStudent.name}</h3>
-                <p className="font-body text-sm text-text-secondary">
-                  {selectedStudent.isGuest ? "Convidado" : "Registado"}
-                </p>
-              </div>
-            </div>
 
-            <div className="space-y-3">
-              {selectedStudent.email && (
+              <div className="space-y-3">
+                {selectedStudent.email && (
+                  <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
+                    <p className="font-body text-xs text-text-secondary">Email</p>
+                    <p className="font-body text-sm text-foreground">{selectedStudent.email}</p>
+                  </div>
+                )}
+                {selectedStudent.phone && (
+                  <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
+                    <p className="font-body text-xs text-text-secondary">Telemóvel</p>
+                    <p className="font-body text-sm text-foreground">{selectedStudent.phone}</p>
+                  </div>
+                )}
                 <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
-                  <p className="font-body text-xs text-text-secondary">Email</p>
-                  <p className="font-body text-sm text-foreground">{selectedStudent.email}</p>
+                  <p className="font-body text-xs text-text-secondary">{selectedStudent.classLabel ?? "Aulas"}</p>
+                  <p className="font-body text-sm text-foreground">{selectedStudent.classDate ?? "Nenhuma"}</p>
+                </div>
+              </div>
+
+              {/* Packs section (apenas registados) */}
+              {!selectedStudent.isGuest && (
+                <div className="mt-4 rounded-xl border border-accent/10 bg-[#2A2A2A] px-4 py-3">
+                  <p className="font-body text-xs text-text-secondary mb-2">Packs</p>
+                  {selectedStudent.packs.length === 0 ? (
+                    <p className="font-body text-sm text-text-muted">Não tem packs ativos</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {selectedStudent.packs.map((p, i) => (
+                        <div key={i} className="flex items-center justify-between">
+                          <span className="font-body text-sm text-foreground">{p.name}</span>
+                          <span className="font-body text-xs text-text-secondary">
+                            {p.remaining === 1 ? "1 aula restante" : `${p.remaining} aulas restantes`}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const packs = await getAvailablePacks(schoolId);
+                      setAvailablePacks(packs);
+                      setShowBuyPack(true);
+                    }}
+                    className="mt-2 w-full rounded-lg bg-accent/20 py-2 text-sm font-semibold text-accent transition-colors hover:bg-accent/30"
+                  >
+                    Comprar pack
+                  </button>
                 </div>
               )}
-              {selectedStudent.phone && (
-                <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
-                  <p className="font-body text-xs text-text-secondary">Telemóvel</p>
-                  <p className="font-body text-sm text-foreground">{selectedStudent.phone}</p>
-                </div>
-              )}
-              <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
-                <p className="font-body text-xs text-text-secondary">{selectedStudent.classLabel ?? "Aulas"}</p>
-                <p className="font-body text-sm text-foreground">{selectedStudent.classDate ?? "Nenhuma"}</p>
-              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(true)}
+                className="mt-5 w-full rounded-xl bg-error/20 py-3 font-body text-sm font-semibold text-error transition-colors hover:bg-error/30"
+              >
+                Eliminar aluno
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedStudent(null)}
+                className="mt-3 mb-4 w-full rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
+              >
+                Fechar
+              </button>
             </div>
-
-            <button
-              type="button"
-              onClick={() => setShowDeleteConfirm(true)}
-              className="mt-6 w-full rounded-xl bg-error/20 py-3 font-body text-sm font-semibold text-error transition-colors hover:bg-error/30"
-            >
-              Eliminar aluno
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setSelectedStudent(null)}
-              className="mt-3 w-full rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
-            >
-              Fechar
-            </button>
           </div>
         </div>
       )}
@@ -298,7 +319,7 @@ export function AlunosView({ students }: Props) {
                   if (res.ok) {
                     setSelectedStudent(null);
                     setShowDeleteConfirm(false);
-                    window.location.reload();
+                    router.refresh();
                   }
                 }}
                 className="flex-1 rounded-xl bg-error py-3 font-body text-sm font-semibold text-error-foreground transition-transform active:scale-95"
@@ -310,31 +331,55 @@ export function AlunosView({ students }: Props) {
         </div>
       )}
 
-      {/* Scroll shadow */}
-      <div className="pointer-events-none fixed bottom-[calc(1.75rem+env(safe-area-inset-bottom))] left-0 right-0 z-40 h-16 bg-gradient-to-t from-background to-transparent" />
-
-      <nav
-        className="fixed left-1/2 z-50 flex w-[90%] max-w-md -translate-x-1/2 items-center justify-around rounded-full border border-accent/10 bg-surface-container-high px-2 py-2 shadow-lg backdrop-blur-md"
-        style={{ bottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
-      >
-        {NAV_ITEMS.map((item) => {
-          const isActive = pathname === item.href;
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={
-                isActive
-                  ? "flex h-12 w-12 scale-90 items-center justify-center rounded-full bg-accent text-primary-foreground transition-all duration-200"
-                  : "flex h-12 w-12 items-center justify-center rounded-full text-text-secondary transition-all hover:bg-accent/10"
-              }
+      {/* Buy pack modal */}
+      {showBuyPack && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50">
+          <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-10">
+            <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted" />
+            <h3 className="font-heading text-xl font-bold text-foreground mb-4">Comprar pack</h3>
+            {availablePacks.length === 0 ? (
+              <p className="font-body text-sm text-text-muted mb-6">Nenhum pack disponível. Cria packs nos Serviços primeiro.</p>
+            ) : (
+              <div className="space-y-3 mb-6">
+                {availablePacks.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    disabled={buyingPackId === p.id}
+                    onClick={async () => {
+                      if (!selectedStudent) return;
+                      setBuyingPackId(p.id);
+                      const res = await buyPack(selectedStudent.id, p.id, schoolId);
+                      if (res.ok) {
+                        setShowBuyPack(false);
+                        router.refresh();
+                      }
+                      setBuyingPackId(null);
+                    }}
+                    className="flex w-full items-center justify-between rounded-xl bg-[#2A2A2A] px-4 py-3 text-left transition-colors hover:bg-[#333] disabled:opacity-50"
+                  >
+                    <div>
+                      <p className="font-body text-sm font-semibold text-foreground">{p.name}</p>
+                      <p className="font-body text-xs text-text-secondary">{p.total_lessons} aulas</p>
+                    </div>
+                    <span className="font-body text-sm font-semibold text-accent">
+                      {buyingPackId === p.id ? "..." : `${(p.price_cents / 100).toFixed(2).replace(".", ",")}€`}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => setShowBuyPack(false)}
+              className="w-full rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
             >
-              <Icon className="h-5 w-5" />
-            </Link>
-          );
-        })}
-      </nav>
-    </div>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
+    </>
   );
 }

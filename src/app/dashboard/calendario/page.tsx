@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { CalendarioView } from "./_components/calendario-view";
-import { getSchoolId } from "./actions";
+import { getSchoolId } from "@/lib/school";
 
 export default async function CalendarioPage() {
   const supabase = await createClient();

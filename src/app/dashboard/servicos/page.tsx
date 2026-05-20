@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ServicosView } from "./_components/servicos-view";
-import { getSchoolId, getServicos } from "./actions";
+import { getServicos } from "./actions";
+import { getSchoolId } from "@/lib/school";
 
 export default async function ServicosPage() {
   const supabase = await createClient();

@@ -4,6 +4,10 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { rateLimitByUser } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
+import { getSchoolId } from "@/lib/school";
+import { sendBookingNotification } from "@/lib/email";
+
+export type SessionAluno = { id: string; name: string; paymentStatus: string };
 
 export type SessionData = {
   id: string;
@@ -11,7 +15,7 @@ export type SessionData = {
   time: string;
   capacidade: number;
   alunos: number;
-  alunosList: string[];
+  alunosList: SessionAluno[];
   class_type_id: string | null;
 };
 
@@ -21,20 +25,6 @@ export type AvulsoServico = {
   default_duration_minutes: number | null;
   price_cents: number;
 };
-
-export async function getSchoolId(): Promise<string | null> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const { data } = await supabase
-    .from("schools")
-    .select("id")
-    .eq("owner_user_id", user.id)
-    .maybeSingle();
-
-  return data?.id ?? null;
-}
 
 export async function getSessionsForMonth(
   year: number,
@@ -62,9 +52,9 @@ export async function getSessionsForMonth(
 
   const { data: allBookings } = await supabase
     .from("bookings")
-    .select("session_id, student_id")
+    .select("session_id, student_id, payment_status")
     .in("session_id", sessionIds)
-    .eq("status", "confirmed");
+    .in("status", ["confirmed", "attended"]);
 
   const studentIds = [...new Set((allBookings ?? []).map((b) => b.student_id))];
 
@@ -75,12 +65,12 @@ export async function getSessionsForMonth(
 
   const studentNameMap = new Map((students ?? []).map((s) => [s.id, s.full_name]));
 
-  const bookingMap: Record<string, { count: number; names: string[] }> = {};
+  const bookingMap: Record<string, { count: number; alunos: { id: string; name: string; paymentStatus: string }[] }> = {};
   for (const b of allBookings ?? []) {
-    if (!bookingMap[b.session_id]) bookingMap[b.session_id] = { count: 0, names: [] };
+    if (!bookingMap[b.session_id]) bookingMap[b.session_id] = { count: 0, alunos: [] };
     bookingMap[b.session_id].count++;
     const name = studentNameMap.get(b.student_id);
-    if (name) bookingMap[b.session_id].names.push(name);
+    if (name) bookingMap[b.session_id].alunos.push({ id: b.student_id, name, paymentStatus: b.payment_status });
   }
 
   for (const s of sessions) {
@@ -91,7 +81,7 @@ export async function getSessionsForMonth(
 
     if (!result[day]) result[day] = [];
 
-    const bData = bookingMap[s.id] ?? { count: 0, names: [] };
+    const bData = bookingMap[s.id] ?? { count: 0, alunos: [] as { id: string; name: string; paymentStatus: string }[] };
 
     result[day].push({
       id: s.id,
@@ -99,7 +89,7 @@ export async function getSessionsForMonth(
       time: `${hours}:${minutes}`,
       capacidade: s.capacity ?? 10,
       alunos: bData.count,
-      alunosList: bData.names,
+      alunosList: bData.alunos,
       class_type_id: s.class_type_id,
     });
   }
@@ -262,10 +252,45 @@ export async function getSchoolStudents(schoolId: string): Promise<{ id: string;
     .map((s) => ({ id: s!.id, name: s!.full_name }));
 }
 
+async function notifyOwnerBooking(
+  schoolId: string,
+  sessionId: string,
+  studentName: string,
+  ownerEmail: string
+): Promise<void> {
+  try {
+    const supabase = await createClient();
+    const [sessionRes, schoolRes] = await Promise.all([
+      supabase.from("sessions").select("starts_at, class_types(name)").eq("id", sessionId).single(),
+      supabase.from("schools").select("name").eq("id", schoolId).single(),
+    ]);
+    const session = sessionRes.data;
+    const school = schoolRes.data;
+    if (!session || !school) return;
+
+    const d = new Date(session.starts_at);
+    const date = d.toLocaleDateString("pt-PT", { day: "numeric", month: "long" });
+    const time = `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
+    const className = (session.class_types as unknown as { name: string } | null)?.name ?? "Aula";
+
+    await sendBookingNotification({
+      ownerEmail,
+      schoolName: school.name,
+      studentName,
+      className,
+      date,
+      time,
+    });
+  } catch {
+    // swallow — notification failure must never break the booking
+  }
+}
+
 export async function createBooking(
   sessionId: string,
   studentId: string,
-  schoolId: string
+  schoolId: string,
+  options?: { paymentMethod?: "single" | "pack"; packPurchaseId?: string }
 ): Promise<{ ok: boolean; error?: string }> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -273,6 +298,32 @@ export async function createBooking(
 
   const rl = await rateLimitByUser(user.id, "createBooking");
   if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
+
+  const paymentMethod = options?.paymentMethod ?? "single";
+  const packPurchaseId = options?.packPurchaseId;
+
+  if (paymentMethod === "pack") {
+    if (!packPurchaseId) return { ok: false, error: "Pack não selecionado" };
+
+    const { data: pp } = await supabase
+      .from("pack_purchases")
+      .select("id, lessons_remaining")
+      .eq("id", packPurchaseId)
+      .eq("student_id", studentId)
+      .eq("status", "active")
+      .single();
+    if (!pp || pp.lessons_remaining < 1) return { ok: false, error: "Pack sem aulas restantes" };
+
+    const newRemaining = pp.lessons_remaining - 1;
+    const { error: updErr } = await supabase
+      .from("pack_purchases")
+      .update({
+        lessons_remaining: newRemaining,
+        ...(newRemaining === 0 ? { status: "exhausted" } : {}),
+      })
+      .eq("id", pp.id);
+    if (updErr) return { ok: false, error: updErr.message };
+  }
 
   const { data: student } = await supabase
     .from("students")
@@ -304,9 +355,10 @@ export async function createBooking(
       booking_group_id: bg.id,
       session_id: sessionId,
       student_id: studentId,
-      payment_method: "single",
+      payment_method: paymentMethod,
       payment_status: "unpaid",
       price_cents: 0,
+      pack_purchase_id: packPurchaseId ?? null,
     });
 
   if (bErr) return { ok: false, error: bErr.message };
@@ -317,8 +369,10 @@ export async function createBooking(
     action: "create_booking",
     entityType: "booking",
     entityId: studentId,
-    metadata: { sessionId, studentName: student.full_name },
+    metadata: { sessionId, studentName: student.full_name, paymentMethod },
   });
+
+  notifyOwnerBooking(schoolId, sessionId, student.full_name, user.email!);
 
   return { ok: true };
 }
@@ -328,7 +382,7 @@ export async function addGuestToSession(
   phone: string | undefined,
   sessionId: string,
   schoolId: string
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: string; studentId?: string; studentName?: string }> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Não autenticado" };
@@ -394,5 +448,312 @@ export async function addGuestToSession(
     metadata: { sessionId, guestName: name, phone },
   });
 
+  notifyOwnerBooking(schoolId, sessionId, name, user.email!);
+
+  return { ok: true, studentId: student.id, studentName: name };
+}
+
+export async function addGroupBooking(
+  sessionId: string,
+  contactName: string,
+  numberOfPeople: number,
+  schoolId: string
+): Promise<{ ok: boolean; error?: string; students?: { id: string; name: string; paymentStatus: string }[] }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Não autenticado" };
+
+  const rl = await rateLimitByUser(user.id, "addGroupBooking");
+  if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
+
+  const { data: school } = await supabase
+    .from("schools")
+    .select("id")
+    .eq("id", schoolId)
+    .eq("owner_user_id", user.id)
+    .maybeSingle();
+  if (!school) return { ok: false, error: "Escola não encontrada" };
+
+  const { data: session } = await supabase
+    .from("sessions")
+    .select("class_type_id")
+    .eq("id", sessionId)
+    .single();
+  if (!session) return { ok: false, error: "Sessão não encontrada" };
+
+  let priceCents = 0;
+  if (session.class_type_id) {
+    const { data: ct } = await supabase
+      .from("class_types")
+      .select("price_cents")
+      .eq("id", session.class_type_id)
+      .single();
+    if (ct) priceCents = ct.price_cents;
+  }
+
+  const admin = createAdminClient();
+
+  // Create N students
+  const studentIds: string[] = [];
+  for (let i = 1; i <= numberOfPeople; i++) {
+    const name = i === 1 ? `Grupo de ${contactName}` : `Grupo de ${contactName} (${i})`;
+    const { data: st, error: err } = await admin
+      .from("students")
+      .insert({ full_name: name, is_guest: true })
+      .select("id")
+      .single();
+    if (err) {
+      for (const sid of studentIds) { await admin.from("students").delete().eq("id", sid); }
+      return { ok: false, error: err.message };
+    }
+    studentIds.push(st.id);
+  }
+
+  // Link all to school
+  for (const sid of studentIds) {
+    const { error: err } = await supabase
+      .from("school_students")
+      .insert({ school_id: schoolId, student_id: sid });
+    if (err) {
+      for (const tid of studentIds) { await admin.from("students").delete().eq("id", tid); }
+      return { ok: false, error: err.message };
+    }
+  }
+
+  // Single booking_group linked to the first student
+  const { data: bg, error: bgErr } = await supabase
+    .from("booking_groups")
+    .insert({
+      school_id: schoolId,
+      session_id: sessionId,
+      booked_by_student_id: studentIds[0],
+      contact_name: contactName,
+      contact_email: `${studentIds[0]}@placeholder.com`,
+      contact_phone: "000000000",
+      source: "guest",
+    })
+    .select("id")
+    .single();
+  if (bgErr) {
+    for (const sid of studentIds) { await admin.from("students").delete().eq("id", sid); }
+    return { ok: false, error: bgErr.message };
+  }
+
+  // One booking per student
+  for (let i = 0; i < studentIds.length; i++) {
+    const { error: bErr } = await supabase
+      .from("bookings")
+      .insert({
+        booking_group_id: bg.id,
+        session_id: sessionId,
+        student_id: studentIds[i],
+        payment_method: "single",
+        payment_status: "unpaid",
+        price_cents: priceCents,
+      });
+    if (bErr) {
+      await supabase.from("bookings").delete().eq("booking_group_id", bg.id);
+      for (const sid of studentIds) { await admin.from("students").delete().eq("id", sid); }
+      return { ok: false, error: bErr.message };
+    }
+  }
+
+  logAudit({
+    schoolId,
+    userId: user.id,
+    action: "add_group_booking",
+    entityType: "booking",
+    entityId: studentIds[0],
+    metadata: { sessionId, contactName, numberOfPeople, priceCents, totalCents: priceCents * numberOfPeople },
+  });
+
+  notifyOwnerBooking(schoolId, sessionId, `Grupo de ${contactName} (${numberOfPeople} pessoas)`, user.email!);
+
+  const groupStudents = studentIds.map((sid, idx) => ({
+    id: sid,
+    name: idx === 0 ? `Grupo de ${contactName}` : `Grupo de ${contactName} (${idx + 1})`,
+    paymentStatus: "unpaid" as const,
+  }));
+
+  return { ok: true, students: groupStudents };
+}
+
+export type StudentProfilePack = {
+  id: string;
+  name: string;
+  remaining: number;
+};
+
+export type StudentProfile = {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  isGuest: boolean;
+  packs: StudentProfilePack[];
+  classLabel: string | null;
+  classDate: string | null;
+};
+
+export async function getStudentProfile(
+  schoolId: string,
+  studentId: string
+): Promise<StudentProfile | null> {
+  const supabase = await createClient();
+
+  const { data: student } = await supabase
+    .from("students")
+    .select("id, full_name, email, phone, is_guest")
+    .eq("id", studentId)
+    .maybeSingle();
+  if (!student) return null;
+
+  // packs
+  const { data: packRows } = await supabase
+    .from("pack_purchases")
+    .select("id, lessons_remaining, pack:packs!inner(name, is_active)")
+    .eq("school_id", schoolId)
+    .eq("student_id", studentId)
+    .eq("status", "active");
+
+  const packs: StudentProfilePack[] = [];
+  for (const pr of packRows ?? []) {
+    const row = pr as { id: string; lessons_remaining: number; pack: unknown };
+    const p = row.pack as { name: string; is_active: boolean } | null;
+    if (p?.is_active) packs.push({ id: row.id, name: p.name, remaining: row.lessons_remaining });
+  }
+
+  // last/next class
+  const { data: bookings } = await supabase
+    .from("bookings")
+    .select("session_id")
+    .eq("student_id", studentId)
+    .in("status", ["confirmed", "attended"]);
+
+  const sessionIds = [...new Set((bookings ?? []).map(b => b.session_id))];
+  let classLabel: string | null = null;
+  let classDate: string | null = null;
+
+  if (sessionIds.length > 0) {
+    const { data: sessions } = await supabase
+      .from("sessions")
+      .select("starts_at")
+      .in("id", sessionIds)
+      .order("starts_at", { ascending: true });
+
+    const now = new Date();
+    let pastDate: Date | null = null;
+    let nextDate: Date | null = null;
+
+    for (const s of sessions ?? []) {
+      const d = new Date(s.starts_at);
+      if (d >= now) { if (!nextDate || d < nextDate) nextDate = d; }
+      else { if (!pastDate || d > pastDate) pastDate = d; }
+    }
+
+    const target = nextDate ?? pastDate;
+    if (target) {
+      classLabel = nextDate ? "Próxima aula" : "Última aula";
+      classDate = target.toLocaleDateString("pt-PT", { day: "numeric", month: "long" });
+    }
+  }
+
+  return {
+    id: student.id,
+    name: student.full_name,
+    email: student.email,
+    phone: student.phone,
+    isGuest: student.is_guest,
+    packs,
+    classLabel,
+    classDate,
+  };
+}
+
+export type AvailablePack = {
+  id: string;
+  name: string;
+  total_lessons: number;
+  price_cents: number;
+};
+
+export async function getAvailablePacks(schoolId: string): Promise<AvailablePack[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("packs")
+    .select("id, name, total_lessons, price_cents")
+    .eq("school_id", schoolId)
+    .eq("is_active", true)
+    .order("name");
+  return data ?? [];
+}
+
+export async function buyPack(
+  studentId: string,
+  packId: string,
+  schoolId: string
+): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Não autenticado" };
+
+  const rl = await rateLimitByUser(user.id, "buyPack");
+  if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
+
+  const { data: pack } = await supabase
+    .from("packs")
+    .select("total_lessons")
+    .eq("id", packId)
+    .eq("school_id", schoolId)
+    .single();
+  if (!pack) return { ok: false, error: "Pack não encontrado" };
+
+  const { error } = await supabase.from("pack_purchases").insert({
+    school_id: schoolId,
+    pack_id: packId,
+    student_id: studentId,
+    lessons_remaining: pack.total_lessons,
+  });
+
+  if (error) return { ok: false, error: error.message };
+
+  logAudit({
+    schoolId,
+    userId: user.id,
+    action: "buy_pack",
+    entityType: "pack_purchase",
+    entityId: packId,
+    metadata: { studentId, lessons: pack.total_lessons },
+  });
+
   return { ok: true };
+}
+
+export async function togglePaymentStatus(
+  sessionId: string,
+  studentId: string,
+  schoolId: string
+): Promise<{ ok: boolean; error?: string; newStatus?: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Não autenticado" };
+
+  const { data: booking } = await supabase
+    .from("bookings")
+    .select("id, payment_status")
+    .eq("session_id", sessionId)
+    .eq("student_id", studentId)
+    .maybeSingle();
+  if (!booking) return { ok: false, error: "Booking não encontrado" };
+
+  const newStatus = booking.payment_status === "paid_offline" ? "unpaid" : "paid_offline";
+
+  const { error } = await supabase
+    .from("bookings")
+    .update({ payment_status: newStatus })
+    .eq("id", booking.id);
+
+  if (error) return { ok: false, error: error.message };
+
+  return { ok: true, newStatus };
 }

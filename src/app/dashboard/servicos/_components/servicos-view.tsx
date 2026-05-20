@@ -1,14 +1,8 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
-  HomeIcon,
-  CalendarIcon,
-  GroupIcon,
-  SessionsIcon,
-  DotsIcon,
   PlusIcon,
 } from "@/app/dashboard/_components/icons";
 import type { ServicoRecord, PackOption } from "../actions";
@@ -19,14 +13,6 @@ type Props = {
   sessions: ServicoRecord[];
   schoolId: string | null;
 };
-
-const NAV_ITEMS = [
-  { href: "/dashboard", label: "Home", icon: HomeIcon },
-  { href: "/dashboard/calendario", label: "Calendário", icon: CalendarIcon },
-  { href: "/dashboard/alunos", label: "Alunos", icon: GroupIcon },
-  { href: "/dashboard/servicos", label: "Serviços", icon: SessionsIcon },
-  { href: "/dashboard/mais", label: "Mais", icon: DotsIcon },
-];
 
 const MODALIDADES = ["Surf", "SUP", "Bodyboard", "Windsurf", "Kitesurf", "Longboard"];
 
@@ -66,7 +52,6 @@ let packIdCounter = 0;
 function nextPackId() { return `pack_${++packIdCounter}`; }
 
 export function ServicosView({ sessions, schoolId }: Props) {
-  const pathname = usePathname();
   const router = useRouter();
   const [selectedSession, setSelectedSession] = useState<ServicoRecord | null>(null);
   const [showModal, setShowModal] = useState(false);
@@ -128,8 +113,8 @@ export function ServicosView({ sessions, schoolId }: Props) {
   }
 
   return (
-    <div className="h-dvh overflow-hidden bg-background text-foreground font-body flex flex-col">
-      <main className="flex-1 flex flex-col px-5 pt-0 pb-24">
+    <>
+      <main className="px-5 pt-4">
         <section className="mt-6 mb-8">
           <h1 className="font-heading text-3xl font-bold text-foreground">
             Serviços
@@ -613,31 +598,6 @@ export function ServicosView({ sessions, schoolId }: Props) {
         </div>
       )}
 
-      {/* Scroll shadow */}
-      <div className="pointer-events-none fixed bottom-[calc(1.75rem+env(safe-area-inset-bottom))] left-0 right-0 z-40 h-16 bg-gradient-to-t from-background to-transparent" />
-
-      <nav
-        className="fixed left-1/2 z-50 flex w-[90%] max-w-md -translate-x-1/2 items-center justify-around rounded-full border border-accent/10 bg-surface-container-high px-2 py-2 shadow-lg backdrop-blur-md"
-        style={{ bottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
-      >
-        {NAV_ITEMS.map((item) => {
-          const isActive = pathname === item.href;
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={
-                isActive
-                  ? "flex h-12 w-12 scale-90 items-center justify-center rounded-full bg-accent text-primary-foreground transition-all duration-200"
-                  : "flex h-12 w-12 items-center justify-center rounded-full text-text-secondary transition-all hover:bg-accent/10"
-              }
-            >
-              <Icon className="h-5 w-5" />
-            </Link>
-          );
-        })}
-      </nav>
-    </div>
+    </>
   );
 }

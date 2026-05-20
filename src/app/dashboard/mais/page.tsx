@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { MaisView } from "./_components/mais-view";
-import { getSchoolInfo, getSchoolId } from "../actions";
+import { getSchoolInfo } from "../actions";
+import { getSchoolId } from "@/lib/school";
 
 export default async function MaisPage() {
   const supabase = await createClient();

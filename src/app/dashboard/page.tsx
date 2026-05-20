@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { DashboardView } from "./_components/dashboard-view";
-import { getSchoolId, getTodaySessions } from "./actions";
+import { getTodaySessions, getAlertas } from "./actions";
+import { getMetricas } from "./mais-metricas/actions";
+import { getSchoolId } from "@/lib/school";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -19,11 +21,16 @@ export default async function DashboardPage() {
 
   const schoolId = await getSchoolId();
   const todaySessions = schoolId ? await getTodaySessions(schoolId) : [];
+  const metricas = schoolId ? await getMetricas("esta_semana") : null;
+  const alertas = schoolId ? await getAlertas(schoolId) : [];
 
   return (
     <DashboardView
       fullName={profile?.full_name ?? "Utilizador"}
       todaySessions={todaySessions}
+      metricas={metricas}
+      alertas={alertas}
+      schoolId={schoolId ?? ""}
     />
   );
 }

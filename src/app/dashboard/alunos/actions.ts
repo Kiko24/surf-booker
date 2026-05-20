@@ -4,6 +4,12 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { rateLimitByUser } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
+import { getSchoolId } from "@/lib/school";
+
+export type StudentPack = {
+  name: string;
+  remaining: number;
+};
 
 export type StudentRecord = {
   id: string;
@@ -11,25 +17,13 @@ export type StudentRecord = {
   email: string | null;
   phone: string | null;
   isGuest: boolean;
+  hasActivePack: boolean;
   classLabel: string | null;
   classDate: string | null;
   classDateRaw: string | null;
   firstSeenAt: string;
+  packs: StudentPack[];
 };
-
-export async function getSchoolId(): Promise<string | null> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const { data } = await supabase
-    .from("schools")
-    .select("id")
-    .eq("owner_user_id", user.id)
-    .maybeSingle();
-
-  return data?.id ?? null;
-}
 
 export async function getStudents(schoolId: string): Promise<StudentRecord[]> {
   const supabase = await createClient();
@@ -78,6 +72,22 @@ export async function getStudents(schoolId: string): Promise<StudentRecord[]> {
     }
   }
 
+  // get pack purchases for all students
+  const { data: studentPacks } = await supabase
+    .from("pack_purchases")
+    .select("student_id, lessons_remaining, pack:packs!inner(name, is_active)")
+    .eq("school_id", schoolId)
+    .eq("status", "active");
+
+  const packsByStudent = new Map<string, StudentPack[]>();
+  for (const sp of studentPacks ?? []) {
+    const p = sp.pack as unknown as { name: string; is_active: boolean } | null;
+    if (!p || !p.is_active) continue;
+    const list = packsByStudent.get(sp.student_id) ?? [];
+    list.push({ name: p.name, remaining: sp.lessons_remaining });
+    packsByStudent.set(sp.student_id, list);
+  }
+
   const now = new Date();
   const result: StudentRecord[] = [];
 
@@ -116,12 +126,14 @@ export async function getStudents(schoolId: string): Promise<StudentRecord[]> {
       email: s.email,
       phone: s.phone,
       isGuest: s.is_guest,
+      hasActivePack: (packsByStudent.get(s.id)?.length ?? 0) > 0,
       classLabel: label,
       classDate: targetDate
         ? targetDate.toLocaleDateString("pt-PT", { day: "numeric", month: "long", year: "numeric" })
         : null,
       classDateRaw: targetDate ? targetDate.toISOString().split("T")[0] : null,
       firstSeenAt: r.first_seen_at,
+      packs: packsByStudent.get(s.id) ?? [],
     });
   }
 

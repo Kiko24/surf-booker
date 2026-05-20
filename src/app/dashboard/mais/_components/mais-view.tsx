@@ -1,17 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useState, useCallback, useRef } from "react";
-import {
-  HomeIcon,
-  CalendarIcon,
-  GroupIcon,
-  SessionsIcon,
-  DotsIcon,
-} from "@/app/dashboard/_components/icons";
+import { useRouter } from "next/navigation";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { addImageRecord, deleteImage, getImages, type SchoolImage } from "../actions";
+import { addSchoolImage, deleteImage, getImages, saveInstructor, deleteInstructor, getInstructors, type SchoolImage, type Instructor } from "../actions";
 
 type Props = {
   fullName: string;
@@ -24,16 +17,7 @@ type Props = {
   schoolId: string | null;
 };
 
-const NAV_ITEMS = [
-  { href: "/dashboard", label: "Home", icon: HomeIcon },
-  { href: "/dashboard/calendario", label: "Calendário", icon: CalendarIcon },
-  { href: "/dashboard/alunos", label: "Alunos", icon: GroupIcon },
-  { href: "/dashboard/servicos", label: "Serviços", icon: SessionsIcon },
-  { href: "/dashboard/mais", label: "Mais", icon: DotsIcon },
-];
-
 export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, schoolLocation, schoolDescription, schoolId }: Props) {
-  const pathname = usePathname();
   const router = useRouter();
   const [showProfile, setShowProfile] = useState(false);
   const [profileName, setProfileName] = useState(fullName);
@@ -48,10 +32,22 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
   const [showInstructors, setShowInstructors] = useState(false);
   const [instrutorNome, setInstrutorNome] = useState("");
   const [instrutorNivel, setInstrutorNivel] = useState("");
-  const [instrutorFoto, setInstrutorFoto] = useState<string | null>(null);
-  const [instrutores, setInstrutores] = useState<{ nome: string; nivel: string; foto: string | null }[]>([]);
-  const [editingInstrutorIndex, setEditingInstrutorIndex] = useState<number | null>(null);
+  const [instrutorFotoFile, setInstrutorFotoFile] = useState<File | null>(null);
+  const [instrutorFotoPreview, setInstrutorFotoPreview] = useState<string | null>(null);
+  const [instrutores, setInstrutores] = useState<Instructor[]>([]);
+  const [editingInstrutorId, setEditingInstrutorId] = useState<string | null>(null);
   const instrutorFileRef = useRef<HTMLInputElement>(null);
+  const [instrutorSaving, setInstrutorSaving] = useState(false);
+
+  useEffect(() => {
+    if (showInstructors && schoolId) {
+      getInstructors(schoolId).then(setInstrutores);
+    }
+  }, [showInstructors, schoolId]);
+
+  const loadInstructors = useCallback(() => {
+    if (schoolId) getInstructors(schoolId).then(setInstrutores);
+  }, [schoolId]);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const logoFileRef = useRef<HTMLInputElement>(null);
 
@@ -74,9 +70,8 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
   }
 
   return (
-    <div className="h-dvh overflow-hidden bg-background text-foreground font-body flex flex-col">
-
-      <main className="flex-1 flex flex-col overflow-y-auto px-5 pb-24 [&::-webkit-scrollbar]:hidden">
+    <>
+      <main className="px-5 pt-4">
 
         {/* School Header — horizontal */}
         <div className="mt-8 mb-8 flex items-center gap-4">
@@ -191,8 +186,8 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                 <path d="m9 18 6-6-6-6" />
               </svg>
             </button>
-            <button
-              type="button"
+            <Link
+              href="/dashboard/mais-metricas"
               className="flex w-full items-center justify-between rounded-xl bg-surface px-5 py-4 text-left transition-colors hover:bg-[#2A2A2A] active:scale-[0.99]"
             >
               <div>
@@ -202,9 +197,9 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 text-text-muted">
                 <path d="m9 18 6-6-6-6" />
               </svg>
-            </button>
-            <button
-              type="button"
+            </Link>
+            <Link
+              href="/dashboard/mais-help"
               className="flex w-full items-center justify-between rounded-xl bg-surface px-5 py-4 text-left transition-colors hover:bg-[#2A2A2A] active:scale-[0.99]"
             >
               <div>
@@ -214,7 +209,7 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 text-text-muted">
                 <path d="m9 18 6-6-6-6" />
               </svg>
-            </button>
+            </Link>
           </div>
         </div>
 
@@ -227,6 +222,11 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
           </div>
           <button
             type="button"
+            onClick={async () => {
+              const { logoutOwner } = await import("../../actions");
+              await logoutOwner();
+              window.location.href = "/";
+            }}
             className="w-full rounded-xl bg-error/20 py-3 font-body text-sm font-semibold text-error transition-colors hover:bg-error/30"
           >
             Terminar sessão
@@ -235,34 +235,6 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
 
       </main>
 
-      {/* Scroll shadow */}
-      <div className="pointer-events-none fixed bottom-[calc(1.75rem+env(safe-area-inset-bottom))] left-0 right-0 z-40 h-16 bg-gradient-to-t from-background to-transparent" />
-
-      {/* Bottom Navigation */}
-      <nav
-        className="fixed left-1/2 z-50 flex w-[90%] max-w-md -translate-x-1/2 items-center justify-around rounded-full border border-accent/10 bg-surface-container-high px-2 py-2 shadow-lg backdrop-blur-md"
-        style={{ bottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
-      >
-        {NAV_ITEMS.map((item) => {
-          const isActive = pathname === item.href;
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={
-                isActive
-                  ? "flex h-12 w-12 scale-90 items-center justify-center rounded-full bg-accent text-primary-foreground transition-all duration-200"
-                  : "flex h-12 w-12 items-center justify-center rounded-full text-text-secondary transition-all hover:bg-accent/10"
-              }
-            >
-              <Icon className="h-5 w-5" />
-            </Link>
-          );
-        })}
-      </nav>
-
-      {/* Profile Modal */}
       {showProfile && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50">
           <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-10 max-h-[90vh] overflow-y-auto">
@@ -453,7 +425,7 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
           <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-10 max-h-[90vh] overflow-y-auto">
             <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted" />
 
-            <h3 className="font-heading text-2xl font-bold text-foreground mb-6">{editingInstrutorIndex !== null ? "Editar Instrutor" : "Adicionar Instrutor"}</h3>
+            <h3 className="font-heading text-2xl font-bold text-foreground mb-6">{editingInstrutorId !== null ? "Editar Instrutor" : "Adicionar Instrutor"}</h3>
 
             {/* Avatar upload circle — centered */}
             <div className="mb-8 flex justify-center">
@@ -462,8 +434,8 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                 onClick={() => instrutorFileRef.current?.click()}
                 className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-2 border-dashed border-text-muted bg-[#2A2A2A] transition-colors hover:border-accent hover:bg-accent/10"
               >
-                {instrutorFoto ? (
-                  <img src={instrutorFoto} alt="" className="h-full w-full object-cover" />
+                {instrutorFotoPreview ? (
+                  <img src={instrutorFotoPreview} alt="" className="h-full w-full object-cover" />
                 ) : (
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8 text-text-muted">
                     <line x1="12" x2="12" y1="5" y2="19" />
@@ -476,7 +448,7 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                 type="file"
                 accept="image/png,image/webp,image/jpeg"
                 className="hidden"
-                onChange={(e) => {
+                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (!file) return;
                   if (!["image/png", "image/webp", "image/jpeg"].includes(file.type)) {
@@ -487,8 +459,9 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                     console.error("Foto demasiado grande. Máximo 1MB");
                     return;
                   }
+                  setInstrutorFotoFile(file);
                   const reader = new FileReader();
-                  reader.onloadend = () => setInstrutorFoto(reader.result as string);
+                  reader.onloadend = () => setInstrutorFotoPreview(reader.result as string);
                   reader.readAsDataURL(file);
                 }}
               />
@@ -526,25 +499,26 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
             {instrutores.length > 0 && (
               <div className="mt-6 space-y-2">
                 {instrutores.map((inst, i) => (
-                  <div key={i} className="flex items-center gap-3 rounded-xl bg-[#2A2A2A] px-4 py-3">
+                  <div key={inst.id} className="flex items-center gap-3 rounded-xl bg-[#2A2A2A] px-4 py-3">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-background text-sm font-bold text-accent">
-                      {inst.foto ? (
-                        <img src={inst.foto} alt="" className="h-full w-full object-cover" />
+                      {inst.avatar_url ? (
+                        <img src={inst.avatar_url} alt="" className="h-full w-full object-cover" />
                       ) : (
-                        inst.nome.split(" ").map(p => p[0]).join("").substring(0, 2).toUpperCase()
+                        inst.name.split(" ").map(p => p[0]).join("").substring(0, 2).toUpperCase()
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-body text-sm font-semibold text-foreground truncate">{inst.nome}</p>
-                      <p className="font-body text-xs text-text-secondary">Nível {inst.nivel || "—"}</p>
+                      <p className="font-body text-sm font-semibold text-foreground truncate">{inst.name}</p>
+                      <p className="font-body text-xs text-text-secondary">Nível {inst.level || "—"}</p>
                     </div>
                     <button
                       type="button"
                       onClick={() => {
-                        setEditingInstrutorIndex(i);
-                        setInstrutorNome(inst.nome);
-                        setInstrutorNivel(inst.nivel);
-                        setInstrutorFoto(inst.foto);
+                        setEditingInstrutorId(inst.id);
+                        setInstrutorNome(inst.name);
+                        setInstrutorNivel(inst.level);
+                        setInstrutorFotoPreview(null);
+                        setInstrutorFotoFile(null);
                       }}
                       className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:text-accent"
                     >
@@ -554,7 +528,11 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                     </button>
                     <button
                       type="button"
-                      onClick={() => setInstrutores(prev => prev.filter((_, j) => j !== i))}
+                      onClick={async () => {
+                        if (!schoolId) return;
+                        const res = await deleteInstructor(schoolId, inst.id);
+                        if (res.ok) loadInstructors();
+                      }}
                       className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:text-error"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
@@ -575,8 +553,9 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                   setShowInstructors(false);
                   setInstrutorNome("");
                   setInstrutorNivel("");
-                  setInstrutorFoto(null);
-                  setEditingInstrutorIndex(null);
+                  setInstrutorFotoFile(null);
+                  setInstrutorFotoPreview(null);
+                  setEditingInstrutorId(null);
                 }}
                 className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
               >
@@ -584,25 +563,31 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  if (!instrutorNome.trim()) return;
-                  if (editingInstrutorIndex !== null) {
-                    setInstrutores(prev => prev.map((inst, j) =>
-                      j === editingInstrutorIndex
-                        ? { nome: instrutorNome.trim(), nivel: instrutorNivel.trim(), foto: instrutorFoto }
-                        : inst
-                    ));
-                    setEditingInstrutorIndex(null);
+                disabled={instrutorSaving}
+                onClick={async () => {
+                  if (!instrutorNome.trim() || !schoolId) return;
+                  setInstrutorSaving(true);
+                  const fd = new FormData();
+                  if (editingInstrutorId) fd.set("id", editingInstrutorId);
+                  fd.set("name", instrutorNome.trim());
+                  fd.set("level", instrutorNivel.trim());
+                  if (instrutorFotoFile) fd.set("avatar", instrutorFotoFile);
+                  const res = await saveInstructor(schoolId, null, fd);
+                  if (res.ok) {
+                    setInstrutorNome("");
+                    setInstrutorNivel("");
+                    setInstrutorFotoFile(null);
+                    setInstrutorFotoPreview(null);
+                    setEditingInstrutorId(null);
+                    loadInstructors();
                   } else {
-                    setInstrutores(prev => [...prev, { nome: instrutorNome.trim(), nivel: instrutorNivel.trim(), foto: instrutorFoto }]);
+                    console.error("save error:", res.error);
                   }
-                  setInstrutorNome("");
-                  setInstrutorNivel("");
-                  setInstrutorFoto(null);
+                  setInstrutorSaving(false);
                 }}
-                className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95"
+                className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95 disabled:opacity-50"
               >
-                {editingInstrutorIndex !== null ? "Guardar" : "Adicionar"}
+                {instrutorSaving ? "A guardar..." : editingInstrutorId !== null ? "Guardar" : "Adicionar"}
               </button>
             </div>
           </div>
@@ -642,30 +627,9 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                 onChange={async (e) => {
                   const file = e.target.files?.[0];
                   if (!file || !schoolId) return;
-                  const ALLOWED = ["image/png", "image/webp", "image/jpeg"];
-                  if (!ALLOWED.includes(file.type)) {
-                    console.error("Formato não permitido. Usa PNG, WebP ou JPEG");
-                    return;
-                  }
-                  if (file.size > 2 * 1024 * 1024) {
-                    console.error("Imagem demasiado grande. Máximo 2MB");
-                    return;
-                  }
-                  const ext = file.name.split(".").pop() || "png";
-                  const fileName = `${crypto.randomUUID()}.${ext}`;
-                  const filePath = `${schoolId}/${fileName}`;
-                  const sb = createClient();
-                  const { error: uploadErr } = await sb.storage
-                    .from("school-images")
-                    .upload(filePath, file, { contentType: file.type });
-                  if (uploadErr) {
-                    console.error("storage error:", uploadErr.message);
-                    return;
-                  }
-                  const res = await addImageRecord(schoolId, filePath);
+                  const res = await addSchoolImage(schoolId, file);
                   if (!res.ok) {
-                    console.error("db error:", res.error);
-                    await sb.storage.from("school-images").remove([filePath]);
+                    console.error("upload error:", res.error);
                     return;
                   }
                   const data = await getImages(schoolId);
@@ -751,8 +715,6 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
           />
         </div>
       )}
-
-
-    </div>
+    </>
   );
 }
