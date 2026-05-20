@@ -24,6 +24,27 @@ export async function getSchoolId(): Promise<string | null> {
   return data?.id ?? null;
 }
 
+export type SchoolInfo = {
+  name: string;
+  logo_url: string | null;
+  location: string | null;
+  description: string | null;
+};
+
+export async function getSchoolInfo(): Promise<SchoolInfo | null> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data } = await supabase
+    .from("schools")
+    .select("name, logo_url, location, description")
+    .eq("owner_user_id", user.id)
+    .maybeSingle();
+
+  return data;
+}
+
 export async function getTodaySessions(schoolId: string): Promise<TodaySession[]> {
   const supabase = await createClient();
 

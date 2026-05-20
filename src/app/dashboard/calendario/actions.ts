@@ -12,6 +12,14 @@ export type SessionData = {
   capacidade: number;
   alunos: number;
   alunosList: string[];
+  class_type_id: string | null;
+};
+
+export type AvulsoServico = {
+  id: string;
+  name: string;
+  default_duration_minutes: number | null;
+  price_cents: number;
 };
 
 export async function getSchoolId(): Promise<string | null> {
@@ -92,14 +100,26 @@ export async function getSessionsForMonth(
       capacidade: s.capacity ?? 10,
       alunos: bData.count,
       alunosList: bData.names,
+      class_type_id: s.class_type_id,
     });
   }
 
   return result;
 }
 
+export async function getAvulsoServicos(schoolId: string): Promise<AvulsoServico[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("class_types")
+    .select("id, name, default_duration_minutes, price_cents")
+    .eq("school_id", schoolId)
+    .eq("is_active", true)
+    .order("created_at", { ascending: false });
+  return data ?? [];
+}
+
 export async function createSession(formData: {
-  nome: string;
+  class_type_id: string | null;
   data: string;
   horario: string;
   duracao: number;
@@ -119,44 +139,13 @@ export async function createSession(formData: {
     return { ok: false, error: "Data ou horário inválidos" };
   }
 
-  // find or create class_type
-  let classTypeId: string | null = null;
-  const name = formData.nome.trim();
-
-  if (name) {
-    const { data: existing } = await supabase
-      .from("class_types")
-      .select("id")
-      .eq("school_id", formData.schoolId)
-      .eq("name", name)
-      .maybeSingle();
-
-    if (existing) {
-      classTypeId = existing.id;
-    } else {
-      const { data: created, error: createErr } = await supabase
-        .from("class_types")
-        .insert({
-          school_id: formData.schoolId,
-          name,
-          default_duration_minutes: formData.duracao,
-          price_cents: 0,
-        })
-        .select("id")
-        .single();
-
-      if (createErr) return { ok: false, error: createErr.message };
-      classTypeId = created.id;
-    }
-  }
-
   const { data: createdSession, error } = await supabase.from("sessions").insert({
     school_id: formData.schoolId,
     starts_at: startsAt.toISOString(),
     duration_minutes: formData.duracao,
     capacity: formData.capacidade,
     price_cents: 0,
-    class_type_id: classTypeId,
+    class_type_id: formData.class_type_id,
     status: "scheduled",
   }).select("id").single();
 
@@ -168,7 +157,7 @@ export async function createSession(formData: {
     action: "create_session",
     entityType: "session",
     entityId: createdSession.id,
-    metadata: { nome: formData.nome, data: formData.data, horario: formData.horario },
+    metadata: { class_type_id: formData.class_type_id, data: formData.data, horario: formData.horario },
   });
 
   return { ok: true };
@@ -212,7 +201,7 @@ export async function deleteSession(sessionId: string): Promise<{ ok: boolean; e
 export async function updateSession(
   sessionId: string,
   formData: {
-    nome: string;
+    class_type_id: string | null;
     data: string;
     horario: string;
     duracao: number;
@@ -233,44 +222,13 @@ export async function updateSession(
     return { ok: false, error: "Data ou horário inválidos" };
   }
 
-  // find or create class_type
-  let classTypeId: string | null = null;
-  const name = formData.nome.trim();
-
-  if (name) {
-    const { data: existing } = await supabase
-      .from("class_types")
-      .select("id")
-      .eq("school_id", formData.schoolId)
-      .eq("name", name)
-      .maybeSingle();
-
-    if (existing) {
-      classTypeId = existing.id;
-    } else {
-      const { data: created, error: createErr } = await supabase
-        .from("class_types")
-        .insert({
-          school_id: formData.schoolId,
-          name,
-          default_duration_minutes: formData.duracao,
-          price_cents: 0,
-        })
-        .select("id")
-        .single();
-
-      if (createErr) return { ok: false, error: createErr.message };
-      classTypeId = created.id;
-    }
-  }
-
   const { error } = await supabase
     .from("sessions")
     .update({
       starts_at: startsAt.toISOString(),
       duration_minutes: formData.duracao,
       capacity: formData.capacidade,
-      class_type_id: classTypeId,
+      class_type_id: formData.class_type_id,
     })
     .eq("id", sessionId);
 
@@ -282,7 +240,7 @@ export async function updateSession(
     action: "update_session",
     entityType: "session",
     entityId: sessionId,
-    metadata: { nome: formData.nome, data: formData.data, horario: formData.horario },
+    metadata: { class_type_id: formData.class_type_id, data: formData.data, horario: formData.horario },
   });
 
   return { ok: true };

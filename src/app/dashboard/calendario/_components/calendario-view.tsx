@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams, useRouter } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
-import { getSessionsForMonth, createSession, updateSession, deleteSession, getSchoolStudents, createBooking, addGuestToSession, type SessionData } from "../actions";
+import { getSessionsForMonth, createSession, updateSession, deleteSession, getSchoolStudents, createBooking, addGuestToSession, getAvulsoServicos, type SessionData, type AvulsoServico } from "../actions";
 import {
   HomeIcon,
   CalendarIcon,
@@ -41,6 +41,7 @@ type DaySession = {
   capacidade: number;
   alunos: number;
   alunosList: string[];
+  class_type_id: string | null;
 };
 
 const EMPTY_SESSIONS: Record<number, DaySession[]> = {};
@@ -64,6 +65,7 @@ function ChevronRight({ className }: { className?: string }) {
 export function CalendarioView({ schoolId }: Props) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
@@ -71,11 +73,12 @@ export function CalendarioView({ schoolId }: Props) {
   const [sessions, setSessions] = useState<Record<number, DaySession[]>>(EMPTY_SESSIONS);
   const [showModal, setShowModal] = useState(false);
   const [dataAula, setDataAula] = useState("");
-  const [nomeAula, setNomeAula] = useState("");
   const [horario, setHorario] = useState("");
   const [duracao, setDuracao] = useState("90");
   const [capacidade, setCapacidade] = useState("");
   const [instrutores, setInstrutores] = useState("");
+  const [servicos, setServicos] = useState<AvulsoServico[]>([]);
+  const [selectedServicoId, setSelectedServicoId] = useState("");
   const [expandedSession, setExpandedSession] = useState<number | null>(null);
   const [loadingSessions, setLoadingSessions] = useState(false);
 
@@ -90,6 +93,13 @@ export function CalendarioView({ schoolId }: Props) {
   useEffect(() => {
     fetchSessions(year, month);
   }, [year, month, fetchSessions]);
+
+  const fetchServicos = useCallback(async () => {
+    if (!schoolId) return;
+    const data = await getAvulsoServicos(schoolId);
+    setServicos(data);
+  }, [schoolId]);
+
   const [editingSession, setEditingSession] = useState<number | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingSession, setDeletingSession] = useState<number | null>(null);
@@ -347,14 +357,16 @@ export function CalendarioView({ schoolId }: Props) {
                                 type="button"
                                 onClick={() => {
                                   setEditingSession(i);
-                                  setNomeAula(s.nome);
                                   setDataAula(selectedDay ? `${year}-${String(month + 1).padStart(2, "0")}-${String(selectedDay).padStart(2, "0")}` : "");
                                   const [h, m] = s.time.split(":");
                                   setHorario(`${h.padStart(2, "0")}:${(m ?? "00").padStart(2, "0")}`);
-                                  setDuracao("90");
+                                  setSelectedServicoId(s.class_type_id ?? "");
+                                  const svc = servicos.find((sv) => sv.id === s.class_type_id);
+                                  setDuracao(svc?.default_duration_minutes ? String(svc.default_duration_minutes) : "90");
                                   setCapacidade(String(s.capacidade));
                                   setInstrutores("");
                                   setShowModal(true);
+                                  fetchServicos();
                                 }}
                                 className="flex-1 rounded-lg bg-accent/20 py-2 font-body text-sm font-semibold text-accent transition-colors hover:bg-accent/30"
                               >
@@ -419,11 +431,12 @@ export function CalendarioView({ schoolId }: Props) {
           setEditingSession(null);
           setShowModal(true);
           setDataAula(selectedDay ? `${year}-${String(month + 1).padStart(2, "0")}-${String(selectedDay).padStart(2, "0")}` : "");
-          setNomeAula("");
+          setSelectedServicoId("");
           setHorario("");
           setDuracao("90");
           setCapacidade("");
           setInstrutores("");
+          fetchServicos();
         }}
         className="fixed bottom-24 right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-primary-foreground shadow-2xl active:scale-90 transition-all duration-200"
         aria-label="Adicionar evento"
@@ -563,19 +576,42 @@ export function CalendarioView({ schoolId }: Props) {
             </h3>
 
             <div className="space-y-4">
-              {/* Nome */}
+              {/* Serviço */}
               <div>
                 <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
-                  Nome da aula <span className="text-error">*</span>
+                  Serviço <span className="text-error">*</span>
                 </label>
-                <input
-                  type="text"
-                  value={nomeAula}
-                  onChange={(e) => setNomeAula(e.target.value)}
-                  placeholder="Ex: Aula iniciantes"
-                  className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
-                  required
-                />
+                <div className="relative">
+                  <select
+                    value={selectedServicoId}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === "__add__") {
+                        router.push("/dashboard/servicos");
+                        return;
+                      }
+                      setSelectedServicoId(val);
+                      const svc = servicos.find((s) => s.id === val);
+                      if (svc?.default_duration_minutes) {
+                        setDuracao(String(svc.default_duration_minutes));
+                      }
+                    }}
+                    className="w-full appearance-none rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground outline-none focus:outline-2 focus:outline-accent"
+                    required
+                  >
+                    <option value="">Selecionar serviço</option>
+                    {servicos.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                    <option disabled>──────────</option>
+                    <option value="__add__">+ Adicionar novo serviço</option>
+                  </select>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted">
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </div>
               </div>
 
               {/* Data */}
@@ -602,23 +638,6 @@ export function CalendarioView({ schoolId }: Props) {
                   value={horario}
                   onChange={(e) => setHorario(e.target.value)}
                   className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground outline-none focus:outline-2 focus:outline-accent [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:invert-[0.7] [&::-webkit-calendar-picker-indicator]:cursor-pointer"
-                  required
-                />
-              </div>
-
-              {/* Duração */}
-              <div>
-                <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
-                  Duração <span className="text-text-muted">(minutos)</span> <span className="text-error">*</span>
-                </label>
-                <input
-                  type="number"
-                  min="15"
-                  max="480"
-                  value={duracao}
-                  onChange={(e) => setDuracao(e.target.value)}
-                  placeholder="Ex: 90"
-                  className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
                   required
                 />
               </div>
@@ -665,11 +684,11 @@ export function CalendarioView({ schoolId }: Props) {
                 <button
                   type="button"
                   onClick={async () => {
-                    if (!horario || !duracao || !capacidade || !nomeAula || !dataAula || !schoolId) {
+                    if (!horario || !duracao || !capacidade || !selectedServicoId || !dataAula || !schoolId) {
                       return;
                     }
                     const payload = {
-                      nome: nomeAula,
+                      class_type_id: selectedServicoId,
                       data: dataAula,
                       horario,
                       duracao: Number(duracao),

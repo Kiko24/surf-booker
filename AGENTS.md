@@ -350,3 +350,7 @@ SELECT id, full_name FROM students WHERE id IN (...);
 4. Match existing UI patterns (bottom sheets, Tailwind classes, naming)
 5. Build with `npx next build` before finishing
 6. Only commit when explicitly asked
+
+## Security Checks
+1. Security is the most important thing on the software, NEVER compromise it for whatever reason.
+2. If you have any question regarding security or something that can break, ask directly to me before commit anything.
