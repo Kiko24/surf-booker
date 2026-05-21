@@ -30,6 +30,7 @@ export default async function MaisPage() {
       schoolLogoUrl={school?.logo_url ?? null}
       schoolLocation={school?.location ?? null}
       schoolDescription={school?.description ?? null}
+      cancellationWindowHours={school?.cancellation_window_hours ?? 24}
       schoolId={schoolId}
     />
   );

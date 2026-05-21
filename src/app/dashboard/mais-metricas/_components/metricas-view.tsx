@@ -271,9 +271,27 @@ export function MetricasView() {
               </section>
             )}
 
+            {/* Instrutores */}
+            <section className="rounded-xl bg-surface p-5">
+              <h2 className="font-heading text-lg font-bold text-foreground mb-3">Instrutores</h2>
+              {d.instrutores.length === 0 ? (
+                <p className="font-body text-sm text-text-muted">Os instrutores não têm aulas registadas</p>
+              ) : (
+                <div className="space-y-2">
+                  {d.instrutores.map((inst) => (
+                    <div key={inst.nome} className="flex items-center justify-between">
+                      <span className="font-body text-sm text-foreground">{inst.nome}</span>
+                      <span className="font-body text-sm font-semibold text-accent">
+                        {inst.total} {inst.total === 1 ? "aula" : "aulas"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
           </div>
         )}
-
       </main>
 
           {showCustom && (

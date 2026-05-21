@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useCallback, useRef, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { addSchoolImage, deleteImage, getImages, saveInstructor, deleteInstructor, getInstructors, type SchoolImage, type Instructor } from "../actions";
+import { addSchoolImage, deleteImage, getImages, saveInstructor, deleteInstructor, getInstructors, getSchoolSettings, saveSchoolSettings, saveSchoolInfo, type SchoolImage, type Instructor, type SchoolSettings } from "../actions";
 
 type Props = {
   fullName: string;
@@ -14,10 +14,11 @@ type Props = {
   schoolLogoUrl: string | null;
   schoolLocation: string | null;
   schoolDescription: string | null;
+  cancellationWindowHours: number;
   schoolId: string | null;
 };
 
-export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, schoolLocation, schoolDescription, schoolId }: Props) {
+export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, schoolLocation, schoolDescription, cancellationWindowHours, schoolId }: Props) {
   const router = useRouter();
   const [showProfile, setShowProfile] = useState(false);
   const [profileName, setProfileName] = useState(fullName);
@@ -38,6 +39,7 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
   const [editingInstrutorId, setEditingInstrutorId] = useState<string | null>(null);
   const instrutorFileRef = useRef<HTMLInputElement>(null);
   const [instrutorSaving, setInstrutorSaving] = useState(false);
+  const [instrutorError, setInstrutorError] = useState("");
 
   useEffect(() => {
     if (showInstructors && schoolId) {
@@ -45,16 +47,42 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
     }
   }, [showInstructors, schoolId]);
 
+  useEffect(() => {
+    if (showCompany && schoolId) {
+      getImages(schoolId).then(setImages);
+    }
+  }, [showCompany, schoolId]);
+
   const loadInstructors = useCallback(() => {
     if (schoolId) getInstructors(schoolId).then(setInstrutores);
   }, [schoolId]);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const logoFileRef = useRef<HTMLInputElement>(null);
 
-  const [showImages, setShowImages] = useState(false);
   const [images, setImages] = useState<SchoolImage[]>([]);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const imageFileRef = useRef<HTMLInputElement>(null);
+
+  const [showSettings, setShowSettings] = useState(false);
+  const [settings, setSettings] = useState<SchoolSettings>({
+    cancellation_window_hours: cancellationWindowHours,
+    low_occupancy_threshold: 40,
+    notify_email_confirmation: true,
+    notify_reminder_24h: true,
+    notify_sms_cancellation: false,
+    notify_new_schedule: true,
+  });
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [settingsError, setSettingsError] = useState("");
+  const [companySaving, setCompanySaving] = useState(false);
+
+  useEffect(() => {
+    if (showSettings && schoolId) {
+      getSchoolSettings(schoolId).then((s) => {
+        if (s) setSettings(s);
+      });
+    }
+  }, [showSettings, schoolId]);
 
   const openProfile = useCallback(() => {
     setProfileName(fullName);
@@ -167,25 +195,6 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                 <path d="m9 18 6-6-6-6" />
               </svg>
             </button>
-            <button
-              type="button"
-              onClick={async () => {
-                if (schoolId) {
-                  const data = await getImages(schoolId);
-                  setImages(data);
-                }
-                setShowImages(true);
-              }}
-              className="flex w-full items-center justify-between rounded-xl bg-surface px-5 py-4 text-left transition-colors hover:bg-[#2A2A2A] active:scale-[0.99]"
-            >
-              <div>
-                <p className="font-body text-base font-semibold text-foreground">Imagens</p>
-                <p className="font-body text-sm text-text-secondary">Gerir showcase do negócio</p>
-              </div>
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 text-text-muted">
-                <path d="m9 18 6-6-6-6" />
-              </svg>
-            </button>
             <Link
               href="/dashboard/mais-metricas"
               className="flex w-full items-center justify-between rounded-xl bg-surface px-5 py-4 text-left transition-colors hover:bg-[#2A2A2A] active:scale-[0.99]"
@@ -198,6 +207,19 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                 <path d="m9 18 6-6-6-6" />
               </svg>
             </Link>
+            <button
+              type="button"
+              onClick={() => setShowSettings(true)}
+              className="flex w-full items-center justify-between rounded-xl bg-surface px-5 py-4 text-left transition-colors hover:bg-[#2A2A2A] active:scale-[0.99]"
+            >
+              <div>
+                <p className="font-body text-base font-semibold text-foreground">Definições</p>
+                <p className="font-body text-sm text-text-secondary">Políticas, alertas e notificações</p>
+              </div>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 text-text-muted">
+                <path d="m9 18 6-6-6-6" />
+              </svg>
+            </button>
             <Link
               href="/dashboard/mais-help"
               className="flex w-full items-center justify-between rounded-xl bg-surface px-5 py-4 text-left transition-colors hover:bg-[#2A2A2A] active:scale-[0.99]"
@@ -236,8 +258,8 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
       </main>
 
       {showProfile && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-10 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50" onClick={() => setShowProfile(false)}>
+          <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-24 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted" />
 
             <div className="flex items-center gap-4 mb-6">
@@ -341,8 +363,8 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
 
       {/* Company Modal */}
       {showCompany && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-10 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50" onClick={() => setShowCompany(false)}>
+          <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-24 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted" />
 
             <div className="flex items-center gap-4 mb-6">
@@ -399,6 +421,91 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                 />
               </div>
 
+              {/* Images gallery */}
+              <div className="pt-4 border-t border-foreground/10">
+                <p className="font-body text-sm font-semibold text-text-secondary mb-4">Imagens do negócio</p>
+                <p className="mb-4 text-center font-body text-sm text-text-secondary">
+                  {images.length} / 6 imagens
+                </p>
+
+                {images.length < 6 && (
+                <div className="mb-6 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={() => imageFileRef.current?.click()}
+                    className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border-2 border-dashed border-text-muted bg-[#2A2A2A] transition-colors hover:border-accent hover:bg-accent/10"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8 text-text-muted">
+                      <line x1="12" x2="12" y1="5" y2="19" />
+                      <line x1="5" x2="19" y1="12" y2="12" />
+                    </svg>
+                  </button>
+                  <input
+                    ref={imageFileRef}
+                    type="file"
+                    accept="image/png,image/webp,image/jpeg"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file || !schoolId) return;
+                      if (!["image/png", "image/webp", "image/jpeg"].includes(file.type)) {
+                        alert("Formato não permitido. Usa PNG, WebP ou JPEG.");
+                        return;
+                      }
+                      if (file.size > 1024 * 1024) {
+                        alert("Imagem demasiado grande. Máximo 1MB.");
+                        return;
+                      }
+                      const res = await addSchoolImage(schoolId, file);
+                      if (!res.ok) { console.error("upload error:", res.error); return; }
+                      const data = await getImages(schoolId);
+                      setImages(data);
+                    }}
+                  />
+                </div>
+                )}
+
+                {images.length === 0 ? (
+                  <p className="py-8 text-center font-body text-sm text-text-secondary">
+                    Nenhuma imagem adicionada ainda
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-3 gap-2">
+                    {images.map((img) => (
+                      <div key={img.id} className="relative aspect-square overflow-hidden rounded-xl bg-[#2A2A2A]">
+                        <button
+                          type="button"
+                          onClick={() => setLightboxImage(img.public_url)}
+                          className="h-full w-full"
+                        >
+                          <img
+                            src={img.public_url}
+                            alt=""
+                            className="h-full w-full object-cover"
+                          />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (schoolId) {
+                              await deleteImage(img.id);
+                              const data = await getImages(schoolId);
+                              setImages(data);
+                            }
+                          }}
+                          className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-error text-white shadow transition-transform active:scale-90"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+                            <path d="M18 6 6 18" />
+                            <path d="m6 6 12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
@@ -409,9 +516,21 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                 </button>
                 <button
                   type="button"
-                  className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95"
+                  disabled={companySaving}
+                  onClick={async () => {
+                    if (!schoolId) return;
+                    setCompanySaving(true);
+                    const res = await saveSchoolInfo(schoolId, {
+                      name: companyName,
+                      location: companyLocation,
+                      description: companyDescription,
+                    });
+                    if (res.ok) setShowCompany(false);
+                    setCompanySaving(false);
+                  }}
+                  className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95 disabled:opacity-50"
                 >
-                  Guardar
+                  {companySaving ? "A guardar..." : "Guardar"}
                 </button>
               </div>
             </div>
@@ -419,10 +538,128 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
         </div>
       )}
 
+      {/* Settings Modal */}
+      {showSettings && (
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50" onClick={() => setShowSettings(false)}>
+          <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-24 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted" />
+
+            <h3 className="font-heading text-2xl font-bold text-foreground mb-6">Definições</h3>
+
+            {settingsError && <p className="font-body text-sm text-error mb-4">{settingsError}</p>}
+
+            {/* Política de cancelamento */}
+            <div className="mb-6">
+              <p className="font-heading text-base font-bold text-foreground mb-2">Política de cancelamento</p>
+              <p className="font-body text-sm text-text-secondary mb-4">
+                Os alunos podem cancelar e receber crédito de volta até
+              </p>
+              <div className="flex items-center gap-3 mb-3">
+                <input
+                  type="number"
+                  min={1}
+                  max={720}
+                  value={settings.cancellation_window_hours}
+                  onChange={(e) => setSettings((prev) => ({ ...prev, cancellation_window_hours: Number(e.target.value) }))}
+                  className="w-20 rounded-xl bg-[#2A2A2A] px-4 py-3 text-center text-foreground outline-none focus:outline-2 focus:outline-accent [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                />
+                <span className="font-body text-sm text-text-secondary">horas antes da aula</span>
+              </div>
+              <div className="rounded-xl bg-[#2A2A2A] p-3 space-y-1">
+                <p className="font-body text-xs text-text-secondary">
+                  • Se cancelar dentro deste prazo → <span className="text-success">crédito devolvido</span>
+                </p>
+                <p className="font-body text-xs text-text-secondary">
+                  • Se cancelar depois → <span className="text-error">crédito não devolvido</span>
+                </p>
+              </div>
+            </div>
+
+            <div className="h-px bg-foreground/10 my-6" />
+
+            {/* Threshold de alertas */}
+            <div className="mb-6">
+              <p className="font-heading text-base font-bold text-foreground mb-2">Threshold de alertas</p>
+              <p className="font-body text-sm text-text-secondary mb-4">
+                Mostrar alerta de baixa ocupação quando a sessão tiver menos de
+              </p>
+              <div className="flex items-center gap-3">
+                <input
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={settings.low_occupancy_threshold}
+                  onChange={(e) => setSettings((prev) => ({ ...prev, low_occupancy_threshold: Number(e.target.value) }))}
+                  className="w-20 rounded-xl bg-[#2A2A2A] px-4 py-3 text-center text-foreground outline-none focus:outline-2 focus:outline-accent [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                />
+                <span className="font-body text-sm text-text-secondary">% de capacidade</span>
+              </div>
+            </div>
+
+            <div className="h-px bg-foreground/10 my-6" />
+
+            {/* Notificações */}
+            <div className="mb-6">
+              <p className="font-heading text-base font-bold text-foreground mb-4">Notificações</p>
+              <div className="space-y-4">
+                {[
+                  { key: "notify_email_confirmation" as const, label: "Email de confirmação de reserva" },
+                  { key: "notify_reminder_24h" as const, label: "Lembrete 24h antes da aula" },
+                  { key: "notify_sms_cancellation" as const, label: "SMS de cancelamento" },
+                  { key: "notify_new_schedule" as const, label: "Novos horários aos alunos" },
+                ].map((item) => (
+                  <label key={item.key} className="flex items-center justify-between py-1">
+                    <span className="font-body text-sm text-foreground">{item.label}</span>
+                    <button
+                      type="button"
+                      onClick={() => setSettings((prev) => ({ ...prev, [item.key]: !prev[item.key] }))}
+                      className={`relative h-6 w-11 rounded-full transition-colors ${settings[item.key] ? "bg-accent" : "bg-[#2A2A2A]"}`}
+                    >
+                      <span
+                        className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${settings[item.key] ? "translate-x-5" : ""}`}
+                      />
+                    </button>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowSettings(false)}
+                className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={settingsSaving}
+                onClick={async () => {
+                  if (!schoolId) return;
+                  setSettingsError("");
+                  setSettingsSaving(true);
+                  const res = await saveSchoolSettings(schoolId, settings);
+                  if (res.ok) {
+                    setShowSettings(false);
+                  } else {
+                    setSettingsError(res.error ?? "Erro ao guardar definições");
+                  }
+                  setSettingsSaving(false);
+                }}
+                className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95 disabled:opacity-50"
+              >
+                {settingsSaving ? "A guardar..." : "Guardar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Instrutor Modal */}
       {showInstructors && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-10 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50" onClick={() => setShowInstructors(false)}>
+          <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-24 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted" />
 
             <h3 className="font-heading text-2xl font-bold text-foreground mb-6">{editingInstrutorId !== null ? "Editar Instrutor" : "Adicionar Instrutor"}</h3>
@@ -469,6 +706,7 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
 
             {/* Inputs below */}
             <div className="space-y-4">
+              {instrutorError && <p className="font-body text-sm text-error">{instrutorError}</p>}
               <div>
                 <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
                   Nome do instrutor <span className="text-error">*</span>
@@ -565,7 +803,9 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                 type="button"
                 disabled={instrutorSaving}
                 onClick={async () => {
-                  if (!instrutorNome.trim() || !schoolId) return;
+                  setInstrutorError("");
+                  if (!instrutorNome.trim()) { setInstrutorError("O nome é obrigatório"); return; }
+                  if (!schoolId) return;
                   setInstrutorSaving(true);
                   const fd = new FormData();
                   if (editingInstrutorId) fd.set("id", editingInstrutorId);
@@ -579,9 +819,10 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                     setInstrutorFotoFile(null);
                     setInstrutorFotoPreview(null);
                     setEditingInstrutorId(null);
+                    setInstrutorError("");
                     loadInstructors();
                   } else {
-                    console.error("save error:", res.error);
+                    setInstrutorError(res.error ?? "Erro ao guardar");
                   }
                   setInstrutorSaving(false);
                 }}
@@ -594,102 +835,7 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
         </div>
       )}
 
-      {/* Images Modal */}
-      {showImages && (
-        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-10 max-h-[90vh] overflow-y-auto">
-            <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted" />
 
-            <h3 className="font-heading text-2xl font-bold text-foreground mb-6">Imagens</h3>
-
-            <p className="mb-4 text-center font-body text-sm text-text-secondary">
-              {images.length} / 6 imagens
-            </p>
-
-            {/* Upload circle */}
-            {images.length < 6 && (
-            <div className="mb-6 flex justify-center">
-              <button
-                type="button"
-                onClick={() => imageFileRef.current?.click()}
-                className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border-2 border-dashed border-text-muted bg-[#2A2A2A] transition-colors hover:border-accent hover:bg-accent/10"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8 text-text-muted">
-                  <line x1="12" x2="12" y1="5" y2="19" />
-                  <line x1="5" x2="19" y1="12" y2="12" />
-                </svg>
-              </button>
-              <input
-                ref={imageFileRef}
-                type="file"
-                accept="image/png,image/webp,image/jpeg"
-                className="hidden"
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  if (!file || !schoolId) return;
-                  const res = await addSchoolImage(schoolId, file);
-                  if (!res.ok) {
-                    console.error("upload error:", res.error);
-                    return;
-                  }
-                  const data = await getImages(schoolId);
-                  setImages(data);
-                }}
-              />
-            </div>
-            )}
-
-            {/* Image grid — 3 columns */}
-            {images.length === 0 ? (
-              <p className="py-8 text-center font-body text-sm text-text-secondary">
-                Nenhuma imagem adicionada ainda
-              </p>
-            ) : (
-              <div className="grid grid-cols-3 gap-2">
-                {images.map((img) => (
-                  <div key={img.id} className="relative aspect-square overflow-hidden rounded-xl bg-[#2A2A2A]">
-                    <button
-                      type="button"
-                      onClick={() => setLightboxImage(img.public_url)}
-                      className="h-full w-full"
-                    >
-                      <img
-                        src={img.public_url}
-                        alt=""
-                        className="h-full w-full object-cover"
-                      />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        if (schoolId) {
-                          await deleteImage(img.id);
-                          const data = await getImages(schoolId);
-                          setImages(data);
-                        }
-                      }}
-                      className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-error text-white shadow transition-transform active:scale-90"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
-                        <path d="M18 6 6 18" />
-                        <path d="m6 6 12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={() => setShowImages(false)}
-              className="mt-6 w-full rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
-            >
-              Fechar
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Lightbox */}
       {lightboxImage && (

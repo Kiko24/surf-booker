@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 
-import { deleteStudent, type StudentRecord } from "../actions";
+import { deleteStudent, toggleWaiver, type StudentRecord } from "../actions";
 import { getAvailablePacks, buyPack, type AvailablePack } from "../../calendario/actions";
 
 type Props = {
@@ -274,6 +274,37 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
                   </button>
                 </div>
               )}
+
+              {/* Waiver */}
+              <div className="mt-4 flex items-center justify-between rounded-xl bg-[#2A2A2A] px-4 py-3">
+                <div>
+                  <p className="font-body text-sm font-semibold text-foreground">Termo de responsabilidade</p>
+                  <p className="font-body text-xs text-text-secondary">
+                    {selectedStudent.waiverSigned ? "Assinado" : "Não assinado"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const res = await toggleWaiver(selectedStudent.id, !selectedStudent.waiverSigned);
+                    if (res.ok) {
+                      setSelectedStudent({
+                        ...selectedStudent,
+                        waiverSigned: !selectedStudent.waiverSigned,
+                      });
+                    }
+                  }}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    selectedStudent.waiverSigned ? "bg-accent" : "bg-[#444]"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                      selectedStudent.waiverSigned ? "translate-x-[1.375rem]" : "translate-x-[1px]"
+                    }`}
+                  />
+                </button>
+              </div>
 
               <button
                 type="button"

@@ -17,6 +17,7 @@ export type StudentRecord = {
   email: string | null;
   phone: string | null;
   isGuest: boolean;
+  waiverSigned: boolean;
   hasActivePack: boolean;
   classLabel: string | null;
   classDate: string | null;
@@ -33,7 +34,7 @@ export async function getStudents(schoolId: string): Promise<StudentRecord[]> {
     .from("school_students")
     .select(`
       first_seen_at,
-      student:students(id, full_name, email, phone, is_guest)
+      student:students(id, full_name, email, phone, is_guest, waiver_signed)
     `)
     .eq("school_id", schoolId)
     .order("first_seen_at", { ascending: false });
@@ -126,6 +127,7 @@ export async function getStudents(schoolId: string): Promise<StudentRecord[]> {
       email: s.email,
       phone: s.phone,
       isGuest: s.is_guest,
+      waiverSigned: (s as unknown as { waiver_signed: boolean }).waiver_signed ?? false,
       hasActivePack: (packsByStudent.get(s.id)?.length ?? 0) > 0,
       classLabel: label,
       classDate: targetDate
@@ -138,6 +140,33 @@ export async function getStudents(schoolId: string): Promise<StudentRecord[]> {
   }
 
   return result;
+}
+
+export async function toggleWaiver(
+  studentId: string,
+  signed: boolean
+): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Não autenticado" };
+
+  const { data: school } = await supabase
+    .from("school_students")
+    .select("school:schools!inner(owner_user_id)")
+    .eq("student_id", studentId)
+    .maybeSingle();
+  if (!school) return { ok: false, error: "Aluno não encontrado na escola" };
+  if ((school.school as unknown as { owner_user_id: string }).owner_user_id !== user.id) {
+    return { ok: false, error: "Sem permissão" };
+  }
+
+  const { error } = await supabase
+    .from("students")
+    .update({ waiver_signed: signed })
+    .eq("id", studentId);
+
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
 }
 
 export async function deleteStudent(studentId: string): Promise<{ ok: boolean; error?: string }> {

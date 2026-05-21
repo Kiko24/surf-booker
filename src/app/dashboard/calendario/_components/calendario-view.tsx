@@ -2,7 +2,7 @@
 
 import { useSearchParams, useRouter } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
-import { getSessionsForMonth, createSession, updateSession, deleteSession, getSchoolStudents, createBooking, addGuestToSession, addGroupBooking, getAvulsoServicos, getStudentProfile, togglePaymentStatus, type SessionData, type AvulsoServico, type StudentProfile, type StudentProfilePack } from "../actions";
+import { getSessionsForMonth, createSession, updateSession, deleteSession, cancelSession, completeSession, getSchoolStudents, createBooking, addGuestToSession, addGroupBooking, getAvulsoServicos, getStudentProfile, togglePaymentStatus, getInstructorsForSchool, type SessionData, type AvulsoServico, type StudentProfile, type StudentProfilePack } from "../actions";
 import {
   PlusIcon,
   ArrowRightIcon,
@@ -26,6 +26,9 @@ type DaySession = {
   alunos: number;
   alunosList: AlunoInscrito[];
   class_type_id: string | null;
+  instructor_id: string | null;
+  instructorName: string | null;
+  starts_at: string;
 };
 
 const EMPTY_SESSIONS: Record<number, DaySession[]> = {};
@@ -43,9 +46,11 @@ export function CalendarioView({ schoolId }: Props) {
   const [horario, setHorario] = useState("");
   const [duracao, setDuracao] = useState("90");
   const [capacidade, setCapacidade] = useState("");
-  const [instrutores, setInstrutores] = useState("");
+  const [instrutoresList, setInstrutoresList] = useState<{ id: string; name: string }[]>([]);
+  const [instrutorSelecionadoId, setInstrutorSelecionadoId] = useState<string>("");
   const [servicos, setServicos] = useState<AvulsoServico[]>([]);
   const [selectedServicoId, setSelectedServicoId] = useState("");
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [expandedSession, setExpandedSession] = useState<number | null>(null);
   const [loadingSessions, setLoadingSessions] = useState(false);
   const [profileStudent, setProfileStudent] = useState<StudentProfile | null>(null);
@@ -69,9 +74,18 @@ export function CalendarioView({ schoolId }: Props) {
     setServicos(data);
   }, [schoolId]);
 
+  const fetchInstrutores = useCallback(async () => {
+    if (!schoolId) return;
+    const data = await getInstructorsForSchool(schoolId);
+    setInstrutoresList(data);
+  }, [schoolId]);
+
   const [editingSession, setEditingSession] = useState<number | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingSession, setDeletingSession] = useState<number | null>(null);
+  const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
+  const [completingSession, setCompletingSession] = useState<number | null>(null);
+  const [completingSaving, setCompletingSaving] = useState(false);
   const [addingToSession, setAddingToSession] = useState<number | null>(null);
   const [studentSearch, setStudentSearch] = useState("");
   const [schoolStudents, setSchoolStudents] = useState<{ id: string; name: string }[]>([]);
@@ -231,6 +245,7 @@ export function CalendarioView({ schoolId }: Props) {
                       {expandedSession === i && (
                         <div className="mt-2 rounded-xl bg-[#2A2A2A] p-4">
                           <p className="font-heading text-base font-bold text-foreground mb-1">{s.nome}</p>
+                          {s.instructorName && <p className="font-body text-xs text-text-secondary mb-3">Instrutor: {s.instructorName}</p>}
                           <p className="font-body text-xs font-semibold uppercase text-text-secondary mb-3">Alunos inscritos</p>
                           <div className="space-y-2">
                             {s.alunosList.map((aluno, idx) => (
@@ -246,221 +261,166 @@ export function CalendarioView({ schoolId }: Props) {
                             ))}
                           </div>
                           <div className="mt-4 pt-3 border-t border-foreground/10">
-                            <div className="mb-3">
-                            {addingToSession === i ? (
-                              <div className="space-y-3">
-                                <div className="flex gap-3">
-                                  <input
-                                    type="text"
-                                    value={studentSearch}
-                                    onChange={async (e) => {
-                                      setStudentSearch(e.target.value);
-                                      if (!schoolStudents.length && schoolId) {
-                                        const list = await getSchoolStudents(schoolId);
-                                        setSchoolStudents(list);
-                                      }
-                                    }}
-                                    placeholder="Procurar aluno..."
-                                    className="min-w-0 flex-[3] rounded-lg bg-surface px-3 py-2 text-sm text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => { setAddingToSession(null); setStudentSearch(""); }}
-                                    className="flex-1 rounded-lg bg-surface px-3 py-2 text-sm text-text-secondary hover:text-foreground transition-colors"
-                                  >
-                                    Cancelar
-                                  </button>
-                                </div>
-                                {studentSearch.trim() && (
-                                  <div className="max-h-48 overflow-y-auto space-y-1">
-                                    {schoolStudents
-                                      .filter((st) => st.name.toLowerCase().includes(studentSearch.toLowerCase()))
-                                      .map((st) => (
-                                        <div key={st.id} className="flex gap-2">
+                            {(() => {
+                              const isPast = new Date(s.starts_at) < new Date();
+                              if (isPast) {
+                                return (
+                                  <div className="flex gap-3">
+                                    <button
+                                      type="button"
+                                      onClick={() => { setCompletingSession(i); setShowCompleteConfirm(true); }}
+                                      className="flex-1 rounded-lg bg-success/20 py-2 font-body text-sm font-semibold text-success transition-colors hover:bg-success/30"
+                                    >
+                                      Marcar como realizada
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => { setDeletingSession(i); setShowDeleteConfirm(true); }}
+                                      className="flex-1 rounded-lg bg-error/20 py-2 font-body text-sm font-semibold text-error transition-colors hover:bg-error/30"
+                                    >
+                                      Cancelar sessão
+                                    </button>
+                                  </div>
+                                );
+                              }
+                              return (
+                                <>
+                                  <div className="mb-3">
+                                  {addingToSession === i ? (
+                                    <div className="space-y-3">
+                                      <div className="flex gap-3">
+                                        <input
+                                          type="text"
+                                          value={studentSearch}
+                                          onChange={async (e) => {
+                                            setStudentSearch(e.target.value);
+                                            if (!schoolStudents.length && schoolId) {
+                                              const list = await getSchoolStudents(schoolId);
+                                              setSchoolStudents(list);
+                                            }
+                                          }}
+                                          placeholder="Procurar aluno..."
+                                          className="min-w-0 flex-[3] rounded-lg bg-surface px-3 py-2 text-sm text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => { setAddingToSession(null); setStudentSearch(""); }}
+                                          className="flex-1 rounded-lg bg-surface px-3 py-2 text-sm text-text-secondary hover:text-foreground transition-colors"
+                                        >
+                                          Cancelar
+                                        </button>
+                                      </div>
+                                      {studentSearch.trim() && (
+                                        <div className="max-h-48 overflow-y-auto space-y-1">
+                                          {schoolStudents
+                                            .filter((st) => st.name.toLowerCase().includes(studentSearch.toLowerCase()))
+                                            .map((st) => (
+                                              <div key={st.id} className="flex gap-2">
+                                                <button
+                                                  type="button"
+                                                  onClick={async () => {
+                                                    if (!schoolId) return;
+                                                    const profile = await getStudentProfile(schoolId, st.id);
+                                                    if (profile && profile.packs.length > 0) {
+                                                      setPendingPackStudent({ sessionId: s.id, studentId: st.id, studentName: st.name });
+                                                      setStudentPacksForBooking(profile.packs);
+                                                    } else {
+                                                      const res = await createBooking(s.id, st.id, schoolId);
+                                                      if (res.ok) {
+                                                        setSessions((prev) => {
+                                                          const next = { ...prev };
+                                                          for (const day of Object.keys(next)) {
+                                                            const dayNum = Number(day);
+                                                            next[dayNum] = next[dayNum].map((sess) =>
+                                                              sess.id === s.id ? { ...sess, alunos: sess.alunos + 1, alunosList: [...sess.alunosList, { id: st.id, name: st.name, paymentStatus: 'unpaid' }] } : sess
+                                                            );
+                                                          }
+                                                          return next;
+                                                        });
+                                                        setAddingToSession(null);
+                                                        setStudentSearch("");
+                                                        fetchSessions(year, month);
+                                                      }
+                                                    }
+                                                  }}
+                                                  className="w-full rounded-lg bg-accent/20 px-3 py-2 text-left text-sm text-accent hover:bg-accent/30 transition-colors"
+                                                >
+                                                  {st.name}
+                                                </button>
+                                              </div>
+                                            ))}
                                           <button
                                             type="button"
-                                            onClick={async () => {
-                                              if (!schoolId) return;
-                                              const profile = await getStudentProfile(schoolId, st.id);
-                                              if (profile && profile.packs.length > 0) {
-                                                setPendingPackStudent({ sessionId: s.id, studentId: st.id, studentName: st.name });
-                                                setStudentPacksForBooking(profile.packs);
-                                              } else {
-                                                await createBooking(s.id, st.id, schoolId);
-                                                setSessions((prev) => {
-                                                  const next = { ...prev };
-                                                  for (const day of Object.keys(next)) {
-                                                    const dayNum = Number(day);
-                                                    next[dayNum] = next[dayNum].map((sess) =>
-                                                      sess.id === s.id
-                                                        ? { ...sess, alunos: sess.alunos + 1, alunosList: [...sess.alunosList, { id: st.id, name: st.name, paymentStatus: 'unpaid' }] }
-                                                        : sess
-                                                    );
-                                                  }
-                                                  return next;
-                                                });
-                                                setAddingToSession(null);
-                                                setStudentSearch("");
-                                                fetchSessions(year, month);
-                                              }
+                                            onClick={() => {
+                                              setAddingToSession(null);
+                                              setStudentSearch("");
+                                              setGuestError("");
+                                              setShowGuestModal(true);
                                             }}
-                                            className="flex-1 rounded-lg bg-surface px-3 py-2 text-left text-sm text-foreground hover:bg-white/10 transition-colors"
+                                            className="w-full rounded-lg bg-accent/20 px-3 py-2 text-left text-sm text-accent hover:bg-accent/30 transition-colors"
                                           >
-                                            {st.name}
+                                            + Novo convidado
                                           </button>
                                         </div>
-                                      ))}
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <div className="space-y-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => { setAddingToSession(i); setStudentSearch(""); setSchoolStudents([]); }}
+                                      className="w-full rounded-lg bg-accent/20 py-2 font-body text-sm font-semibold text-accent transition-colors hover:bg-accent/30"
+                                    >
+                                      + Adicionar aluno
+                                    </button>
                                     <button
                                       type="button"
                                       onClick={() => {
-                                        if (!schoolId || !studentSearch.trim()) return;
-                                        setGuestName(studentSearch.trim());
-                                        setGuestPhone("");
-                                        setGuestSessionId(s.id);
-                                        setGuestError("");
-                                        setShowGuestModal(true);
+                                        setGroupSessionId(s.id);
+                                        setGroupName("");
+                                        setGroupPeople("2");
+                                        setGroupError("");
+                                        setShowGroupModal(true);
                                       }}
-                                      className="w-full rounded-lg bg-accent/20 px-3 py-2 text-left text-sm text-accent hover:bg-accent/30 transition-colors"
+                                      className="w-full rounded-lg bg-surface py-2 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
                                     >
-                                      + Novo convidado
+                                      + Adicionar grupo
+                                    </button>
+                                    </div>
+                                  )}
+                                  </div>
+                                  <div className="flex gap-3">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setEditingSession(i);
+                                        setDataAula(selectedDay ? `${year}-${String(month + 1).padStart(2, "0")}-${String(selectedDay).padStart(2, "0")}` : "");
+                                        const [h, m] = s.time.split(":");
+                                        setHorario(`${h.padStart(2, "0")}:${(m ?? "00").padStart(2, "0")}`);
+                                        setSelectedServicoId(s.class_type_id ?? "");
+                                        const svc = servicos.find((sv) => sv.id === s.class_type_id);
+                                        setDuracao(svc?.default_duration_minutes ? String(svc.default_duration_minutes) : "90");
+                                        setCapacidade(String(s.capacidade));
+                                        setInstrutorSelecionadoId(s.instructor_id ?? "");
+                                        setShowModal(true);
+                                        fetchServicos();
+                                        fetchInstrutores();
+                                      }}
+                                      className="flex-1 rounded-lg bg-accent/20 py-2 font-body text-sm font-semibold text-accent transition-colors hover:bg-accent/30"
+                                    >
+                                      Editar
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => { setDeletingSession(i); setShowDeleteConfirm(true); }}
+                                      className="flex-1 rounded-lg bg-error/20 py-2 font-body text-sm font-semibold text-error transition-colors hover:bg-error/30"
+                                    >
+                                      Cancelar
                                     </button>
                                   </div>
-      )}
-
-      {/* Pack choice modal */}
-      {pendingPackStudent && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-24">
-            <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted" />
-            <h3 className="font-heading text-lg font-bold text-foreground mb-1">Método de pagamento</h3>
-            <p className="font-body text-sm text-text-secondary mb-4">{pendingPackStudent.studentName}</p>
-
-            <button
-              type="button"
-              onClick={async () => {
-                if (!schoolId) return;
-                const { sessionId, studentId, studentName } = pendingPackStudent;
-                await createBooking(sessionId, studentId, schoolId);
-                setSessions((prev) => {
-                  const next = { ...prev };
-                  for (const day of Object.keys(next)) {
-                    const dayNum = Number(day);
-                    next[dayNum] = next[dayNum].map((sess) =>
-                      sess.id === sessionId
-                        ? { ...sess, alunos: sess.alunos + 1, alunosList: [...sess.alunosList, { id: studentId, name: studentName, paymentStatus: 'unpaid' }] }
-                        : sess
-                    );
-                  }
-                  return next;
-                });
-                setPendingPackStudent(null);
-                setAddingToSession(null);
-                setStudentSearch("");
-                fetchSessions(year, month);
-              }}
-              className="w-full rounded-xl bg-surface py-3 font-body text-sm font-semibold text-foreground transition-colors hover:bg-[#2A2A2A] mb-2"
-            >
-              Pagamento único
-            </button>
-
-            {studentPacksForBooking.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={async () => {
-                  if (!schoolId) return;
-                  const { sessionId, studentId, studentName } = pendingPackStudent;
-                  await createBooking(sessionId, studentId, schoolId, {
-                    paymentMethod: "pack",
-                    packPurchaseId: p.id,
-                  });
-                  setSessions((prev) => {
-                    const next = { ...prev };
-                    for (const day of Object.keys(next)) {
-                      const dayNum = Number(day);
-                      next[dayNum] = next[dayNum].map((sess) =>
-                        sess.id === sessionId
-                          ? { ...sess, alunos: sess.alunos + 1, alunosList: [...sess.alunosList, { id: studentId, name: studentName, paymentStatus: 'unpaid' }] }
-                          : sess
-                      );
-                    }
-                    return next;
-                  });
-                  setPendingPackStudent(null);
-                  setAddingToSession(null);
-                  setStudentSearch("");
-                  fetchSessions(year, month);
-                }}
-                className="w-full rounded-xl bg-accent/20 py-3 font-body text-sm font-semibold text-accent transition-colors hover:bg-accent/30 mb-2"
-              >
-                Usar pack — {p.name} ({p.remaining} {p.remaining === 1 ? "restante" : "restantes"})
-              </button>
-            ))}
-
-            <button
-              type="button"
-              onClick={() => { setPendingPackStudent(null); }}
-              className="w-full rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
-            >
-              Cancelar
-            </button>
-          </div>
-        </div>
-      )}
-                              </div>
-                            ) : (
-                              <div className="space-y-2">
-                              <button
-                                type="button"
-                                onClick={() => { setAddingToSession(i); setStudentSearch(""); setSchoolStudents([]); }}
-                                className="w-full rounded-lg bg-accent/20 py-2 font-body text-sm font-semibold text-accent transition-colors hover:bg-accent/30"
-                              >
-                                + Adicionar aluno
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setGroupSessionId(s.id);
-                                  setGroupName("");
-                                  setGroupPeople("2");
-                                  setGroupError("");
-                                  setShowGroupModal(true);
-                                }}
-                                className="w-full rounded-lg bg-surface py-2 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
-                              >
-                                + Adicionar grupo
-                              </button>
-                              </div>
-                            )}
-                            </div>
-                            <div className="flex gap-3">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditingSession(i);
-                                  setDataAula(selectedDay ? `${year}-${String(month + 1).padStart(2, "0")}-${String(selectedDay).padStart(2, "0")}` : "");
-                                  const [h, m] = s.time.split(":");
-                                  setHorario(`${h.padStart(2, "0")}:${(m ?? "00").padStart(2, "0")}`);
-                                  setSelectedServicoId(s.class_type_id ?? "");
-                                  const svc = servicos.find((sv) => sv.id === s.class_type_id);
-                                  setDuracao(svc?.default_duration_minutes ? String(svc.default_duration_minutes) : "90");
-                                  setCapacidade(String(s.capacidade));
-                                  setInstrutores("");
-                                  setShowModal(true);
-                                  fetchServicos();
-                                }}
-                                className="flex-1 rounded-lg bg-accent/20 py-2 font-body text-sm font-semibold text-accent transition-colors hover:bg-accent/30"
-                              >
-                                Editar
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => { setDeletingSession(i); setShowDeleteConfirm(true); }}
-                                className="flex-1 rounded-lg bg-error/20 py-2 font-body text-sm font-semibold text-error transition-colors hover:bg-error/30"
-                              >
-                                Eliminar
-                              </button>
-                            </div>
+                                </>
+                              );
+                            })()}
                           </div>
                         </div>
                       )}
@@ -489,8 +449,9 @@ export function CalendarioView({ schoolId }: Props) {
           setHorario("");
           setDuracao("90");
           setCapacidade("");
-          setInstrutores("");
+          setInstrutorSelecionadoId("");
           fetchServicos();
+          fetchInstrutores();
         }}
         className="fixed bottom-24 right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-primary-foreground shadow-2xl active:scale-90 transition-all duration-200"
         aria-label="Adicionar evento"
@@ -498,13 +459,13 @@ export function CalendarioView({ schoolId }: Props) {
         <PlusIcon className="h-6 w-6" />
       </button>
 
-      {/* Delete confirmation */}
+      {/* Cancel confirmation */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-5">
           <div className="w-full max-w-sm rounded-2xl bg-surface p-6 text-center">
-            <p className="font-heading text-xl font-bold text-foreground mb-2">Eliminar aula</p>
+            <p className="font-heading text-xl font-bold text-foreground mb-2">Cancelar aula</p>
             <p className="font-body text-sm text-text-secondary mb-6">
-              Tens a certeza que queres eliminar esta aula?
+              Esta aula será removida e todos os alunos inscritos receberão um email de notificação.
             </p>
             <div className="flex gap-3">
               <button
@@ -512,20 +473,57 @@ export function CalendarioView({ schoolId }: Props) {
                 onClick={() => setShowDeleteConfirm(false)}
                 className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
               >
-                Cancelar
+                Voltar
               </button>
               <button
                 type="button"
                 onClick={async () => {
                   if (deletingSession === null || !daySessions[deletingSession]) return;
-                  await deleteSession(daySessions[deletingSession].id);
+                  await cancelSession(daySessions[deletingSession].id);
                   setShowDeleteConfirm(false);
                   setDeletingSession(null);
                   fetchSessions(year, month);
                 }}
                 className="flex-1 rounded-xl bg-error py-3 font-body text-sm font-semibold text-error-foreground transition-transform active:scale-95"
               >
-                Sim, eliminar
+                Sim, cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Complete confirmation */}
+      {showCompleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-5">
+          <div className="w-full max-w-sm rounded-2xl bg-surface p-6 text-center">
+            <p className="font-heading text-xl font-bold text-foreground mb-2">Marcar como realizada</p>
+            <p className="font-body text-sm text-text-secondary mb-6">
+              Alunos com pagamento pendente serão marcados como pagos, créditos de pack serão descontados e a sessão será fechada.
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowCompleteConfirm(false)}
+                className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
+              >
+                Voltar
+              </button>
+              <button
+                type="button"
+                disabled={completingSaving}
+                onClick={async () => {
+                  if (completingSession === null || !daySessions[completingSession]) return;
+                  setCompletingSaving(true);
+                  await completeSession(daySessions[completingSession].id);
+                  setShowCompleteConfirm(false);
+                  setCompletingSession(null);
+                  setCompletingSaving(false);
+                  fetchSessions(year, month);
+                }}
+                className="flex-1 rounded-xl bg-success py-3 font-body text-sm font-semibold text-foreground transition-transform active:scale-95 disabled:opacity-50"
+              >
+                {completingSaving ? "A processar..." : "Sim, realizar"}
               </button>
             </div>
           </div>
@@ -716,7 +714,7 @@ export function CalendarioView({ schoolId }: Props) {
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50">
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50">
           <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-24">
             <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted" />
 
@@ -733,18 +731,19 @@ export function CalendarioView({ schoolId }: Props) {
                 <div className="relative">
                   <select
                     value={selectedServicoId}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (val === "__add__") {
-                        router.push("/dashboard/servicos");
-                        return;
-                      }
-                      setSelectedServicoId(val);
-                      const svc = servicos.find((s) => s.id === val);
-                      if (svc?.default_duration_minutes) {
-                        setDuracao(String(svc.default_duration_minutes));
-                      }
-                    }}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === "__add__") {
+                          router.push("/dashboard/servicos");
+                          return;
+                        }
+                        setSelectedServicoId(val);
+                        setFormErrors((prev) => ({ ...prev, servico: "" }));
+                        const svc = servicos.find((s) => s.id === val);
+                        if (svc?.default_duration_minutes) {
+                          setDuracao(String(svc.default_duration_minutes));
+                        }
+                      }}
                     className="w-full appearance-none rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground outline-none focus:outline-2 focus:outline-accent"
                     required
                   >
@@ -761,6 +760,7 @@ export function CalendarioView({ schoolId }: Props) {
                     <path d="m6 9 6 6 6-6" />
                   </svg>
                 </div>
+                {formErrors.servico && <p className="mt-1 font-body text-sm text-error">{formErrors.servico}</p>}
               </div>
 
               {/* Data */}
@@ -771,10 +771,11 @@ export function CalendarioView({ schoolId }: Props) {
                 <input
                   type="date"
                   value={dataAula}
-                  onChange={(e) => setDataAula(e.target.value)}
+                  onChange={(e) => { setDataAula(e.target.value); setFormErrors((prev) => ({ ...prev, data: "" })); }}
                   className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground outline-none focus:outline-2 focus:outline-accent [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:invert-[0.7] [&::-webkit-calendar-picker-indicator]:cursor-pointer"
                   required
                 />
+                {formErrors.data && <p className="mt-1 font-body text-sm text-error">{formErrors.data}</p>}
               </div>
 
               {/* Horário início */}
@@ -785,10 +786,11 @@ export function CalendarioView({ schoolId }: Props) {
                 <input
                   type="time"
                   value={horario}
-                  onChange={(e) => setHorario(e.target.value)}
+                  onChange={(e) => { setHorario(e.target.value); setFormErrors((prev) => ({ ...prev, horario: "" })); }}
                   className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground outline-none focus:outline-2 focus:outline-accent [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:invert-[0.7] [&::-webkit-calendar-picker-indicator]:cursor-pointer"
                   required
                 />
+                {formErrors.horario && <p className="mt-1 font-body text-sm text-error">{formErrors.horario}</p>}
               </div>
 
               {/* Capacidade máxima */}
@@ -800,25 +802,34 @@ export function CalendarioView({ schoolId }: Props) {
                   type="number"
                   min="1"
                   value={capacidade}
-                  onChange={(e) => setCapacidade(e.target.value)}
+                  onChange={(e) => { setCapacidade(e.target.value); setFormErrors((prev) => ({ ...prev, capacidade: "" })); }}
                   placeholder="Ex: 8"
                   className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
                   required
                 />
+                {formErrors.capacidade && <p className="mt-1 font-body text-sm text-error">{formErrors.capacidade}</p>}
               </div>
 
-              {/* Instrutores (opcional) */}
+              {/* Instrutor (opcional) */}
               <div>
                 <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
-                  Instrutor(es) <span className="text-text-muted">(opcional)</span>
+                  Instrutor <span className="text-text-muted">(opcional)</span>
                 </label>
-                <input
-                  type="text"
-                  value={instrutores}
-                  onChange={(e) => setInstrutores(e.target.value)}
-                  placeholder="Ex: João, Maria"
-                  className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
-                />
+                <div className="relative">
+                  <select
+                    value={instrutorSelecionadoId}
+                    onChange={(e) => setInstrutorSelecionadoId(e.target.value)}
+                    className="w-full appearance-none rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground outline-none focus:outline-2 focus:outline-accent"
+                  >
+                    <option value="">Sem instrutor</option>
+                    {instrutoresList.map((inst) => (
+                      <option key={inst.id} value={inst.id}>{inst.name}</option>
+                    ))}
+                  </select>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted">
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </div>
               </div>
 
               {/* Actions */}
@@ -833,22 +844,29 @@ export function CalendarioView({ schoolId }: Props) {
                 <button
                   type="button"
                   onClick={async () => {
-                    if (!horario || !duracao || !capacidade || !selectedServicoId || !dataAula || !schoolId) {
-                      return;
-                    }
+                    const errors: Record<string, string> = {};
+                    if (!selectedServicoId) errors.servico = "Seleciona um serviço";
+                    if (!dataAula) errors.data = "Seleciona a data";
+                    if (!horario) errors.horario = "Define o horário";
+                    if (!capacidade || Number(capacidade) < 1) errors.capacidade = "A capacidade deve ser pelo menos 1";
+                    setFormErrors(errors);
+                    if (Object.keys(errors).length > 0) return;
+
                     const payload = {
                       class_type_id: selectedServicoId,
+                      instructor_id: instrutorSelecionadoId || null,
                       data: dataAula,
                       horario,
                       duracao: Number(duracao),
                       capacidade: Number(capacidade),
-                      schoolId,
+                      schoolId: schoolId!,
                     };
                     const res = editingSession !== null
                       ? await updateSession(daySessions[editingSession].id, payload)
                       : await createSession(payload);
                     if (res.ok) {
                       setShowModal(false);
+                      setFormErrors({});
                       fetchSessions(year, month);
                     }
                   }}
@@ -932,6 +950,87 @@ export function CalendarioView({ schoolId }: Props) {
                 </>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pack choice modal */}
+      {pendingPackStudent && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50">
+          <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-24">
+            <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted" />
+            <h3 className="font-heading text-lg font-bold text-foreground mb-1">Método de pagamento</h3>
+            <p className="font-body text-sm text-text-secondary mb-4">{pendingPackStudent.studentName}</p>
+
+            <button
+              type="button"
+              onClick={async () => {
+                if (!schoolId) return;
+                const { sessionId, studentId, studentName } = pendingPackStudent;
+                await createBooking(sessionId, studentId, schoolId);
+                setSessions((prev) => {
+                  const next = { ...prev };
+                  for (const day of Object.keys(next)) {
+                    const dayNum = Number(day);
+                    next[dayNum] = next[dayNum].map((sess) =>
+                      sess.id === sessionId
+                        ? { ...sess, alunos: sess.alunos + 1, alunosList: [...sess.alunosList, { id: studentId, name: studentName, paymentStatus: 'unpaid' }] }
+                        : sess
+                    );
+                  }
+                  return next;
+                });
+                setPendingPackStudent(null);
+                setAddingToSession(null);
+                setStudentSearch("");
+                fetchSessions(year, month);
+              }}
+              className="w-full rounded-xl bg-surface py-3 font-body text-sm font-semibold text-foreground transition-colors hover:bg-[#2A2A2A] mb-2"
+            >
+              Pagamento único
+            </button>
+
+            {studentPacksForBooking.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={async () => {
+                  if (!schoolId) return;
+                  const { sessionId, studentId, studentName } = pendingPackStudent;
+                  await createBooking(sessionId, studentId, schoolId, {
+                    paymentMethod: "pack",
+                    packPurchaseId: p.id,
+                  });
+                  setSessions((prev) => {
+                    const next = { ...prev };
+                    for (const day of Object.keys(next)) {
+                      const dayNum = Number(day);
+                      next[dayNum] = next[dayNum].map((sess) =>
+                        sess.id === sessionId
+                          ? { ...sess, alunos: sess.alunos + 1, alunosList: [...sess.alunosList, { id: studentId, name: studentName, paymentStatus: 'unpaid' }] }
+                          : sess
+                      );
+                    }
+                    return next;
+                  });
+                  setPendingPackStudent(null);
+                  setAddingToSession(null);
+                  setStudentSearch("");
+                  fetchSessions(year, month);
+                }}
+                className="w-full rounded-xl bg-accent/20 py-3 font-body text-sm font-semibold text-accent transition-colors hover:bg-accent/30 mb-2"
+              >
+                Usar pack — {p.name} ({p.remaining} {p.remaining === 1 ? "restante" : "restantes"})
+              </button>
+            ))}
+
+            <button
+              type="button"
+              onClick={() => { setPendingPackStudent(null); }}
+              className="w-full rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
+            >
+              Cancelar
+            </button>
           </div>
         </div>
       )}

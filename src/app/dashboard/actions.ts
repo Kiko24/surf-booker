@@ -16,6 +16,7 @@ export type SchoolInfo = {
   logo_url: string | null;
   location: string | null;
   description: string | null;
+  cancellation_window_hours: number;
 };
 
 export async function getSchoolInfo(): Promise<SchoolInfo | null> {
@@ -25,7 +26,7 @@ export async function getSchoolInfo(): Promise<SchoolInfo | null> {
 
   const { data } = await supabase
     .from("schools")
-    .select("name, logo_url, location, description")
+    .select("name, logo_url, location, description, cancellation_window_hours")
     .eq("owner_user_id", user.id)
     .maybeSingle();
 
@@ -79,7 +80,7 @@ export async function getTodaySessions(schoolId: string): Promise<TodaySession[]
 
 export type Alerta = {
   id: string;
-  tipo: "baixa_ocupacao" | "pack_a_expirar" | "waiver_em_falta" | "semana_vazia" | "pagamento_pendente" | "lotada" | "sem_instrutor";
+  tipo: "baixa_ocupacao" | "pack_a_expirar" | "waiver_em_falta" | "semana_vazia" | "pagamento_pendente" | "lotada" | "sem_instrutor" | "sessoes_por_confirmar";
   mensagem: string;
   link: string;
   entityId: string | null;
@@ -268,6 +269,28 @@ export async function getAlertas(schoolId: string): Promise<Alerta[]> {
     const dataStr = d.toLocaleDateString("pt-PT", { day: "numeric", month: "long" });
     const hora = `${d.getHours().toString().padStart(2,"0")}:${d.getMinutes().toString().padStart(2,"0")}`;
     alertas.push({ id: `instrutor-${++idCounter}`, tipo: "sem_instrutor", mensagem: `"${nome}" ${dataStr} às ${hora} — sem instrutor atribuído`, link: "/dashboard/calendario", entityId: s.id });
+  }
+
+  // ─── 8. Sessões passadas por confirmar (há mais de 2 dias) ──
+  const ha2Dias = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
+  const { count: pastUnconfirmed } = await supabase
+    .from("sessions")
+    .select("*", { count: "exact", head: true })
+    .eq("school_id", schoolId)
+    .eq("status", "scheduled")
+    .lt("starts_at", ha2Dias.toISOString());
+
+  if (pastUnconfirmed && pastUnconfirmed > 0) {
+    const entityKey = `sessoes_por_confirmar:`;
+    if (!dismissedKeys.has(entityKey)) {
+      alertas.push({
+        id: `pendentes-${++idCounter}`,
+        tipo: "sessoes_por_confirmar",
+        mensagem: `Tens ${pastUnconfirmed} ${pastUnconfirmed === 1 ? "sessão por confirmar" : "sessões por confirmar"}`,
+        link: "/dashboard/calendario",
+        entityId: null,
+      });
+    }
   }
 
   return alertas;

@@ -66,6 +66,7 @@ export function ServicosView({ sessions, schoolId }: Props) {
   const [avulsoAtivo, setAvulsoAtivo] = useState(false);
   const [avulsoPreco, setAvulsoPreco] = useState("");
   const [packs, setPacks] = useState<PackFormEntry[]>([]);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   function resetForm() {
     setNome("");
@@ -323,10 +324,11 @@ export function ServicosView({ sessions, schoolId }: Props) {
                 <input
                   type="text"
                   value={nome}
-                  onChange={(e) => setNome(e.target.value)}
+                  onChange={(e) => { setNome(e.target.value); setFormErrors((prev) => ({ ...prev, nome: "" })); }}
                   placeholder="Ex: Aula Nível 1"
                   className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
                 />
+                {formErrors.nome && <p className="mt-1 font-body text-sm text-error">{formErrors.nome}</p>}
               </div>
 
               {/* Modalidade */}
@@ -337,7 +339,7 @@ export function ServicosView({ sessions, schoolId }: Props) {
                 <div className="relative">
                   <select
                     value={modalidade}
-                    onChange={(e) => setModalidade(e.target.value)}
+                    onChange={(e) => { setModalidade(e.target.value); setFormErrors((prev) => ({ ...prev, modalidade: "" })); }}
                     className="w-full appearance-none rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground outline-none focus:outline-2 focus:outline-accent"
                   >
                     <option value="" disabled>Selecionar modalidade</option>
@@ -361,10 +363,11 @@ export function ServicosView({ sessions, schoolId }: Props) {
                   min="15"
                   max="480"
                   value={duracao}
-                  onChange={(e) => setDuracao(e.target.value)}
+                  onChange={(e) => { setDuracao(e.target.value); setFormErrors((prev) => ({ ...prev, duracao: "" })); }}
                   placeholder="Ex: 90"
                   className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
                 />
+                {formErrors.duracao && <p className="mt-1 font-body text-sm text-error">{formErrors.duracao}</p>}
               </div>
 
               {/* Sobre */}
@@ -405,15 +408,17 @@ export function ServicosView({ sessions, schoolId }: Props) {
                     type="number"
                     min="0"
                     value={avulsoPreco}
-                    onChange={(e) => setAvulsoPreco(e.target.value)}
+                    onChange={(e) => { setAvulsoPreco(e.target.value); setFormErrors((prev) => ({ ...prev, avulsoPreco: "" })); }}
                     placeholder="Ex: 35"
                     className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
                   />
+                  {formErrors.avulsoPreco && <p className="mt-1 font-body text-sm text-error">{formErrors.avulsoPreco}</p>}
                 </div>
               )}
 
               {/* Pack section */}
               <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
+                {formErrors.packs && <p className="mb-2 font-body text-sm text-error">{formErrors.packs}</p>}
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-body text-sm font-semibold text-foreground">Pack disponível</span>
                   {packs.length > 0 && (
@@ -507,10 +512,19 @@ export function ServicosView({ sessions, schoolId }: Props) {
                 <button
                   type="button"
                   onClick={async () => {
-                    if (!nome || !modalidade || !duracao || !schoolId) return;
-                    if (avulsoAtivo && !avulsoPreco) return;
-                    const hasValidPack = packs.length > 0 && packs.every((p) => p.nome && p.numeroAulas && p.preco);
-                    if (!avulsoAtivo && !hasValidPack) return;
+                    const errors: Record<string, string> = {};
+                    if (!nome.trim()) errors.nome = "O nome é obrigatório";
+                    if (!modalidade) errors.modalidade = "Seleciona a modalidade";
+                    if (!duracao || Number(duracao) < 15) errors.duracao = "A duração mínima é 15 minutos";
+                    if (avulsoAtivo && (!avulsoPreco || Number(avulsoPreco) < 1)) errors.avulsoPreco = "Define o preço avulso";
+
+                    const invalidPacks = packs.filter((p) => !p.nome || !p.numeroAulas || !p.preco);
+                    if (!avulsoAtivo && packs.length === 0) errors.packs = "Adiciona pelo menos um pack ou ativa o avulso";
+                    if (invalidPacks.length > 0) errors.packs = "Preenche nome, aulas e preço de cada pack";
+
+                    setFormErrors(errors);
+                    if (Object.keys(errors).length > 0) return;
+                    if (!schoolId) return;
 
                     const packData = packs
                       .filter((p) => p.nome && p.numeroAulas && p.preco)

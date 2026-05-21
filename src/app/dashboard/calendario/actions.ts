@@ -5,7 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { rateLimitByUser } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
 import { getSchoolId } from "@/lib/school";
-import { sendBookingNotification } from "@/lib/email";
+import { sendBookingNotification, sendCancellationNotification } from "@/lib/email";
 
 export type SessionAluno = { id: string; name: string; paymentStatus: string };
 
@@ -17,6 +17,9 @@ export type SessionData = {
   alunos: number;
   alunosList: SessionAluno[];
   class_type_id: string | null;
+  instructor_id: string | null;
+  instructorName: string | null;
+  starts_at: string;
 };
 
 export type AvulsoServico = {
@@ -38,7 +41,7 @@ export async function getSessionsForMonth(
 
   const { data: sessions } = await supabase
     .from("sessions")
-    .select("id, starts_at, duration_minutes, capacity, class_type_id, class_types(name)")
+    .select("id, starts_at, duration_minutes, capacity, class_type_id, instructor_id, class_types(name), instructors(name), status")
     .eq("school_id", schoolId)
     .gte("starts_at", startOfMonth.toISOString())
     .lt("starts_at", endOfMonth.toISOString())
@@ -83,6 +86,7 @@ export async function getSessionsForMonth(
 
     const bData = bookingMap[s.id] ?? { count: 0, alunos: [] as { id: string; name: string; paymentStatus: string }[] };
 
+    const instructor = s.instructors as unknown as { name: string } | null;
     result[day].push({
       id: s.id,
       nome: (s.class_types as unknown as { name: string } | null)?.name ?? "Aula",
@@ -91,6 +95,9 @@ export async function getSessionsForMonth(
       alunos: bData.count,
       alunosList: bData.alunos,
       class_type_id: s.class_type_id,
+      instructor_id: s.instructor_id,
+      instructorName: instructor?.name ?? null,
+      starts_at: s.starts_at,
     });
   }
 
@@ -110,6 +117,7 @@ export async function getAvulsoServicos(schoolId: string): Promise<AvulsoServico
 
 export async function createSession(formData: {
   class_type_id: string | null;
+  instructor_id: string | null;
   data: string;
   horario: string;
   duracao: number;
@@ -136,6 +144,7 @@ export async function createSession(formData: {
     capacity: formData.capacidade,
     price_cents: 0,
     class_type_id: formData.class_type_id,
+    instructor_id: formData.instructor_id,
     status: "scheduled",
   }).select("id").single();
 
@@ -188,10 +197,155 @@ export async function deleteSession(sessionId: string): Promise<{ ok: boolean; e
   return { ok: true };
 }
 
+export async function cancelSession(sessionId: string): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Não autenticado" };
+
+  const rl = await rateLimitByUser(user.id, "cancelSession");
+  if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
+
+  const { data: session } = await supabase
+    .from("sessions")
+    .select("school_id, starts_at, class_type_id")
+    .eq("id", sessionId)
+    .single();
+  if (!session) return { ok: false, error: "Sessão não encontrada" };
+
+  const [schoolRes, classTypeRes, bookingsRes] = await Promise.all([
+    supabase.from("schools").select("name").eq("id", session.school_id).single(),
+    session.class_type_id
+      ? supabase.from("class_types").select("name").eq("id", session.class_type_id).single()
+      : Promise.resolve({ data: null }),
+    supabase.from("bookings").select("student_id").eq("session_id", sessionId),
+  ]);
+
+  const schoolName = schoolRes.data?.name ?? "";
+  const className = (classTypeRes.data as { name: string } | null)?.name ?? "Aula";
+
+  const studentIds = (bookingsRes.data ?? []).map((b) => b.student_id);
+
+  const { data: students } = await supabase
+    .from("students")
+    .select("id, full_name, email")
+    .in("id", studentIds);
+
+  const d = new Date(session.starts_at);
+  const date = d.toLocaleDateString("pt-PT", { day: "numeric", month: "long" });
+  const time = `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
+
+  for (const s of students ?? []) {
+    if (s.email) {
+      sendCancellationNotification({
+        studentEmail: s.email,
+        studentName: s.full_name,
+        schoolName,
+        className,
+        date,
+        time,
+      }).catch(() => {});
+    }
+  }
+
+  const { error } = await supabase
+    .from("sessions")
+    .delete()
+    .eq("id", sessionId);
+
+  if (error) return { ok: false, error: error.message };
+
+  logAudit({
+    schoolId: session.school_id,
+    userId: user.id,
+    action: "cancel_session",
+    entityType: "session",
+    entityId: sessionId,
+  });
+
+  return { ok: true };
+}
+
+export async function completeSession(sessionId: string): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Não autenticado" };
+
+  const rl = await rateLimitByUser(user.id, "completeSession");
+  if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
+
+  const { data: session } = await supabase
+    .from("sessions")
+    .select("school_id")
+    .eq("id", sessionId)
+    .single();
+  if (!session) return { ok: false, error: "Sessão não encontrada" };
+
+  const { data: bookings } = await supabase
+    .from("bookings")
+    .select("id, student_id, payment_method, payment_status, pack_purchase_id")
+    .eq("session_id", sessionId)
+    .in("status", ["confirmed"]);
+
+  for (const b of bookings ?? []) {
+    // Cobrar avulso se unpaid
+    if (b.payment_method === "single" && b.payment_status === "unpaid") {
+      await supabase
+        .from("bookings")
+        .update({ payment_status: "paid_offline" })
+        .eq("id", b.id);
+    }
+
+    // Descontar crédito de pack
+    if (b.payment_method === "pack" && b.pack_purchase_id) {
+      const { data: pp } = await supabase
+        .from("pack_purchases")
+        .select("id, lessons_remaining")
+        .eq("id", b.pack_purchase_id)
+        .eq("student_id", b.student_id)
+        .eq("status", "active")
+        .single();
+      if (pp && pp.lessons_remaining >= 1) {
+        const newRemaining = pp.lessons_remaining - 1;
+        await supabase
+          .from("pack_purchases")
+          .update({
+            lessons_remaining: newRemaining,
+            ...(newRemaining === 0 ? { status: "exhausted" } : {}),
+          })
+          .eq("id", pp.id);
+      }
+    }
+
+    // Marcar booking como attended
+    await supabase
+      .from("bookings")
+      .update({ status: "attended" })
+      .eq("id", b.id);
+  }
+
+  const { error } = await supabase
+    .from("sessions")
+    .update({ status: "completed" })
+    .eq("id", sessionId);
+
+  if (error) return { ok: false, error: error.message };
+
+  logAudit({
+    schoolId: session.school_id,
+    userId: user.id,
+    action: "complete_session",
+    entityType: "session",
+    entityId: sessionId,
+  });
+
+  return { ok: true };
+}
+
 export async function updateSession(
   sessionId: string,
   formData: {
     class_type_id: string | null;
+    instructor_id: string | null;
     data: string;
     horario: string;
     duracao: number;
@@ -219,6 +373,7 @@ export async function updateSession(
       duration_minutes: formData.duracao,
       capacity: formData.capacidade,
       class_type_id: formData.class_type_id,
+      instructor_id: formData.instructor_id,
     })
     .eq("id", sessionId);
 
@@ -590,6 +745,7 @@ export type StudentProfile = {
   email: string | null;
   phone: string | null;
   isGuest: boolean;
+  waiverSigned: boolean;
   packs: StudentProfilePack[];
   classLabel: string | null;
   classDate: string | null;
@@ -603,7 +759,7 @@ export async function getStudentProfile(
 
   const { data: student } = await supabase
     .from("students")
-    .select("id, full_name, email, phone, is_guest")
+    .select("id, full_name, email, phone, is_guest, waiver_signed")
     .eq("id", studentId)
     .maybeSingle();
   if (!student) return null;
@@ -664,6 +820,7 @@ export async function getStudentProfile(
     email: student.email,
     phone: student.phone,
     isGuest: student.is_guest,
+    waiverSigned: student.waiver_signed,
     packs,
     classLabel,
     classDate,
@@ -727,6 +884,16 @@ export async function buyPack(
   });
 
   return { ok: true };
+}
+
+export async function getInstructorsForSchool(schoolId: string): Promise<{ id: string; name: string }[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("instructors")
+    .select("id, name")
+    .eq("school_id", schoolId)
+    .order("name");
+  return data ?? [];
 }
 
 export async function togglePaymentStatus(

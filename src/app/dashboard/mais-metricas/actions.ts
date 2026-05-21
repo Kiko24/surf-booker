@@ -37,6 +37,7 @@ export type MetricasData = {
     mes_max: { mes: number; total: number } | null;
     mes_min: { mes: number; total: number } | null;
   };
+  instrutores: { nome: string; total: number }[];
 };
 
 const WEEKDAYS = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
@@ -333,6 +334,37 @@ export async function getMetricas(
   const mesMax = entries.sort((a, b) => b.total - a.total)[0] ?? null;
   const mesMin = entries.sort((a, b) => a.total - b.total)[0] ?? null;
 
+  // ─── INSTRUTORES ─────────────────────────────────────────
+  const { data: instrutorSessions } = await supabase
+    .from("sessions")
+    .select("instructor_id, instructors!inner(name)")
+    .eq("school_id", schoolId)
+    .eq("status", "scheduled")
+    .not("instructor_id", "is", null)
+    .gte("starts_at", startStr)
+    .lt("starts_at", endStr);
+
+  const instrutorCount: Record<string, { nome: string; total: number }> = {};
+  for (const s of instrutorSessions ?? []) {
+    const nome = (s.instructors as unknown as { name: string })?.name ?? "Desconhecido";
+    if (!instrutorCount[s.instructor_id!]) instrutorCount[s.instructor_id!] = { nome, total: 0 };
+    instrutorCount[s.instructor_id!].total++;
+  }
+
+  // fetch all instructors even if no sessions
+  const { data: allInstructors } = await supabase
+    .from("instructors")
+    .select("name")
+    .eq("school_id", schoolId)
+    .order("name");
+
+  for (const inst of allInstructors ?? []) {
+    if (!Object.values(instrutorCount).some((c) => c.nome === inst.name)) {
+      instrutorCount[inst.name] = { nome: inst.name, total: 0 };
+    }
+  }
+  const instrutores = Object.values(instrutorCount).sort((a, b) => b.total - a.total);
+
   return {
     receita: { total: totalReceita, por_tipo: porTipo, por_servico: porServico, comparativo: comparativoReceita },
     ocupacao: { taxa_media: taxaMedia, realizadas, canceladas, mais_popular: maisPopular, menos_ocupada: menosOcupada, comparativo: comparativoOcupacao },
@@ -346,6 +378,7 @@ export async function getMetricas(
     mes_max: mesMax,
     mes_min: mesMin,
   },
+    instrutores,
   };
 }
 

@@ -343,3 +343,87 @@ export async function deleteImage(
 
   return { ok: true };
 }
+
+export type SchoolSettings = {
+  cancellation_window_hours: number;
+  low_occupancy_threshold: number;
+  notify_email_confirmation: boolean;
+  notify_reminder_24h: boolean;
+  notify_sms_cancellation: boolean;
+  notify_new_schedule: boolean;
+};
+
+export async function getSchoolSettings(schoolId: string): Promise<SchoolSettings | null> {
+  const { supabase } = await requireOwner(schoolId);
+
+  const [schoolRes, settingsRes] = await Promise.all([
+    supabase.from("schools").select("cancellation_window_hours").eq("id", schoolId).single(),
+    supabase.from("school_settings").select("*").eq("school_id", schoolId).maybeSingle(),
+  ]);
+
+  if (!schoolRes.data) return null;
+
+  return {
+    cancellation_window_hours: schoolRes.data.cancellation_window_hours,
+    low_occupancy_threshold: settingsRes.data?.low_occupancy_threshold ?? 40,
+    notify_email_confirmation: settingsRes.data?.notify_email_confirmation ?? true,
+    notify_reminder_24h: settingsRes.data?.notify_reminder_24h ?? true,
+    notify_sms_cancellation: settingsRes.data?.notify_sms_cancellation ?? false,
+    notify_new_schedule: settingsRes.data?.notify_new_schedule ?? true,
+  };
+}
+
+export async function saveSchoolSettings(
+  schoolId: string,
+  settings: SchoolSettings
+): Promise<{ ok: boolean; error?: string }> {
+  const { supabase, user } = await requireOwner(schoolId);
+
+  const rl = await rateLimitByUser(user.id, "saveSchoolSettings");
+  if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
+
+  const [schoolErr, settingsErr] = await Promise.all([
+    supabase
+      .from("schools")
+      .update({ cancellation_window_hours: settings.cancellation_window_hours })
+      .eq("id", schoolId),
+    supabase
+      .from("school_settings")
+      .upsert({
+        school_id: schoolId,
+        low_occupancy_threshold: settings.low_occupancy_threshold,
+        notify_email_confirmation: settings.notify_email_confirmation,
+        notify_reminder_24h: settings.notify_reminder_24h,
+        notify_sms_cancellation: settings.notify_sms_cancellation,
+        notify_new_schedule: settings.notify_new_schedule,
+      }, { onConflict: "school_id" }),
+  ]);
+
+  if (schoolErr.error) return { ok: false, error: schoolErr.error.message };
+  if (settingsErr.error) return { ok: false, error: settingsErr.error.message };
+
+  return { ok: true };
+}
+
+export async function saveSchoolInfo(
+  schoolId: string,
+  data: { name: string; location: string; description: string }
+): Promise<{ ok: boolean; error?: string }> {
+  const { supabase, user } = await requireOwner(schoolId);
+
+  const rl = await rateLimitByUser(user.id, "saveSchoolInfo");
+  if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
+
+  const { error } = await supabase
+    .from("schools")
+    .update({
+      name: data.name,
+      location: data.location || null,
+      description: data.description || null,
+    })
+    .eq("id", schoolId);
+
+  if (error) return { ok: false, error: error.message };
+
+  return { ok: true };
+}
