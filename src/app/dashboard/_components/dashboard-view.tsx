@@ -51,7 +51,7 @@ function SessionCard({ time, durationMinutes, title, inscritos, capacidade, alun
           <h5 className="font-body text-sm font-semibold text-foreground truncate">{title}</h5>
           <div className="flex items-center gap-2 mt-1">
             <span className="font-body text-xs text-text-secondary">{inscritos}/{capacidade}</span>
-            {badge && <span className={badge.className}>{badge.label}</span>}
+            {badge && <span className={`${badge.className} hidden md:inline-flex`}>{badge.label}</span>}
           </div>
         </div>
         {inscritos > 0 && (
@@ -194,8 +194,7 @@ export function DashboardView({ fullName, todaySessions, metricas, alertas, scho
               </div>
             </div>
           ) : (
-            <div className="grid gap-2"
-              style={{ gridTemplateColumns: `repeat(${Math.min(activeAlerts.length, 3)}, 1fr)` }}>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
               {activeAlerts.slice(0, 3).map((a) => (
                 <div key={a.id}
                   className="flex items-center gap-2 rounded-xl border border-accent/10 bg-surface py-5 px-3 transition-colors hover:bg-white/5"
@@ -281,10 +280,11 @@ export function DashboardView({ fullName, todaySessions, metricas, alertas, scho
               <SessionCard key={todaySessions[0].id} {...todaySessions[0]} />
             </div>
           ) : (
-            <div className="grid gap-2"
-              style={{ gridTemplateColumns: `repeat(${Math.min(todaySessions.length, 3)}, 1fr)` }}>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
               {todaySessions.slice(0, 3).map((s) => (
-                <SessionCard key={s.id} {...s} compact />
+                <div key={s.id}>
+                  <SessionCard {...s} compact />
+                </div>
               ))}
             </div>
           )}
@@ -295,12 +295,12 @@ export function DashboardView({ fullName, todaySessions, metricas, alertas, scho
             <div className="min-w-0 flex-1 max-w-lg space-y-4">
               <h3 className="font-heading text-2xl text-foreground">Esta semana</h3>
               <div className="flex gap-3">
-                <div className="flex gap-3 min-w-0">
-                  <div className="flex flex-1 flex-col items-center justify-between rounded-xl border border-accent/10 bg-surface p-6 text-center shadow-md aspect-square">
-                    <div className="flex w-full flex-1 flex-col items-center justify-between gap-2">
-                      <span className="font-body text-sm font-semibold uppercase text-text-secondary">Taxa de ondas</span>
-                      <span className="font-heading text-3xl text-foreground">{metricas?.ocupacao.taxa_media ?? 0}%</span>
-                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-background">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 w-full">
+                  <div className="flex flex-1 flex-col items-center justify-between rounded-xl border border-accent/10 bg-surface p-8 text-center shadow-md">
+                    <div className="flex w-full flex-1 flex-col items-center justify-between gap-4">
+                      <span className="font-body text-xs font-semibold uppercase tracking-wider text-text-secondary">Taxa de ondas</span>
+                      <span className="font-heading text-3xl font-bold text-foreground">{metricas?.ocupacao.taxa_media ?? 0}%</span>
+                      <div className="h-1.5 w-full max-w-[120px] overflow-hidden rounded-full bg-background">
                         <div className="h-full rounded-full bg-accent" style={{ width: `${metricas?.ocupacao.taxa_media ?? 0}%` }} />
                       </div>
                       {metricas && (
@@ -311,10 +311,10 @@ export function DashboardView({ fullName, todaySessions, metricas, alertas, scho
                     </div>
                   </div>
 
-                  <div className="flex flex-1 flex-col items-center justify-between rounded-xl border border-accent/10 bg-surface p-6 text-center shadow-md aspect-square">
-                    <div className="flex w-full flex-1 flex-col items-center justify-between gap-2">
-                      <span className="font-body text-sm font-semibold uppercase text-text-secondary">Receita</span>
-                      <span className="font-heading text-3xl text-foreground">{metricas ? formatPrice(metricas.receita.total) : "0,00€"}</span>
+                  <div className="flex flex-1 flex-col items-center justify-between rounded-xl border border-accent/10 bg-surface p-8 text-center shadow-md">
+                    <div className="flex w-full flex-1 flex-col items-center justify-between gap-4">
+                      <span className="font-body text-xs font-semibold uppercase tracking-wider text-text-secondary">Receita</span>
+                      <span className="font-heading text-3xl font-bold text-foreground">{metricas ? formatPrice(metricas.receita.total) : "0,00€"}</span>
                       <div className="h-1.5 w-full" />
                       {metricas && (
                         <span className={`font-body text-sm ${metricas.receita.comparativo > 0 ? "text-accent" : metricas.receita.comparativo < 0 ? "text-error" : "text-text-secondary"}`}>
@@ -324,10 +324,10 @@ export function DashboardView({ fullName, todaySessions, metricas, alertas, scho
                     </div>
                   </div>
 
-                  <div className="flex flex-1 flex-col items-center justify-between rounded-xl border border-accent/10 bg-surface p-6 text-center shadow-md aspect-square">
-                    <div className="flex w-full flex-1 flex-col items-center justify-between gap-2">
-                      <span className="font-body text-sm font-semibold uppercase text-text-secondary">No-Show</span>
-                      <span className="font-heading text-3xl text-foreground">{metricas?.noshow.taxa ?? 0}%</span>
+                  <div className="hidden md:flex flex-1 flex-col items-center justify-between rounded-xl border border-accent/10 bg-surface p-8 text-center shadow-md">
+                    <div className="flex w-full flex-1 flex-col items-center justify-between gap-4">
+                      <span className="font-body text-xs font-semibold uppercase tracking-wider text-text-secondary">No-Show</span>
+                      <span className="font-heading text-3xl font-bold text-foreground">{metricas?.noshow.taxa ?? 0}%</span>
                       <div className="h-1.5 w-full" />
                       {metricas && (
                         <span className={`font-body text-sm ${metricas.noshow.comparativo > 0 ? "text-error" : metricas.noshow.comparativo < 0 ? "text-success" : "text-text-secondary"}`}>
@@ -339,7 +339,7 @@ export function DashboardView({ fullName, todaySessions, metricas, alertas, scho
                 </div>
               </div>
             </div>
-            <div className="flex flex-1 flex-col min-w-48 ml-12">
+            <div className="hidden md:flex flex-1 flex-col min-w-48 ml-12">
               <h3 className="font-heading text-2xl text-foreground mb-4">Atividade recente</h3>
               <div className="flex-1 border-l border-white/10 pl-4 space-y-3">
                 {recentActivity.length === 0 ? (

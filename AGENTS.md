@@ -248,11 +248,23 @@ Centered dialog:
 ### Bottom Navigation (Navbar)
 Fixed at bottom, centered, with glass effect:
 ```tsx
-<nav className="fixed left-1/2 z-50 flex w-[90%] max-w-md -translate-x-1/2 items-center justify-around rounded-full border border-accent/10 bg-surface-container-high px-2 py-2 shadow-lg backdrop-blur-md"
+<nav className="fixed left-1/2 z-50 flex w-[90%] max-md -translate-x-1/2 items-center justify-around rounded-full border border-accent/10 bg-surface-container-high px-2 py-2 shadow-lg backdrop-blur-md"
   style={{ bottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
   {NAV_ITEMS.map(item => (...))}
 </nav>
 ```
+
+### Calendar Layout (Dual-Sidebar Pattern)
+The calendar implements a responsive dual-layout system:
+- **Desktop (xl)**: Side-by-side layout. The sessions sidebar sits naturally next to the calendar grid. Both containers are synchronized in height (`xl:h-full`) and top alignment (`xl:mt-16`).
+- **Mobile**: Single-column layout. The sessions list appears as a "Details Card" directly below the calendar grid (integrated into the scroll flow, not as a modal bottom sheet).
+- **Glass Card Style**: Standardized `glass-card` look using `bg-surface/60 backdrop-blur-xl border border-white/10`.
+- **No-Scroll Policy (Mobile)**: The root container uses `h-svh overflow-hidden` to prevent global page bouncing. Scrolling is strictly scoped to internal containers (like the sessions list) to maintain a fixed, app-like feel.
+
+### Floating Action Button (FAB)
+Primary trigger for session creation:
+- **Positioning**: Fixed at `bottom-24 right-6` on mobile (to float above the navbar) and `bottom-12 right-8` on desktop.
+- **Redundancy**: Secondary "Criar aula" buttons in lists are avoided in favor of the centralized FAB.
 
 ### Loading States
 Use a `loadingSessions` boolean state to show loading indicator. The `fetchSessions` callback:

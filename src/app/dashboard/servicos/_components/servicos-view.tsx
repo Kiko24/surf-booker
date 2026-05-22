@@ -116,108 +116,90 @@ export function ServicosView({ sessions, schoolId }: Props) {
   return (
     <>
       <main className="px-5 pt-4">
-        <section className="mt-6 mb-8">
+        <section className="mt-6 mb-8 flex items-end justify-between">
           <h1 className="font-heading text-3xl font-bold text-foreground">
             Serviços
           </h1>
+          <button
+            type="button"
+            onClick={() => {
+              setEditingServico(null);
+              setShowModal(true);
+              resetForm();
+            }}
+            className="hidden md:flex items-center gap-2 rounded-full bg-accent px-6 py-2.5 font-body text-sm font-semibold text-primary-foreground transition-colors hover:bg-accent/90"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                <path d="M5 12h14M12 5v14"/>
+            </svg>
+            Adicionar serviço
+          </button>
         </section>
 
-        <button
-          type="button"
-          onClick={() => {
-            setEditingServico(null);
-            setShowModal(true);
-            resetForm();
-          }}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-4 font-body text-lg font-semibold text-primary-foreground shadow-lg transition-transform active:scale-95"
-        >
-          <PlusIcon className="h-5 w-5" />
-          Adicionar serviços
-        </button>
-
-        <div className="mt-4 w-full max-w-md mx-auto divide-y divide-foreground/10">
-          {sessions.length === 0 ? (
-            <p className="py-8 text-center font-body text-base text-text-secondary">
-              Nenhum serviço criado ainda
-            </p>
-          ) : sessions.map((s) => (
-            <div
-              key={s.id}
-              className="flex items-center gap-3 py-3"
-            >
-              <button
-                type="button"
-                onClick={() => setSelectedSession(s)}
-                className="flex-1 min-w-0 text-left"
-              >
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="font-body text-base font-bold text-foreground truncate">
-                    {s.nome}
-                  </h3>
-                  {s.modalidade && (
-                    <span className="shrink-0 rounded-full bg-background px-2 py-0.5 text-xs font-semibold text-text-secondary">
-                      {s.modalidade}
-                    </span>
-                  )}
-                </div>
-                <div className="mt-1 flex items-center gap-2 flex-wrap">
-                  {s.avulsoDisponivel && (
-                    <span className="rounded-full bg-accent/20 px-2 py-0.5 text-xs font-semibold text-accent">
-                      Avulso
-                    </span>
-                  )}
-                  {s.packs.length > 0 && (
-                    <span className="rounded-full bg-blue-500/20 px-2 py-0.5 text-xs font-semibold text-blue-400">
-                      Pack
-                    </span>
-                  )}
-                </div>
-                <div className="mt-0.5 text-xs text-text-secondary">
-                  {s.avulsoDisponivel && (
-                    <span>{formatPrice(s.avulsoPreco)} avulso</span>
-                  )}
-                  {s.avulsoDisponivel && s.packs.length > 0 && (
-                    <span>{" · "}</span>
-                  )}
-                  {s.packs.map((p, i) => (
-                    <span key={p.id}>
-                      {i > 0 && <span>{" · "}</span>}
-                      Pack {p.numeroAulas}x {formatPrice(p.preco)}
-                    </span>
-                  ))}
-                </div>
-                <div className="mt-0.5 text-xs text-text-muted">
-                  {s.vezesUsado} {s.vezesUsado === 1 ? "vez utilizado" : "vezes utilizado"}
-                </div>
-              </button>
-
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditingServico(s);
-                    setShowModal(true);
-                    fillEditForm(s);
-                  }}
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-text-secondary hover:text-accent transition-colors"
-                  aria-label="Editar"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                    <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                    <path d="m15 5 4 4" />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDeletingServico(s)}
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-text-secondary hover:text-error transition-colors"
-                  aria-label="Eliminar"
-                >
-                  <TrashIcon className="h-4 w-4" />
+        {/* Mobile View: List */}
+        <div className="md:hidden">
+          <button
+            type="button"
+            onClick={() => {
+              setEditingServico(null);
+              setShowModal(true);
+              resetForm();
+            }}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-4 font-body text-lg font-semibold text-primary-foreground shadow-lg transition-transform active:scale-95"
+          >
+            <PlusIcon className="h-5 w-5" />
+            Adicionar serviços
+          </button>
+          <div className="mt-4 w-full max-w-md mx-auto divide-y divide-foreground/10">
+            {sessions.length === 0 ? (
+              <p className="py-8 text-center font-body text-base text-text-secondary">
+                Nenhum serviço criado ainda
+              </p>
+            ) : sessions.map((s) => (
+              <div key={s.id} className="flex items-center gap-3 py-3">
+                <button type="button" onClick={() => setSelectedSession(s)} className="flex-1 text-left">
+                  <h3 className="font-body text-base font-bold text-foreground">{s.nome}</h3>
+                  <p className="text-xs text-text-secondary">{s.modalidade} &middot; {s.duracao}min</p>
                 </button>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
+        </div>
+
+        {/* Desktop View: Table */}
+        <div className="hidden md:block mt-6 w-full rounded-xl bg-surface-container-lowest overflow-hidden shadow-2xl">
+          <table className="w-full text-left border-collapse">
+            <thead className="bg-surface/50 border-b border-white/5">
+              <tr>
+                <th className="px-5 py-3 font-body text-[10px] text-text-secondary uppercase tracking-widest text-center">Nome do serviço</th>
+                <th className="px-5 py-3 font-body text-[10px] text-text-secondary uppercase tracking-widest text-center">Modalidade</th>
+                <th className="px-5 py-3 font-body text-[10px] text-text-secondary uppercase tracking-widest text-center">Duração</th>
+                <th className="px-5 py-3 font-body text-[10px] text-text-secondary uppercase tracking-widest text-center">Tipo</th>
+                <th className="px-5 py-3"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-outline-variant">
+              {sessions.map((s) => (
+                <tr key={s.id} className="hover:bg-surface-container-high transition-colors group">
+                  <td className="px-6 py-4 font-body-lg text-body-lg text-on-surface align-middle text-center">{s.nome}</td>
+                  <td className="px-6 py-4 font-body-md text-body-md text-on-surface-variant align-middle text-center">{s.modalidade}</td>
+                  <td className="px-6 py-4 font-body-md text-body-md text-on-surface-variant align-middle text-center">{s.duracao} min</td>
+                  <td className="px-6 py-4 align-middle text-center">
+                    <span className="px-3 py-1 rounded-full bg-primary-fixed-dim/10 text-primary-fixed-dim text-[12px] font-bold uppercase tracking-wider">
+                      {s.avulsoDisponivel ? "Avulso" : "Pack"}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right align-middle">
+                    <button onClick={() => setSelectedSession(s)} className="p-2 text-on-surface-variant hover:text-primary-fixed-dim">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                        <path d="M5 12h14M12 5v14"/>
+                      </svg>
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </main>
 

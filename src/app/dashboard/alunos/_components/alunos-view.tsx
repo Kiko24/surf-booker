@@ -84,7 +84,7 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
 
   return (
     <>
-      <main className="px-5 pt-4">
+      <main className="px-5 pt-4 flex flex-col min-h-screen">
         <section className="mt-6 mb-6 flex items-end justify-between">
           {searchOpen ? (
               <div className="flex w-full items-center gap-4">
@@ -111,26 +111,46 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
               <h1 className="font-heading text-3xl font-bold text-foreground">
                 Alunos
               </h1>
-              <button
-                type="button"
-                onClick={handleSearchToggle}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-surface text-text-secondary transition-colors hover:text-foreground"
-                aria-label="Pesquisar"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-4 w-4"
+              <div className="flex items-center gap-2 ml-auto">
+                <button
+                  type="button"
+                  className="hidden md:flex items-center gap-2 rounded-full bg-accent px-4 py-2 font-body text-sm font-semibold text-primary-foreground transition-colors hover:bg-accent/90"
                 >
-                  <circle cx="11" cy="11" r="8" />
-                  <path d="m21 21-4.35-4.35" />
-                </svg>
-              </button>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                      <path d="M5 12h14M12 5v14"/>
+                  </svg>
+                  Adicionar aluno
+                </button>
+                <button
+                  type="button"
+                  className="md:hidden flex h-9 w-9 items-center justify-center rounded-full bg-accent text-primary-foreground transition-colors hover:bg-accent/90"
+                  aria-label="Adicionar aluno"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                      <path d="M5 12h14M12 5v14"/>
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSearchToggle}
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-surface text-text-secondary transition-colors hover:text-foreground"
+                  aria-label="Pesquisar"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-4 w-4"
+                  >
+                    <circle cx="11" cy="11" r="8" />
+                    <path d="m21 21-4.35-4.35" />
+                  </svg>
+                </button>
+              </div>
             </>
           )}
         </section>
@@ -152,55 +172,99 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
           ))}
         </nav>
 
-        <div className="mt-6 w-full max-w-md mx-auto rounded-2xl bg-surface text-foreground overflow-hidden flex-1">
+        {/* Mobile View: List */}
+        <div className="md:hidden mt-6 w-full rounded-2xl bg-surface text-foreground overflow-hidden flex-1 mb-24">
           <div className="h-full overflow-y-auto [&::-webkit-scrollbar]:hidden px-5 pt-2 pb-4">
             <div className="divide-y divide-foreground/10">
               {filtered.map((s) => (
-                <div
-                  key={s.id}
-                  className="flex items-center gap-4 py-3"
-                >
+                <div key={s.id} className="flex items-center gap-4 py-3">
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-background text-lg font-bold text-accent">
                     {getInitials(s.name)}
                   </div>
-
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-body text-base font-bold text-foreground truncate">
-                      {s.name}
-                    </h3>
+                    <h3 className="font-body text-base font-bold text-foreground truncate">{s.name}</h3>
                     <div className="mt-0.5 text-xs text-text-secondary">
                       {s.classLabel && s.classDate ? `${s.classLabel}: ${s.classDate}` : "Sem aulas"}
                     </div>
-                    <div className="text-xs">
-                      {s.isGuest ? (
-                        <span className="text-text-muted">Convidado</span>
-                      ) : (
-                        <span className="text-success">Registado</span>
-                      )}
-                    </div>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setSelectedStudent(s)}
-                    className="flex h-8 w-8 items-center justify-center rounded-full text-text-secondary hover:text-foreground transition-colors"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="h-4 w-4"
-                    >
+                  <button type="button" onClick={() => setSelectedStudent(s)} className="flex h-8 w-8 items-center justify-center rounded-full text-text-secondary hover:text-foreground transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
                       <path d="m9 18 6-6-6-6" />
                     </svg>
                   </button>
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+
+        {/* Desktop View: Table */}
+        <div className="hidden md:block mt-6 w-full rounded-2xl bg-surface text-foreground overflow-hidden">
+          <table className="w-full text-left border-collapse">
+            <thead className="bg-surface/50 border-b border-white/5">
+              <tr>
+                <th className="px-5 py-3 font-body text-[10px] text-text-secondary uppercase tracking-widest text-center">Nome do Aluno</th>
+                <th className="px-5 py-3 font-body text-[10px] text-text-secondary uppercase tracking-widest text-center">Status do Pack</th>
+                <th className="px-5 py-3 font-body text-[10px] text-text-secondary uppercase tracking-widest text-center">Última Aula</th>
+                <th className="px-5 py-3 font-body text-[10px] text-text-secondary uppercase tracking-widest text-center">Estado</th>
+                <th className="px-5 py-3"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {filtered.map((s) => (
+                <tr key={s.id} className="hover:bg-white/5 transition-colors">
+                  <td className="px-5 py-3 align-middle text-center">
+                    <div className="flex items-center justify-center gap-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-background text-[10px] font-bold text-accent">
+                        {getInitials(s.name)}
+                      </div>
+                      <span className="font-body text-sm font-medium text-foreground">{s.name}</span>
+                    </div>
+                  </td>
+                  <td className="px-5 py-3 font-body text-sm text-text-secondary align-middle text-center">
+                    {s.packs.length > 0 ? `${s.packs[0].remaining} aulas` : "Sem pack"}
+                  </td>
+                  <td className="px-5 py-3 font-body text-sm text-text-secondary align-middle text-center">
+                    {s.classDate ?? "N/A"}
+                  </td>
+                  <td className="px-5 py-3 align-middle text-center">
+                    <span className={`text-[10px] font-bold uppercase tracking-wider ${s.isGuest ? "text-text-muted" : "text-success"}`}>
+                      {s.isGuest ? "Convidado" : "Registado"}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3 text-right align-middle">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedStudent(s)}
+                      className="text-text-secondary hover:text-foreground"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                        <path d="M5 12h14M12 5v14"/>
+                      </svg>
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        
+        {/* Summary Bar (Footer of content) */}
+        <div className="hidden md:flex mt-auto pt-6 md:mb-4 flex items-center justify-between border-t border-white/10">
+          <div className="flex flex-col">
+            <span className="font-body text-[10px] text-text-secondary uppercase tracking-widest">Total Alunos</span>
+            <span className="font-heading text-xl text-foreground">{students.length}</span>
+          </div>
+          
+          {/* Pagination Placeholder */}
+          <div className="flex items-center gap-2">
+            <button className="p-2 border border-white/10 rounded-lg text-text-secondary hover:bg-surface transition-colors disabled:opacity-30" disabled>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+            <span className="font-body text-sm px-4 text-foreground">1 de 1</span>
+            <button className="p-2 border border-white/10 rounded-lg text-text-secondary hover:bg-surface transition-colors disabled:opacity-30" disabled>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
           </div>
         </div>
       </main>
