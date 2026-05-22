@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, useCallback } from "react";
-import { dismissAlert, type TodaySession, type Alerta } from "../actions";
+import { dismissAlert, type TodaySession, type Alerta, type ActivityItem } from "../actions";
 import type { MetricasData } from "../mais-metricas/actions";
 
 type Props = {
@@ -11,6 +11,7 @@ type Props = {
   metricas: MetricasData | null;
   alertas: Alerta[];
   schoolId: string;
+  recentActivity: ActivityItem[];
 };
 
 function formatPrice(cents: number): string {
@@ -25,43 +26,122 @@ function todayLabel(): string {
   return `${weekdays[d.getDay()]}, ${d.getDate()} de ${months[d.getMonth()]}`;
 }
 
-function SessionCard({ time, title, inscritos, capacidade }: TodaySession) {
+function SessionCard({ time, durationMinutes, title, inscritos, capacidade, alunosList, compact }: TodaySession & { compact?: boolean }) {
   const pct = capacidade > 0 ? (inscritos / capacidade) * 100 : 0;
 
-  let tag: { label: string; className: string } | null = null;
+  let badge: { label: string; className: string } | null = null;
 
   if (inscritos >= capacidade) {
-    tag = { label: "Lotada", className: "rounded-full bg-error/20 px-2 py-0.5 font-body text-sm font-semibold text-error" };
+    badge = { label: "Lotada", className: "rounded-full bg-error/20 px-2 py-0.5 font-body text-[10px] font-bold uppercase tracking-wider text-error" };
   } else if (pct <= 50) {
-    tag = { label: "Pouca ocupação", className: "rounded-full bg-success/20 px-2 py-0.5 font-body text-sm font-semibold text-success" };
+    badge = { label: "Pouca ocupação", className: "rounded-full bg-success/20 px-2 py-0.5 font-body text-[10px] font-bold uppercase tracking-wider text-success" };
+  }
+
+  const visibleAlunos = alunosList.slice(0, 4);
+  const restantes = alunosList.length - 4;
+
+  if (compact) {
+    return (
+      <div className="flex items-center gap-3 rounded-xl border border-white/5 bg-surface py-5 px-3">
+        <div className="w-20 shrink-0">
+          <p className="font-heading text-lg text-accent">{time}</p>
+          <p className="font-body text-xs text-text-secondary">{durationMinutes} min</p>
+        </div>
+        <div className="flex-1 min-w-0">
+          <h5 className="font-body text-sm font-semibold text-foreground truncate">{title}</h5>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="font-body text-xs text-text-secondary">{inscritos}/{capacidade}</span>
+            {badge && <span className={badge.className}>{badge.label}</span>}
+          </div>
+        </div>
+        {inscritos > 0 && (
+          <div className="flex items-center -space-x-1.5 shrink-0">
+            {visibleAlunos.slice(0, 3).map((aluno, i) => (
+              <div key={i}
+                className="flex h-6 w-6 items-center justify-center rounded-full bg-surface text-[8px] font-bold text-accent border border-background"
+                title={aluno.name}
+              >
+                {aluno.name.split(" ").map(p => p[0]).join("").substring(0, 2).toUpperCase()}
+              </div>
+            ))}
+            {(alunosList.length > 3 || restantes > 0) && (
+              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#2A2A2A] text-[8px] font-bold text-text-secondary border border-background">
+                +{alunosList.length > 3 ? alunosList.length - 3 : restantes}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
   }
 
   return (
-    <div className="flex items-start justify-between rounded-xl border border-accent/10 bg-surface p-5 shadow-lg">
-      <div className="flex flex-col gap-1">
-        <span className="font-body text-sm font-semibold uppercase tracking-wider text-text-secondary">
-          {time}
-        </span>
-        <span className="font-body text-lg font-bold text-foreground">
+    <div className="group flex items-center py-5 border-b border-white/5 last:border-b-0">
+      <div className="w-28 shrink-0">
+        <p className="font-heading text-xl text-accent">{time}</p>
+        <p className="font-body text-xs text-text-secondary">{durationMinutes} min</p>
+      </div>
+      <div className="flex-1 min-w-0">
+        <h5 className="font-body text-base font-semibold text-foreground group-hover:text-accent transition-colors truncate">
           {title}
-        </span>
+        </h5>
+        <div className="flex items-center gap-3 mt-1">
+          <span className="font-body text-sm text-text-secondary flex items-center gap-1">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+            {inscritos}/{capacidade} inscritos
+          </span>
+          {badge && <span className={badge.className}>{badge.label}</span>}
+        </div>
       </div>
-      <div className="flex flex-col items-end gap-1">
-        <span className="font-body text-base text-text-secondary">{inscritos}/{capacidade} inscritos</span>
-        {tag && <span className={tag.className}>{tag.label}</span>}
-      </div>
+      {inscritos > 0 && (
+        <div className="flex items-center ml-4">
+          {visibleAlunos.map((aluno, i) => (
+            <div
+              key={i}
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-surface text-[10px] font-bold text-accent -ml-2 first:ml-0 border-2 border-background"
+              title={aluno.name}
+            >
+              {aluno.name.split(" ").map(p => p[0]).join("").substring(0, 2).toUpperCase()}
+            </div>
+          ))}
+          {restantes > 0 && (
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#2A2A2A] text-[10px] font-bold text-text-secondary -ml-2 border-2 border-background">
+              +{restantes}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
-export function DashboardView({ fullName, todaySessions, metricas, alertas, schoolId }: Props) {
-  const [dark, setDark] = useState(true);
-  const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
+function getWindDir(deg: number): string {
+  const dirs = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
+  return dirs[Math.round(deg / 22.5) % 16];
+}
 
-  const handleDismiss = useCallback((a: Alerta) => {
+export function DashboardView({ fullName, todaySessions, metricas, alertas, schoolId, recentActivity }: Props) {
+  const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
+  const [dismissedActivity, setDismissedActivity] = useState<Set<string>>(new Set());
+  const [showNotifications, setShowNotifications] = useState(false);
+
+  const handleDismissAlert = useCallback((a: Alerta) => {
     setDismissedAlerts((prev) => new Set(prev).add(a.id));
     dismissAlert(schoolId, a.tipo, a.entityId);
   }, [schoolId]);
+
+  const handleDismissActivity = useCallback((id: string) => {
+    setDismissedActivity((prev) => new Set(prev).add(id));
+  }, []);
+
+  const activeAlerts = alertas.filter((a) => !dismissedAlerts.has(a.id));
+  const activeActivity = recentActivity.filter((a) => !dismissedActivity.has(a.id));
+  const alertCount = activeAlerts.length + activeActivity.length;
 
   const firstName = fullName.split(" ")[0];
 
@@ -76,83 +156,201 @@ export function DashboardView({ fullName, todaySessions, metricas, alertas, scho
               {todayLabel()} &nbsp;&middot; {todaySessions.length} {todaySessions.length === 1 ? "sessão hoje" : "sessões hoje"}
             </p>
           </div>
-          <button type="button" onClick={() => setDark(!dark)}
-            className="mt-1 flex h-9 w-9 items-center justify-center rounded-full bg-surface text-text-secondary transition-colors hover:text-foreground active:scale-95"
-            aria-label={dark ? "Modo claro" : "Modo escuro"}>
-            {dark ? (
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                <circle cx="12" cy="12" r="5" /><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
-              </svg>
-            ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-              </svg>
+          <button
+            type="button"
+            onClick={() => setShowNotifications(true)}
+            className="relative mt-1 flex h-9 w-9 items-center justify-center rounded-full bg-surface text-text-secondary transition-colors hover:text-foreground active:scale-95"
+            aria-label="Notificações"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+            </svg>
+            {alertCount > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-error px-1 text-[10px] font-bold text-white">
+                {alertCount}
+              </span>
             )}
           </button>
         </section>
 
-        {alertas.length > 0 && (
-          <section className="space-y-3">
-            <h3 className="font-heading text-2xl text-foreground">Alertas</h3>
-            <div className="space-y-2">
-              {alertas.filter((a) => !dismissedAlerts.has(a.id)).map((a) => (
+        <section className="space-y-3">
+          <h3 className="font-heading text-2xl text-foreground">Alertas</h3>
+          {activeAlerts.length === 0 ? (
+            <div className="rounded-xl border border-accent/10 bg-surface min-h-[96px] flex items-center justify-center">
+              <p className="font-body text-sm text-text-secondary">Nada para mostrar</p>
+            </div>
+          ) : activeAlerts.length === 1 ? (
+            <div className="rounded-xl border border-accent/10 bg-surface">
+              <div className="flex items-center gap-3 px-4 py-5">
+                <Link href={activeAlerts[0].link} className="flex-1 min-w-0">
+                  <p className="font-body text-sm text-foreground">{activeAlerts[0].mensagem}</p>
+                </Link>
+                <button type="button" onClick={() => handleDismissAlert(activeAlerts[0])}
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-text-muted hover:bg-white/10"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M18 6 6 18M6 6l12 12" /></svg>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid gap-2"
+              style={{ gridTemplateColumns: `repeat(${Math.min(activeAlerts.length, 3)}, 1fr)` }}>
+              {activeAlerts.slice(0, 3).map((a) => (
                 <div key={a.id}
-                  className="flex items-center gap-3 rounded-xl border border-accent/10 bg-surface p-4 transition-colors hover:bg-white/5"
+                  className="flex items-center gap-2 rounded-xl border border-accent/10 bg-surface py-5 px-3 transition-colors hover:bg-white/5"
                 >
                   <Link href={a.link} className="flex-1 min-w-0">
-                    <p className="font-body text-sm text-foreground">{a.mensagem}</p>
+                    <p className="font-body text-xs text-foreground">{a.mensagem}</p>
                   </Link>
-                  <button type="button" onClick={() => handleDismiss(a)}
-                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-text-muted hover:bg-white/10"
+                  <button type="button" onClick={() => handleDismissAlert(a)}
+                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-text-muted hover:bg-white/10"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M18 6 6 18M6 6l12 12" /></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3"><path d="M18 6 6 18M6 6l12 12" /></svg>
                   </button>
                 </div>
               ))}
             </div>
-          </section>
+          )}
+        </section>
+
+        {showNotifications && (
+          <>
+            <div className="fixed inset-0 z-50" onClick={() => setShowNotifications(false)} />
+            <div className="absolute right-5 top-20 z-50 w-80 rounded-2xl border border-white/10 bg-surface p-5 shadow-xl max-h-[70vh] overflow-y-auto">
+              {activeAlerts.length === 0 && activeActivity.length === 0 ? (
+                <p className="font-body text-sm text-text-secondary text-center py-4">Nenhuma notificação</p>
+              ) : (
+                <>
+                  {activeAlerts.length > 0 && (
+                    <div className="space-y-2 mb-4">
+                      <h4 className="font-heading text-sm font-semibold text-text-secondary uppercase tracking-wider">Alertas</h4>
+                      {activeAlerts.map((a) => (
+                        <div key={a.id} className="flex items-center gap-2 rounded-xl bg-[#2A2A2A] p-3">
+                          <Link href={a.link} className="flex-1 min-w-0" onClick={() => setShowNotifications(false)}>
+                            <p className="font-body text-sm text-foreground">{a.mensagem}</p>
+                          </Link>
+                          <button type="button" onClick={() => handleDismissAlert(a)}
+                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-text-muted hover:bg-white/10"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3"><path d="M18 6 6 18M6 6l12 12" /></svg>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {activeActivity.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="font-heading text-sm font-semibold text-text-secondary uppercase tracking-wider">Atividade recente</h4>
+                      {activeActivity.map((item) => (
+                        <div key={item.id} className="flex items-start gap-2 border-l-2 border-accent/30 pl-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-body text-sm text-foreground" dangerouslySetInnerHTML={{ __html: item.message }} />
+                            <p className="font-body text-xs text-text-muted mt-0.5">{item.timeAgo}</p>
+                          </div>
+                          <button type="button" onClick={() => handleDismissActivity(item.id)}
+                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-text-muted hover:bg-white/10 mt-0.5"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3"><path d="M18 6 6 18M6 6l12 12" /></svg>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </>
         )}
 
-        <section className="space-y-4">
-          <h3 className="font-heading text-2xl text-foreground">Sessões de hoje</h3>
-          <div className="space-y-3">
-            {todaySessions.length > 0 ? todaySessions.map((s) => (
-              <SessionCard key={s.id} {...s} />
-            )) : (
-              <p className="rounded-xl bg-surface px-5 py-8 text-center font-body text-base text-text-secondary">
+        <section className="space-y-1">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-heading text-2xl text-foreground">Sessões de hoje</h3>
+            <Link href="/dashboard/calendario" className="font-body text-xs font-semibold uppercase tracking-widest text-text-secondary hover:text-accent transition-colors">
+              Ver calendário
+            </Link>
+          </div>
+          {todaySessions.length === 0 ? (
+            <div className="rounded-xl border border-white/5 bg-surface px-5 min-h-[96px] flex items-center justify-center">
+              <p className="font-body text-base text-text-secondary text-center">
                 Hoje não há aulas marcadas
               </p>
-            )}
-          </div>
+            </div>
+          ) : todaySessions.length === 1 ? (
+            <div className="rounded-xl border border-white/5 bg-surface min-h-[96px]">
+              <SessionCard key={todaySessions[0].id} {...todaySessions[0]} />
+            </div>
+          ) : (
+            <div className="grid gap-2"
+              style={{ gridTemplateColumns: `repeat(${Math.min(todaySessions.length, 3)}, 1fr)` }}>
+              {todaySessions.slice(0, 3).map((s) => (
+                <SessionCard key={s.id} {...s} compact />
+              ))}
+            </div>
+          )}
         </section>
 
         <section className="space-y-4">
-          <h3 className="font-heading text-2xl text-foreground">Esta semana</h3>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col items-center rounded-xl border border-accent/10 bg-surface p-5 text-center shadow-md aspect-square">
-              <div className="flex w-full flex-1 flex-col items-center justify-between gap-2">
-                <span className="font-body text-sm font-semibold uppercase text-text-secondary">Taxa de ondas</span>
-                <span className="font-heading text-3xl text-foreground">{metricas?.ocupacao.taxa_media ?? 0}%</span>
-                <div className="h-1 w-full overflow-hidden rounded-full bg-background">
-                  <div className="h-full rounded-full bg-accent" style={{ width: `${metricas?.ocupacao.taxa_media ?? 0}%` }} />
+          <div className="flex flex-wrap gap-8">
+            <div className="min-w-0 flex-1 max-w-lg space-y-4">
+              <h3 className="font-heading text-2xl text-foreground">Esta semana</h3>
+              <div className="flex gap-3">
+                <div className="flex gap-3 min-w-0">
+                  <div className="flex flex-1 flex-col items-center justify-between rounded-xl border border-accent/10 bg-surface p-6 text-center shadow-md aspect-square">
+                    <div className="flex w-full flex-1 flex-col items-center justify-between gap-2">
+                      <span className="font-body text-sm font-semibold uppercase text-text-secondary">Taxa de ondas</span>
+                      <span className="font-heading text-3xl text-foreground">{metricas?.ocupacao.taxa_media ?? 0}%</span>
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-background">
+                        <div className="h-full rounded-full bg-accent" style={{ width: `${metricas?.ocupacao.taxa_media ?? 0}%` }} />
+                      </div>
+                      {metricas && (
+                        <span className={`font-body text-sm ${metricas.ocupacao.comparativo > 0 ? "text-accent" : metricas.ocupacao.comparativo < 0 ? "text-error" : "text-text-secondary"}`}>
+                          {metricas.ocupacao.comparativo > 0 ? "↑" : metricas.ocupacao.comparativo < 0 ? "↓" : "—"} {metricas.ocupacao.comparativo !== 0 ? `${Math.abs(metricas.ocupacao.comparativo)}%` : "Estável"}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-1 flex-col items-center justify-between rounded-xl border border-accent/10 bg-surface p-6 text-center shadow-md aspect-square">
+                    <div className="flex w-full flex-1 flex-col items-center justify-between gap-2">
+                      <span className="font-body text-sm font-semibold uppercase text-text-secondary">Receita</span>
+                      <span className="font-heading text-3xl text-foreground">{metricas ? formatPrice(metricas.receita.total) : "0,00€"}</span>
+                      <div className="h-1.5 w-full" />
+                      {metricas && (
+                        <span className={`font-body text-sm ${metricas.receita.comparativo > 0 ? "text-accent" : metricas.receita.comparativo < 0 ? "text-error" : "text-text-secondary"}`}>
+                          {metricas.receita.comparativo > 0 ? "↑" : metricas.receita.comparativo < 0 ? "↓" : "—"} {metricas.receita.comparativo !== 0 ? `${Math.abs(metricas.receita.comparativo)}%` : "Estável"}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-1 flex-col items-center justify-between rounded-xl border border-accent/10 bg-surface p-6 text-center shadow-md aspect-square">
+                    <div className="flex w-full flex-1 flex-col items-center justify-between gap-2">
+                      <span className="font-body text-sm font-semibold uppercase text-text-secondary">No-Show</span>
+                      <span className="font-heading text-3xl text-foreground">{metricas?.noshow.taxa ?? 0}%</span>
+                      <div className="h-1.5 w-full" />
+                      {metricas && (
+                        <span className={`font-body text-sm ${metricas.noshow.comparativo > 0 ? "text-error" : metricas.noshow.comparativo < 0 ? "text-success" : "text-text-secondary"}`}>
+                          {metricas.noshow.comparativo > 0 ? "↑" : metricas.noshow.comparativo < 0 ? "↓" : "—"} {metricas.noshow.comparativo !== 0 ? `${Math.abs(metricas.noshow.comparativo)}%` : "Estável"}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                {metricas && metricas.ocupacao.comparativo !== 0 && (
-                  <span className={`font-body text-sm ${metricas.ocupacao.comparativo > 0 ? "text-accent" : "text-error"}`}>
-                    {metricas.ocupacao.comparativo > 0 ? "↑" : "↓"} {Math.abs(metricas.ocupacao.comparativo)}% face semana passada
-                  </span>
-                )}
               </div>
             </div>
-
-            <div className="flex flex-col items-center rounded-xl border border-accent/10 bg-surface p-5 text-center shadow-md aspect-square">
-              <div className="flex w-full flex-1 flex-col items-center justify-between gap-2">
-                <span className="font-body text-sm font-semibold uppercase text-text-secondary">Receita</span>
-                <span className="font-heading text-3xl text-foreground">{metricas ? formatPrice(metricas.receita.total) : "0,00€"}</span>
-                <div className="h-1 w-full" />
-                {metricas && metricas.receita.comparativo !== 0 && (
-                  <span className={`font-body text-sm ${metricas.receita.comparativo > 0 ? "text-accent" : "text-error"}`}>
-                    {metricas.receita.comparativo > 0 ? "↑" : "↓"} {Math.abs(metricas.receita.comparativo)}% face semana passada
-                  </span>
+            <div className="flex flex-1 flex-col min-w-48 ml-12">
+              <h3 className="font-heading text-2xl text-foreground mb-4">Atividade recente</h3>
+              <div className="flex-1 border-l border-white/10 pl-4 space-y-3">
+                {recentActivity.length === 0 ? (
+                  <p className="font-body text-sm text-text-secondary">Nenhuma atividade registada</p>
+                ) : (
+                  recentActivity.map((item) => (
+                    <div key={item.id} className="text-sm">
+                      <p className="font-body text-foreground" dangerouslySetInnerHTML={{ __html: item.message }} />
+                      <p className="font-body text-xs text-text-muted">{item.timeAgo}</p>
+                    </div>
+                  ))
                 )}
               </div>
             </div>

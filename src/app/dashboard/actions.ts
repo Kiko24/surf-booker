@@ -6,9 +6,11 @@ import { getSchoolId } from "@/lib/school";
 export type TodaySession = {
   id: string;
   time: string;
+  durationMinutes: number;
   title: string;
   inscritos: number;
   capacidade: number;
+  alunosList: { name: string }[];
 };
 
 export type SchoolInfo = {
@@ -42,7 +44,7 @@ export async function getTodaySessions(schoolId: string): Promise<TodaySession[]
 
   const { data: sessions } = await supabase
     .from("sessions")
-    .select("id, starts_at, capacity, class_types(name)")
+    .select("id, starts_at, duration_minutes, capacity, class_types(name)")
     .eq("school_id", schoolId)
     .eq("status", "scheduled")
     .gte("starts_at", startOfDay.toISOString())
@@ -55,25 +57,37 @@ export async function getTodaySessions(schoolId: string): Promise<TodaySession[]
 
   const { data: allBookings } = await supabase
     .from("bookings")
-    .select("session_id")
+    .select("session_id, student_id")
     .in("session_id", sessionIds)
     .eq("status", "confirmed");
 
   const bookingCount: Record<string, number> = {};
+  const bookingStudents: Record<string, string[]> = {};
   for (const b of allBookings ?? []) {
     bookingCount[b.session_id] = (bookingCount[b.session_id] ?? 0) + 1;
+    if (!bookingStudents[b.session_id]) bookingStudents[b.session_id] = [];
+    bookingStudents[b.session_id].push(b.student_id);
   }
+
+  const allStudentIds = [...new Set((allBookings ?? []).map(b => b.student_id))];
+  const { data: students } = allStudentIds.length > 0
+    ? await supabase.from("students").select("id, full_name").in("id", allStudentIds)
+    : { data: [] };
+  const studentNameMap = new Map((students ?? []).map(s => [s.id, s.full_name]));
 
   return sessions.map((s) => {
     const d = new Date(s.starts_at);
     const hours = d.getUTCHours().toString().padStart(2, "0");
     const minutes = d.getUTCMinutes().toString().padStart(2, "0");
+    const alunosIds = bookingStudents[s.id] ?? [];
     return {
       id: s.id,
       time: `${hours}:${minutes}`,
+      durationMinutes: s.duration_minutes,
       title: (s.class_types as unknown as { name: string } | null)?.name ?? "Aula",
       inscritos: bookingCount[s.id] ?? 0,
       capacidade: s.capacity ?? 10,
+      alunosList: alunosIds.map(id => ({ name: studentNameMap.get(id) ?? "Aluno" })),
     };
   });
 }
@@ -310,4 +324,93 @@ export async function dismissAlert(schoolId: string, tipo: string, entityId: str
 export async function logoutOwner(): Promise<void> {
   const supabase = await createClient();
   await supabase.auth.signOut();
+}
+
+export type ActivityItem = {
+  id: string;
+  type: "new_booking" | "pack_purchase" | "cancellation";
+  message: string;
+  timeAgo: string;
+  timestamp: string;
+};
+
+function formatTimeAgo(d: Date): string {
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return "agora";
+  if (mins < 60) return `há ${mins} min`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `há ${hours} ${hours === 1 ? "hora" : "horas"}`;
+  const days = Math.floor(hours / 24);
+  return `há ${days} ${days === 1 ? "dia" : "dias"}`;
+}
+
+export async function getRecentActivity(schoolId: string): Promise<ActivityItem[]> {
+  const supabase = await createClient();
+  const items: ActivityItem[] = [];
+
+  // Buscar novas reservas (booking_groups criados recentemente)
+  const { data: recentBookings } = await supabase
+    .from("booking_groups")
+    .select("id, created_at, contact_name, bookings( student_id, students( full_name ) )")
+    .eq("school_id", schoolId)
+    .order("created_at", { ascending: false })
+    .limit(5);
+
+  for (const bg of recentBookings ?? []) {
+    const bks = bg.bookings as unknown as { student_id: string; students: { full_name: string } | null }[];
+    const firstB = bks?.[0];
+    const name = firstB?.students?.full_name ?? bg.contact_name;
+    items.push({
+      id: bg.id,
+      type: "new_booking",
+      message: `<span class="font-semibold">${name}</span> fez uma reserva.`,
+      timeAgo: formatTimeAgo(new Date(bg.created_at)),
+      timestamp: bg.created_at,
+    });
+  }
+
+  // Buscar pagamentos de pack
+  const { data: recentPacks } = await supabase
+    .from("pack_purchases")
+    .select("id, created_at, students( full_name ), packs( name )")
+    .eq("school_id", schoolId)
+    .order("created_at", { ascending: false })
+    .limit(5);
+
+  for (const pp of recentPacks ?? []) {
+    const s = pp.students as unknown as { full_name: string };
+    const p = pp.packs as unknown as { name: string };
+    items.push({
+      id: pp.id,
+      type: "pack_purchase",
+      message: `<span class="font-semibold">${s?.full_name ?? "Aluno"}</span> comprou o pack <span class="font-semibold">${p?.name ?? "Pack"}</span>.`,
+      timeAgo: formatTimeAgo(new Date(pp.created_at)),
+      timestamp: pp.created_at,
+    });
+  }
+
+  // Buscar cancelamentos (bookings cancelados)
+  const { data: cancelled } = await supabase
+    .from("bookings")
+    .select("id, student_id, students( full_name )")
+    .in("status", ["cancelled_by_school", "cancelled_by_student"])
+    .limit(5);
+
+  // For cancellations, get session info to find school_id context
+  for (const cb of cancelled ?? []) {
+    const s = cb.students as unknown as { full_name: string };
+    items.push({
+      id: cb.id,
+      type: "cancellation",
+      message: `<span class="font-semibold">${s?.full_name ?? "Aluno"}</span> cancelou a reserva.`,
+      timeAgo: "",
+      timestamp: "",
+    });
+  }
+
+  items.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+  return items.slice(0, 10);
 }

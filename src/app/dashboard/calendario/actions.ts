@@ -137,6 +137,12 @@ export async function createSession(formData: {
     return { ok: false, error: "Data ou horário inválidos" };
   }
 
+  const now = new Date();
+  const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  if (startsAt < todayStart) {
+    return { ok: false, error: "Não é possível criar aulas em dias anteriores ao dia de hoje" };
+  }
+
   const { data: createdSession, error } = await supabase.from("sessions").insert({
     school_id: formData.schoolId,
     starts_at: startsAt.toISOString(),
