@@ -158,7 +158,7 @@ export function ServicosView({ sessions, schoolId }: Props) {
             ) : sessions.map((s) => (
               <div key={s.id} className="flex items-center gap-3 py-3">
                 <button type="button" onClick={() => setSelectedSession(s)} className="flex-1 text-left">
-                  <h3 className="font-body text-base font-bold text-foreground">{s.nome}</h3>
+                  <h3 className="font-body text-base font-bold text-foreground"><span className="inline-block w-2 h-2 rounded-full bg-accent mr-2 mb-0.5" />{s.nome}</h3>
                   <p className="text-xs text-text-secondary">{s.modalidade} &middot; {s.duracao}min</p>
                 </button>
               </div>
@@ -181,7 +181,7 @@ export function ServicosView({ sessions, schoolId }: Props) {
             <tbody className="divide-y divide-outline-variant">
               {sessions.map((s) => (
                 <tr key={s.id} className="hover:bg-surface-container-high transition-colors group">
-                  <td className="px-6 py-4 font-body-lg text-body-lg text-on-surface align-middle text-center">{s.nome}</td>
+                  <td className="px-6 py-4 font-body-lg text-body-lg text-on-surface align-middle text-center"><span className="inline-block w-2 h-2 rounded-full bg-accent mr-2 align-middle" />{s.nome}</td>
                   <td className="px-6 py-4 font-body-md text-body-md text-on-surface-variant align-middle text-center">{s.modalidade}</td>
                   <td className="px-6 py-4 font-body-md text-body-md text-on-surface-variant align-middle text-center">{s.duracao} min</td>
                   <td className="px-6 py-4 align-middle text-center">
@@ -210,13 +210,6 @@ export function ServicosView({ sessions, schoolId }: Props) {
             <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted" />
 
             <div className="flex items-center gap-4 mb-6">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-background text-xl font-bold text-accent">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="12" y1="8" x2="12" y2="16" />
-                  <line x1="8" y1="12" x2="16" y2="12" />
-                </svg>
-              </div>
               <div>
                 <h3 className="font-heading text-xl font-bold text-foreground">{selectedSession.nome}</h3>
                 <div className="flex items-center gap-2 mt-1">
@@ -268,21 +261,34 @@ export function ServicosView({ sessions, schoolId }: Props) {
                 </div>
               )}
 
-              {selectedSession.sobre && (
-                <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
-                  <p className="font-body text-xs text-text-secondary">Sobre</p>
-                  <p className="font-body text-sm text-foreground">{selectedSession.sobre}</p>
-                </div>
-              )}
+              <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
+                <p className="font-body text-xs text-text-secondary">Sobre</p>
+                <p className="font-body text-sm text-foreground">{selectedSession.sobre || "—"}</p>
+              </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setSelectedSession(null)}
-              className="mt-6 w-full rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
-            >
-              Fechar
-            </button>
+            <div className="flex gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => setSelectedSession(null)}
+                className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
+              >
+                Fechar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const s = selectedSession;
+                  setSelectedSession(null);
+                  setEditingServico(s);
+                  fillEditForm(s);
+                  setShowModal(true);
+                }}
+                className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95"
+              >
+                Editar
+              </button>
+            </div>
           </div>
         </div>
       )}

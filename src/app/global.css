@@ -147,3 +147,15 @@ textarea::placeholder {
 .react-datepicker__triangle {
   display: none !important;
 }
+
+/* Scale up layout uniformly on large screens */
+@media (min-width: 1536px) {
+  html {
+    font-size: 20px;
+  }
+}
+@media (min-width: 1920px) {
+  html {
+    font-size: 22px;
+  }
+}

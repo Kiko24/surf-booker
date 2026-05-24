@@ -186,9 +186,9 @@ src/
 │       └── calendario-view.tsx       # Calendar UI: month grid, sessions list, modals
 ├── alunos/
 │   ├── page.tsx                      # Server component, fetches schoolId + students
-│   ├── actions.ts                    # Server actions: getStudents, deleteStudent
+│   ├── actions.ts                    # Server actions: getStudents, deleteStudent, createStudent, toggleWaiver
 │   └── _components/
-│       └── alunos-view.tsx           # Students list UI, search, filter, student popup
+│       └── alunos-view.tsx           # Students list UI, search, filter, student popup, add student modal
 ├── equipamento/                      # (not implemented yet)
 │   └── page.tsx
 └── mais/                             # (not implemented yet)
@@ -210,6 +210,7 @@ src/
 - **Usar APENAS quando não há política RLS OU quando a tabela não tem coluna para verificar ownership**:
   - `addGuestToSession()` in calendario/actions.ts (students table não tem school_id, impossível verificar ownership via RLS; validação feita server-side antes do insert)
   - `deleteStudent()` in alunos/actions.ts (deletes across 4 tables)
+  - `createStudent()` in alunos/actions.ts (students table insert — same reason as addGuestToSession)
 
 ## UI Patterns & Conventions
 
@@ -254,16 +255,18 @@ Fixed at bottom, centered, with glass effect:
 </nav>
 ```
 
-### Calendar Layout (Dual-Sidebar Pattern)
-The calendar implements a responsive dual-layout system:
-- **Desktop (xl)**: Side-by-side layout. The sessions sidebar sits naturally next to the calendar grid. Both containers are synchronized in height (`xl:h-full`) and top alignment (`xl:mt-16`).
-- **Mobile**: Single-column layout. The sessions list appears as a "Details Card" directly below the calendar grid (integrated into the scroll flow, not as a modal bottom sheet).
-- **Glass Card Style**: Standardized `glass-card` look using `bg-surface/60 backdrop-blur-xl border border-white/10`.
-- **No-Scroll Policy (Mobile)**: The root container uses `h-svh overflow-hidden` to prevent global page bouncing. Scrolling is strictly scoped to internal containers (like the sessions list) to maintain a fixed, app-like feel.
+### Calendar Layout (Compact Dual-Panel)
+The calendar page uses a compact double-width layout:
+- **Container**: `<main>` with `maxWidth: 800px`, `height: 95vh`, left-aligned with `px-5`, wrapped in a `relative` div.
+- **Header**: "Calendário" title + month nav arrows in same flex row, left-aligned, with same top spacing as dashboard home (`pt-4 + mt-4`).
+- **Calendar grid**: Cells `min-h-[48px] mobile / 56px desktop`, day numbers `text-xs`, session text `text-[9px]`, occupancy bar `h-0.5`, cells `p-1`, gap between day number and content `mt-1.5`.
+- **Sessions sidebar**: Positioned `absolute` outside `<main>`, inside the `relative` wrapper, with `left: calc(100% + 24px)`, `top-0 bottom-0`, `w-[380px]`, `pt-20`. Does NOT shrink the calendar when visible.
+- **Past sessions**: When `session.starts_at < new Date()`, sidebar shows "Realizada" / "Cancelada" instead of "Editar" + "Cancelar" + "Concluir".
+- **Month nav**: No divider between title and month. Buttons have border.
 
 ### Floating Action Button (FAB)
 Primary trigger for session creation:
-- **Positioning**: Fixed at `bottom-24 right-6` on mobile (to float above the navbar) and `bottom-12 right-8` on desktop.
+- **Positioning**: Fixed at `bottom-12 right-16`.
 - **Redundancy**: Secondary "Criar aula" buttons in lists are avoided in favor of the centralized FAB.
 
 ### Loading States
@@ -323,6 +326,17 @@ SELECT id, full_name FROM students WHERE id IN (...);
 - If only past sessions: show latest past as "Última aula: {date}"
 - If none: "Sem aulas"
 
+### Students Page: Adding a Student
+1. User clicks "Adicionar aluno" button → modal opens, fetches available packs
+2. Fields: Nome (required), Telemóvel (optional, stored for future account linking), Pack (optional dropdown)
+3. `createStudent()` server action:
+   - Verifies auth + ownership (schools.owner_user_id)
+   - Uses `createAdminClient()` to insert into `students` (bypass RLS — no school_id column)
+   - Uses `createClient()` to insert into `school_students` (RLS verifies ownership)
+   - If pack selected: calls `buyPack()` to create pack_purchase
+   - Logs audit with action "create_student"
+4. On success: closes modal, calls `router.refresh()` to reload the list
+
 ## What Has Been Built
 
 ### Completed
@@ -336,16 +350,18 @@ SELECT id, full_name FROM students WHERE id IN (...);
 - All RLS policies for security (SELECT, INSERT, UPDATE, DELETE where needed)
 - "Próxima aula"/"Última aula" logic on students page
 - Rate limiting via Upstash Redis (30 req/min sliding window) on all mutations
-- Audit logging (6 actions tracked: create/update/delete session, create booking, add guest, delete student)
+- Audit logging (7 actions tracked: create/update/delete session, create booking, add guest, delete student, create student)
+- Calendar compact layout (redesigned cells, header, sidebar outside main, past-session buttons)
+- Students page: Add student modal with name, phone (optional), and pack purchase (optional)
+- `createStudent()` server action in alunos/actions.ts (inserts student + school_student + optional buyPack)
 
 ### Not Started / Pending
 - Equipment page (`/dashboard/equipamento`)
 - More/Settings page (`/dashboard/mais`)
-- Pack management (payment packs for students)
 - Instructor management
 - Check-in / attendance marking
 - Email/notification system
-- Student profile page (detailed view with history)
+- Student profile page with full history
 
 ## Key Decisions
 1. **Admin client with server-side validation** for operations on tables that can't enforce ownership via RLS (e.g. `students` has no `school_id` column). The server action always verifies `auth.getUser()` + `schools.owner_user_id` before using admin client.
@@ -354,6 +370,8 @@ SELECT id, full_name FROM students WHERE id IN (...);
 4. **Composite FK `(id, session_id)`** on booking_groups ensures bookings always reference a valid group + session
 5. **Guest students** have `is_guest=true, auth_user_id=null` — identified as distinct from registered users
 6. **Service role key** stored in `SUPABASE_SERVICE_ROLE_KEY` env var
+7. **Calendar sidebar outside main flow** — positioned `absolute` outside `<main>` to prevent calendar from shrinking when sidebar appears
+8. **Past session buttons** — sidebar shows "Realizada"/"Cancelada" (no "Editar") when `session.starts_at < new Date()`
 
 ## Before Making Changes
 1. Read this file first

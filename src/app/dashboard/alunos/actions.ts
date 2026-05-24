@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { rateLimitByUser } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
 import { getSchoolId } from "@/lib/school";
+import { buyPack } from "../calendario/actions";
 
 export type StudentPack = {
   name: string;
@@ -212,4 +213,58 @@ export async function deleteStudent(studentId: string): Promise<{ ok: boolean; e
   }
 
   return { ok: true };
+}
+
+export async function createStudent(
+  name: string,
+  phone: string | undefined,
+  packId: string | undefined,
+  schoolId: string
+): Promise<{ ok: boolean; error?: string; studentId?: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Não autenticado" };
+
+  const rl = await rateLimitByUser(user.id, "createStudent");
+  if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
+
+  const { data: school } = await supabase
+    .from("schools")
+    .select("id")
+    .eq("id", schoolId)
+    .eq("owner_user_id", user.id)
+    .maybeSingle();
+  if (!school) return { ok: false, error: "Escola não encontrada" };
+
+  if (!name.trim()) return { ok: false, error: "Nome é obrigatório" };
+
+  const admin = createAdminClient();
+
+  const { data: student, error: sErr } = await admin
+    .from("students")
+    .insert({ full_name: name.trim(), is_guest: true, ...(phone ? { phone } : {}) })
+    .select("id")
+    .single();
+  if (sErr) return { ok: false, error: sErr.message };
+
+  const { error: ssErr } = await supabase
+    .from("school_students")
+    .insert({ school_id: schoolId, student_id: student.id });
+  if (ssErr) return { ok: false, error: ssErr.message };
+
+  if (packId) {
+    const res = await buyPack(student.id, packId, schoolId);
+    if (!res.ok) return { ok: false, error: res.error };
+  }
+
+  logAudit({
+    schoolId,
+    userId: user.id,
+    action: "create_student",
+    entityType: "student",
+    entityId: student.id,
+    metadata: { studentName: name.trim(), hasPack: !!packId },
+  });
+
+  return { ok: true, studentId: student.id };
 }

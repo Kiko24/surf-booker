@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 
-import { deleteStudent, toggleWaiver, type StudentRecord } from "../actions";
+import { deleteStudent, toggleWaiver, createStudent, type StudentRecord } from "../actions";
 import { getAvailablePacks, buyPack, type AvailablePack } from "../../calendario/actions";
 
 type Props = {
@@ -61,6 +61,13 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStudent, setSelectedStudent] = useState<StudentRecord | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addName, setAddName] = useState("");
+  const [addPhone, setAddPhone] = useState("");
+  const [addPackId, setAddPackId] = useState("");
+  const [addSaving, setAddSaving] = useState(false);
+  const [addError, setAddError] = useState("");
+  const [addPacks, setAddPacks] = useState<AvailablePack[]>([]);
   const [showBuyPack, setShowBuyPack] = useState(false);
   const [availablePacks, setAvailablePacks] = useState<AvailablePack[]>([]);
   const [buyingPackId, setBuyingPackId] = useState<string | null>(null);
@@ -85,7 +92,7 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
   return (
     <>
       <main className="px-5 pt-4 flex flex-col min-h-screen">
-        <section className="mt-6 mb-6 flex items-end justify-between">
+        <section className="mt-6 mb-6 flex items-center justify-between">
           {searchOpen ? (
               <div className="flex w-full items-center gap-4">
               <div className="relative flex-1">
@@ -114,6 +121,15 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
               <div className="flex items-center gap-2 ml-auto">
                 <button
                   type="button"
+                  onClick={async () => {
+                    setAddName("");
+                    setAddPhone("");
+                    setAddPackId("");
+                    setAddError("");
+                    const packs = await getAvailablePacks(schoolId);
+                    setAddPacks(packs);
+                    setShowAddModal(true);
+                  }}
                   className="hidden md:flex items-center gap-2 rounded-full bg-accent px-4 py-2 font-body text-sm font-semibold text-primary-foreground transition-colors hover:bg-accent/90"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
@@ -123,6 +139,15 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
                 </button>
                 <button
                   type="button"
+                  onClick={async () => {
+                    setAddName("");
+                    setAddPhone("");
+                    setAddPackId("");
+                    setAddError("");
+                    const packs = await getAvailablePacks(schoolId);
+                    setAddPacks(packs);
+                    setShowAddModal(true);
+                  }}
                   className="md:hidden flex h-9 w-9 items-center justify-center rounded-full bg-accent text-primary-foreground transition-colors hover:bg-accent/90"
                   aria-label="Adicionar aluno"
                 >
@@ -471,6 +496,97 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
             >
               Cancelar
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Add student modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50">
+          <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-10">
+            <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted" />
+            <h3 className="font-heading text-2xl font-bold text-foreground mb-6">Adicionar aluno</h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+                  Nome <span className="text-error">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={addName}
+                  onChange={(e) => setAddName(e.target.value)}
+                  placeholder="Nome do aluno"
+                  className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+                />
+              </div>
+
+              <div>
+                <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+                  Telemóvel <span className="text-text-muted">(opcional)</span>
+                </label>
+                <input
+                  type="tel"
+                  value={addPhone}
+                  onChange={(e) => setAddPhone(e.target.value)}
+                  placeholder="Ex: 912 345 678"
+                  className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+                />
+                <p className="mt-1 font-body text-xs text-text-muted">Poderá ser usado para ligar a uma conta futura.</p>
+              </div>
+
+              <div>
+                <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+                  Pack <span className="text-text-muted">(opcional)</span>
+                </label>
+                <div className="relative">
+                  <select
+                    value={addPackId}
+                    onChange={(e) => setAddPackId(e.target.value)}
+                    className="w-full appearance-none rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground outline-none focus:outline-2 focus:outline-accent"
+                  >
+                    <option value="">Sem pack</option>
+                    {addPacks.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name} — {p.total_lessons} aulas ({(p.price_cents / 100).toFixed(2).replace(".", ",")}€)</option>
+                    ))}
+                  </select>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted">
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </div>
+              </div>
+
+              {addError && (
+                <p className="font-body text-sm text-error">{addError}</p>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={addSaving}
+                  onClick={async () => {
+                    if (!addName.trim()) { setAddError("O nome é obrigatório"); return; }
+                    setAddSaving(true);
+                    setAddError("");
+                    const res = await createStudent(addName.trim(), addPhone.trim() || undefined, addPackId || undefined, schoolId);
+                    if (!res.ok) { setAddError(res.error ?? "Erro ao adicionar aluno"); setAddSaving(false); return; }
+                    setShowAddModal(false);
+                    setAddSaving(false);
+                    router.refresh();
+                  }}
+                  className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95 disabled:opacity-50"
+                >
+                  {addSaving ? "A adicionar..." : "Adicionar"}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
