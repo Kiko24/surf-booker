@@ -148,14 +148,14 @@ textarea::placeholder {
   display: none !important;
 }
 
-/* Scale up layout uniformly on large screens */
+/* Scale up dashboard uniformly on large screens */
 @media (min-width: 1536px) {
-  html {
+  .dashboard-scale {
     font-size: 20px;
   }
 }
 @media (min-width: 1920px) {
-  html {
+  .dashboard-scale {
     font-size: 22px;
   }
 }

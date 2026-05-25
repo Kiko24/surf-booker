@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Oswald, Lato } from 'next/font/google';
+import { headers } from 'next/headers';
 import './global.css';
 
 const oswald = Oswald({
@@ -17,7 +18,7 @@ const lato = Lato({
 });
 
 export const metadata: Metadata = {
-  title: 'SurfBooker',
+  title: 'Alaia',
   description: 'Marca sessões facilmente.',
 };
 
@@ -30,13 +31,16 @@ export const viewport: Viewport = {
   themeColor: '#1E1E1E',
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const pathname = (await headers()).get("next-url") ?? "";
+  const isDashboard = pathname.startsWith("/dashboard");
+
   return (
-    <html lang="pt-PT" className={`${oswald.variable} ${lato.variable}`}>
+    <html lang="pt-PT" className={`${oswald.variable} ${lato.variable}${isDashboard ? " dashboard-scale" : ""}`}>
       <body className="bg-background text-foreground antialiased">
         {children}
       </body>

@@ -36,9 +36,6 @@ yarn-error.log*
 # vercel
 .vercel
 
-# supabase migrations
-/supabase/migrations
-
 # typescript
 *.tsbuildinfo
 next-env.d.ts

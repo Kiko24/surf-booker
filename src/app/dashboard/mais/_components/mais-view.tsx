@@ -137,8 +137,8 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                 console.error("Formato não permitido. Usa PNG, WebP ou JPEG");
                 return;
               }
-              if (file.size > 2048 * 1024) {
-                console.error("Logotipo demasiado grande. Máximo 2MB");
+              if (file.size > 1024 * 1024) {
+                console.error("Logotipo demasiado grande. Máximo 1MB");
                 return;
               }
               const reader = new FileReader();
@@ -284,7 +284,7 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
           </div>
 
           {/* Right column — desktop panel content */}
-          <div className="hidden md:block md:col-span-9 md:h-[calc(100vh-10rem)] md:overflow-hidden">
+          <div className="md:col-span-9 md:h-[calc(100vh-10rem)] md:overflow-hidden">
             {!selectedSection && (
               <div className="h-full flex flex-col items-center justify-center text-center">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="h-12 w-12 text-text-muted mb-4">
@@ -322,11 +322,11 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">Palavra-passe</label>
+                      <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">Palavra-passe <span className="text-text-muted">(opcional)</span></label>
                       <input type="password" value={profilePassword} onChange={(e) => setProfilePassword(e.target.value)} placeholder="Nova palavra-passe" className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent" />
                     </div>
                     <div>
-                      <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">Confirmar palavra-passe</label>
+                      <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">Confirmar <span className="text-text-muted">(opcional)</span></label>
                       <input type="password" value={profileConfirmPassword} onChange={(e) => setProfileConfirmPassword(e.target.value)} placeholder="Repetir palavra-passe" className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent" />
                       {profilePassword && profileConfirmPassword && profilePassword !== profileConfirmPassword && (
                         <p className="mt-1 font-body text-sm text-error">As palavras-passe não coincidem</p>
@@ -386,7 +386,7 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                         const file = e.target.files?.[0];
                         if (!file || !schoolId) return;
                         if (!["image/png", "image/webp", "image/jpeg"].includes(file.type)) { alert("Formato não permitido. Usa PNG, WebP ou JPEG."); return; }
-                        if (file.size > 2048 * 1024) { alert("Imagem demasiado grande. Máximo 2MB."); return; }
+                        if (file.size > 1024 * 1024) { alert("Imagem demasiado grande. Máximo 1MB."); return; }
                         const res = await addSchoolImage(schoolId, file);
                         if (!res.ok) { console.error("upload error:", res.error); return; }
                         const data = await getImages(schoolId);
@@ -397,7 +397,7 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                     {images.length === 0 ? (
                       <p className="py-8 text-center font-body text-sm text-text-secondary">Nenhuma imagem adicionada ainda</p>
                     ) : (
-                      <div className="grid grid-cols-6 gap-6">
+                      <div className="grid grid-cols-3 gap-2">
                         {images.map((img) => (
                           <div key={img.id} className="relative aspect-square overflow-hidden rounded-xl bg-[#2A2A2A]">
                             <button type="button" onClick={() => setLightboxImage(img.public_url)} className="h-full w-full">
@@ -445,7 +445,7 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                     const file = e.target.files?.[0];
                     if (!file) return;
                     if (!["image/png", "image/webp", "image/jpeg"].includes(file.type)) { console.error("Formato não permitido. Usa PNG, WebP ou JPEG"); return; }
-                    if (file.size > 2048 * 1024) { console.error("Foto demasiado grande. Máximo 2MB"); return; }
+                    if (file.size > 1024 * 1024) { console.error("Foto demasiado grande. Máximo 1MB"); return; }
                     setInstrutorFotoFile(file);
                     const reader = new FileReader();
                     reader.onloadend = () => setInstrutorFotoPreview(reader.result as string);
@@ -653,7 +653,7 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
 
               <div>
                 <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
-                  Palavra-passe <span className="text-text-muted"></span>
+                  Palavra-passe <span className="text-text-muted">(opcional)</span>
                 </label>
                 <input
                   type="password"
@@ -666,7 +666,7 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
 
               <div>
                 <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
-                  Confirmar palavra-passe <span className="text-text-muted"></span>
+                  Confirmar palavra-passe <span className="text-text-muted">(opcional)</span>
                 </label>
                 <input
                   type="password"
@@ -791,8 +791,8 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                         alert("Formato não permitido. Usa PNG, WebP ou JPEG.");
                         return;
                       }
-                      if (file.size > 2048 * 1024) {
-                        alert("Imagem demasiado grande. Máximo 2MB.");
+                      if (file.size > 1024 * 1024) {
+                        alert("Imagem demasiado grande. Máximo 1MB.");
                         return;
                       }
                       const res = await addSchoolImage(schoolId, file);
@@ -1031,8 +1031,8 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                     console.error("Formato não permitido. Usa PNG, WebP ou JPEG");
                     return;
                   }
-                  if (file.size > 2048 * 1024) {
-console.error("Foto demasiado grande. Máximo 2MB");
+                  if (file.size > 1024 * 1024) {
+                    console.error("Foto demasiado grande. Máximo 1MB");
                     return;
                   }
                   setInstrutorFotoFile(file);
