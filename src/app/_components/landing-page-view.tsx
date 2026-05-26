@@ -20,7 +20,7 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
   }
 
   return (
-    <div className="bg-white">
+    <div className="bg-[#F7FAFC]">
       {/* Navbar — absolute sobre a hero */}
       <header className="absolute left-0 right-0 top-0 z-10 px-5 py-4 sm:px-8">
         <div className="mx-auto flex max-w-4xl items-center justify-between rounded-full border border-gray-200 bg-white/90 px-4 py-2 shadow-sm backdrop-blur-sm">
@@ -39,7 +39,7 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
             </a>
           </nav>
 
-          <a href="/" className="font-heading text-xl font-bold text-accent">
+          <a href="/" className="font-heading text-xl font-bold text-accent-light">
             Alaia
           </a>
 
@@ -67,7 +67,7 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
                 </a>
                 <a
                   href="/signup-owner"
-                  className="font-body rounded-full bg-accent px-4 py-2 text-sm font-semibold text-black transition-colors hover:brightness-110"
+                  className="font-body rounded-full border border-accent-light bg-white px-4 py-2 text-sm font-semibold text-accent-light transition-colors hover:bg-accent-light hover:text-white"
                 >
                   Registar o seu negócio
                 </a>
@@ -98,91 +98,77 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
         )}
       </div>
 
-      {/* Hero — 100dvh */}
-      <section className="relative flex h-dvh flex-col">
+      {/* Hero — min 100dvh, cresce se necessario */}
+      <section className="relative flex min-h-dvh flex-col justify-between">
         {/* Photo — absolute, decorativa */}
         <div className="absolute right-[32px] top-[92px] bottom-[32px] z-[1] w-[calc(50%-32px)] overflow-hidden rounded-xl">
           <Image src="/images/hero-section.png" alt="" fill sizes="50vw" className="object-cover" priority />
-          {/* CTA — retângulo branco centrado horizontalmente na foto */}
-          <a href="/user-flow" className="absolute left-1/2 -translate-x-1/2 flex w-60 items-center rounded-3xl border border-gray-200 bg-white px-4 py-1.5 shadow-lg" style={{ bottom: '48px' }}>
-            <span className="font-body text-sm font-semibold text-black uppercase">Começar já</span>
-            <div className="ml-auto flex h-8 w-8 items-center justify-center rounded-full bg-black" style={{ marginRight: '-8px' }}>
-              <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-              </svg>
-            </div>
-          </a>
         </div>
 
-        {/* Timeline features + divider */}
-        <div className="absolute z-10 flex flex-col left-5 sm:left-8" style={{ right: 'calc(50% + 32px)', bottom: '32px' }}>
-          {/* Placeholder text — absolute, 32px acima do divider */}
-          <span className="absolute bottom-full mb-8 font-body text-lg font-medium text-black left-0 right-0 max-w-full">
-            A plataforma de gestão para escolas de surf e watersports. Os teus alunos reservam online, tu geres tudo num só lugar.
-          </span>
-          {/* Divider */}
-          <div className="flex items-center mb-8 mr-4">
-            <div className="h-px bg-gray-300 flex-1" />
-          </div>
-          {/* Row: rectangle + 32px gap + bullet points */}
-          <div className="flex items-stretch">
-            {/* Rectangle — dark filler */}
-            <div className="bg-[#1E1E1E] flex-1" />
-            {/* 32px spacer */}
-            <div className="w-8 shrink-0" />
-            {/* Features — mantém estrutura original */}
-            <div className="flex justify-end shrink-0">
-              <div className="relative max-w-sm">
-              <div className="absolute inset-y-0 left-[16.5px] w-px bg-gradient-to-b from-blue-600 via-blue-600/40 to-transparent" />
-              <ul className="space-y-10">
-                {[
-                  { title: "Reservas online a qualquer hora" },
-                  { title: "Reduz os no-shows" },
-                  { title: "Sem Whatsapp. Sem papéis." },
-                ].map((item, i) => (
-                  <li key={i} className="relative pl-10">
-                    <div className={`absolute left-[16.5px] top-1.5 h-3 w-3 -translate-x-1/2 rounded-full border-2 border-white ${i === 0 ? "bg-blue-600 shadow-[0_0_8px_rgba(37,99,235,0.5)]" : "bg-blue-600/40"}`} />
-                    <h3 className="font-body text-sm font-semibold text-gray-900">{item.title}</h3>
-                    <p className="mt-0.5 text-sm leading-snug min-h-[2.5rem]">&nbsp;</p>
-                  </li>
-                ))}
-              </ul>
+        {/* Headline no topo */}
+        <div className="relative z-10 px-5 pt-[92px] sm:px-8">
+          <h1 className="font-heading text-[clamp(2.5rem,7vw,4rem)] font-bold leading-none tracking-tight text-gray-900 uppercase">
+              {user ? (
+              <>Bem-vindo de volta<br/><span className="text-accent-light">{user.name.split(" ")[0]}</span></>
+            ) : (
+              <>
+                <div className="inline-flex flex-col items-start">
+                  <span>Feito para</span>
+                  <span className="text-accent-light whitespace-nowrap">quem vive o mar.</span>
+                </div>
+              </>
+            )}
+          </h1>
+          {user && (
+            <p className="mt-6 text-sm text-gray-400">
+              A tua página de perfil e reservas está a caminho.
+            </p>
+          )}
+        </div>
+
+        {/* Wrapper no fundo — em fluxo, nao absolute */}
+        <div className="relative z-10 flex flex-col pb-[32px] w-full max-w-[calc(50%-32px)] pl-5 sm:pl-8">
+          {/* Container 1: subtitle + CTA + divider */}
+          <div>
+            <span className="block font-body text-lg lg:text-base xl:text-lg font-medium text-black">
+              A plataforma de gestão para escolas de surf e desportos aquáticos. Os teus alunos reservam online, tu geres tudo num só lugar.
+            </span>
+            <a href="/user-flow" className="mt-4 mb-4 xl:mb-4 flex w-48 2xl:w-60 items-center rounded-3xl bg-accent-light px-4 py-1 2xl:py-1.5 shadow-lg">
+              <span className="font-body text-xs 2xl:text-sm font-semibold text-white uppercase">Começar já</span>
+              <div className="ml-auto flex h-6 w-6 2xl:h-8 2xl:w-8 items-center justify-center rounded-full bg-white" style={{ marginRight: '-8px' }}>
+                <svg className="h-3 w-3 2xl:h-4 2xl:w-4 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+              </div>
+            </a>
+            <div className="flex items-center mb-4 xl:mb-8 mr-4">
+              <div className="h-px bg-gray-300 flex-1" />
             </div>
-
           </div>
-
-          </div>
-
-          </div>
-
-          {/* Bottom — conteúdo */}
-          <div className="relative flex flex-1 flex-col px-5 pb-12 sm:px-8 lg:pb-16">
-            <div className="mt-[92px] min-h-[calc(100dvh-160px)] w-full max-w-6xl">
-              {/* Left — headline + CTA */}
-              <div className="text-left">
-                <h1 className="font-heading text-[clamp(2.5rem,7vw,4rem)] font-bold leading-none tracking-tight text-gray-900 uppercase">
-                  {user ? (
-                    <>Bem-vindo de volta<br/><span className="text-accent">{user.name.split(" ")[0]}</span></>
-                  ) : (
-                    <>
-                      <div className="inline-flex flex-col items-start">
-                        <div className="flex items-center w-full">
-                          <span className="shrink-0">Feito</span>
-                          <span className="w-6 shrink-0" />
-                          <span className="flex-1 h-px bg-gray-300" />
-                          <span className="inline-block h-0 w-0 border-y-[5px] border-l-[8px] border-y-transparent border-l-gray-300" />
-                        </div>
-                        <span className="text-accent whitespace-nowrap">Para quem vive o mar.</span>
-                      </div>
-                    </>
-                  )}
-                </h1>
-                {user && (
-                  <p className="mt-6 text-sm text-gray-400">
-                    A tua página de perfil e reservas está a caminho.
-                  </p>
-                )}
-
+          {/* Cards row */}
+          <div className="flex flex-row gap-4 lg:gap-3 xl:gap-4 2xl:gap-8">
+            {/* Card timeline */}
+            <div className="flex-1 2xl:min-h-[284px] rounded-2xl border border-gray-200/70 bg-white/70 p-4 lg:p-3 xl:p-4 2xl:p-6 shadow-xl shadow-black/5 backdrop-blur-md">
+              <div className="relative">
+                <div className="absolute top-[12px] bottom-[12px] left-[9px] w-px bg-gradient-to-b from-accent-light via-accent-light/40 to-transparent z-0" />
+                <ul className="space-y-6 lg:space-y-4 xl:space-y-6 2xl:space-y-8">
+                  {[
+                    { title: "Reservas online a qualquer hora", desc: "Os teus alunos marcam aulas 24/7 sem te ligar." },
+                    { title: "Reduz os no-shows", desc: "Lembretes automáticos e política de cancelamento." },
+                    { title: "Sem Whatsapp. Sem papéis.", desc: "Tudo centralizado: calendário, alunos e pagamentos." },
+                  ].map((item, i) => (
+                    <li key={i} className="group relative pl-10 lg:pl-8 xl:pl-10 cursor-pointer hover:bg-accent/5 rounded-lg -mx-2 px-2 transition-colors">
+                      <div className="absolute left-[17px] top-1.5 h-3 w-3 -translate-x-1/2 rounded-full border-2 border-white bg-accent-light/40 transition-all z-10 group-hover:scale-125 group-hover:bg-accent-light group-hover:shadow-[0_0_8px_rgba(30,111,168,0.5)]" />
+                      <h3 className="font-body text-sm 2xl:text-base font-semibold text-gray-900">{item.title}</h3>
+                      <p className="mt-0.5 text-xs 2xl:text-sm leading-snug text-gray-500">{item.desc}</p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+            {/* Card novo */}
+            <div className="flex-1 2xl:min-h-[284px] rounded-2xl border border-gray-200/70 bg-white/70 p-6 lg:p-4 xl:p-6 2xl:p-8 shadow-xl shadow-black/5 backdrop-blur-md">
+              <p className="font-body text-xs 2xl:text-sm text-gray-400">Conteúdo em breve</p>
             </div>
           </div>
         </div>
