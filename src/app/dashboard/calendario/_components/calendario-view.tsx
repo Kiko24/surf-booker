@@ -162,11 +162,12 @@ export function CalendarioView({ schoolId }: Props) {
     <>
       <div className="relative" style={{ maxWidth: "800px" }}>
         <main
-          className="px-5 pt-4 flex flex-col gap-3 overflow-hidden h-[60vh] md:h-[95vh]"
+          className="px-5 pt-4 flex flex-col gap-3 md:overflow-hidden md:h-[95vh]"
         >
           {/* Title + Month nav */}
           <div className="flex flex-col md:flex-row md:items-start gap-0 mt-4 shrink-0">
-            <h1 className="font-heading text-2xl xl:text-3xl font-bold text-foreground shrink-0">
+
+            <h1 className="max-md:hidden font-heading text-2xl xl:text-3xl font-bold text-foreground shrink-0">
               Calendário
             </h1>
             <div className="flex items-center gap-1.5 self-center md:self-auto md:ml-6 md:mt-[6px] mt-4">
@@ -213,7 +214,7 @@ export function CalendarioView({ schoolId }: Props) {
                 </div>
 
                 {/* Days grid */}
-                <div className="grid grid-cols-7 flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden">
+                <div className="grid grid-cols-7 max-md:overflow-visible md:flex-1 md:overflow-y-auto [&::-webkit-scrollbar]:hidden">
                   {Array.from({ length: firstDayOfWeek }, (_, i) => (
                     <div
                       key={`empty-${i}`}
@@ -462,7 +463,7 @@ export function CalendarioView({ schoolId }: Props) {
 
         {/* Sessions sidebar — same height as calendar */}
         {showSidebar && (
-          <div className="absolute left-[calc(100%+24px)] top-0 bottom-0 w-[380px] flex flex-col overflow-hidden xl:z-10 pt-20">
+          <div className="max-md:hidden absolute left-[calc(100%+24px)] top-0 bottom-0 w-[380px] flex flex-col overflow-hidden xl:z-10 pt-20">
             <div className="rounded-2xl bg-surface border border-white/5 flex flex-col overflow-hidden flex-1 min-h-0">
               <div className="p-4 border-b border-white/5 shrink-0">
                 <h3 className="font-heading text-lg font-bold text-foreground">

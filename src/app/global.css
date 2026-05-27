@@ -31,6 +31,9 @@
 
   /* Radius */
   --radius-pill: 9999px;
+
+  /* Breakpoints */
+  --breakpoint-2xl: 1440px;
 }
 
 * {

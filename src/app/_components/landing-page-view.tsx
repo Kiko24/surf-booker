@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import mockupImg from "@/components/images/mockup.png";
 
 type UserInfo = {
   id: string;
@@ -27,13 +28,13 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
           <nav className="flex items-center gap-1">
             <a
               href="#como-funciona"
-              className="font-body rounded-full px-3 py-1.5 text-sm font-semibold text-gray-900 transition-all hover:bg-accent/10"
+              className="font-body rounded-full px-3 py-1.5 text-sm font-semibold text-gray-900 transition-all hover:bg-accent/10 focus-visible:outline-2 focus-visible:outline-accent-light"
             >
               Como funciona?
             </a>
             <a
               href="#precos"
-              className="font-body rounded-full px-3 py-1.5 text-sm font-semibold text-gray-900 transition-all hover:bg-accent/10"
+              className="font-body rounded-full px-3 py-1.5 text-sm font-semibold text-gray-900 transition-all hover:bg-accent/10 focus-visible:outline-2 focus-visible:outline-accent-light"
             >
               Preços
             </a>
@@ -81,13 +82,13 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
       <div className="absolute left-0 right-0 top-16 z-10 flex justify-center gap-1 px-5 py-3 sm:hidden">
         <a
           href="#como-funciona"
-          className="font-body rounded-full px-3 py-1.5 text-sm font-semibold text-gray-900 transition-all hover:bg-accent/10"
+          className="font-body rounded-full px-3 py-1.5 text-sm font-semibold text-gray-900 transition-all hover:bg-accent/10 focus-visible:outline-2 focus-visible:outline-accent-light"
         >
           Como funciona?
         </a>
         <a
           href="#precos"
-          className="font-body rounded-full px-3 py-1.5 text-sm font-semibold text-gray-900 transition-all hover:bg-accent/10"
+          className="font-body rounded-full px-3 py-1.5 text-sm font-semibold text-gray-900 transition-all hover:bg-accent/10 focus-visible:outline-2 focus-visible:outline-accent-light"
         >
           Preços
         </a>
@@ -98,94 +99,78 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
         )}
       </div>
 
-      {/* Hero — min 100dvh, cresce se necessario */}
-      <section className="relative flex min-h-dvh flex-col justify-between">
-        {/* Photo — absolute, decorativa */}
-        <div className="absolute right-[32px] top-[92px] bottom-[32px] z-[1] w-[calc(50%-32px)] overflow-hidden rounded-xl">
-          <Image src="/images/hero-section.png" alt="" fill sizes="50vw" className="object-cover" priority />
+      <section className="relative z-0 flex min-h-dvh items-center justify-center overflow-hidden">
+        {/* Imagem de fundo */}
+        <div className="absolute inset-0 z-0">
+          <Image src="/images/hero-section.png" alt="" fill className="object-cover" priority />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-black/20" />
         </div>
 
-        {/* Headline no topo */}
-        <div className="relative z-10 px-5 pt-[92px] sm:px-8">
-          <h1 className="font-heading text-[clamp(2.5rem,7vw,4rem)] font-bold leading-none tracking-tight text-gray-900 uppercase">
-              {user ? (
-              <>Bem-vindo de volta<br/><span className="text-accent-light">{user.name.split(" ")[0]}</span></>
-            ) : (
-              <>
-                <div className="inline-flex flex-col items-start">
-                  <span>Feito para</span>
-                  <span className="text-accent-light whitespace-nowrap">quem vive o mar.</span>
-                </div>
-              </>
-            )}
+        {/* Conteúdo centrado */}
+        <div className="relative z-10 flex flex-col items-center text-center px-5 sm:px-8 max-w-3xl">
+          <h1 className="font-heading text-[clamp(2.5rem,6.11vw,5.5rem)] font-bold leading-none tracking-tight text-white uppercase">
+            Feito para<br/>
+            <span className="text-accent">quem vive o mar.</span>
           </h1>
-          {user && (
-            <p className="mt-6 text-sm text-gray-400">
-              A tua página de perfil e reservas está a caminho.
-            </p>
-          )}
-        </div>
-
-        {/* Wrapper no fundo — em fluxo, nao absolute */}
-        <div className="relative z-10 flex flex-col pb-[32px] w-full max-w-[calc(50%-32px)] pl-5 sm:pl-8">
-          {/* Container 1: subtitle + CTA + divider */}
-          <div>
-            <span className="block font-body text-lg lg:text-base xl:text-lg font-medium text-black">
-              A plataforma de gestão para escolas de surf e desportos aquáticos. Os teus alunos reservam online, tu geres tudo num só lugar.
-            </span>
-            <a href="/user-flow" className="mt-4 mb-4 xl:mb-4 flex w-48 2xl:w-60 items-center rounded-3xl bg-accent-light px-4 py-1 2xl:py-1.5 shadow-lg">
-              <span className="font-body text-xs 2xl:text-sm font-semibold text-white uppercase">Começar já</span>
-              <div className="ml-auto flex h-6 w-6 2xl:h-8 2xl:w-8 items-center justify-center rounded-full bg-white" style={{ marginRight: '-8px' }}>
-                <svg className="h-3 w-3 2xl:h-4 2xl:w-4 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                </svg>
-              </div>
-            </a>
-            <div className="flex items-center mb-4 xl:mb-8 mr-4">
-              <div className="h-px bg-gray-300 flex-1" />
-            </div>
-          </div>
-          {/* Cards row */}
-          <div className="flex flex-row gap-4 lg:gap-3 xl:gap-4 2xl:gap-8">
-            {/* Card timeline */}
-            <div className="flex-1 2xl:min-h-[284px] rounded-2xl border border-gray-200/70 bg-white/70 p-4 lg:p-3 xl:p-4 2xl:p-6 shadow-xl shadow-black/5 backdrop-blur-md">
-              <div className="relative">
-                <div className="absolute top-[12px] bottom-[12px] left-[9px] w-px bg-gradient-to-b from-accent-light via-accent-light/40 to-transparent z-0" />
-                <ul className="space-y-6 lg:space-y-4 xl:space-y-6 2xl:space-y-8">
-                  {[
-                    { title: "Reservas online a qualquer hora", desc: "Os teus alunos marcam aulas 24/7 sem te ligar." },
-                    { title: "Reduz os no-shows", desc: "Lembretes automáticos e política de cancelamento." },
-                    { title: "Sem Whatsapp. Sem papéis.", desc: "Tudo centralizado: calendário, alunos e pagamentos." },
-                  ].map((item, i) => (
-                    <li key={i} className="group relative pl-10 lg:pl-8 xl:pl-10 cursor-pointer hover:bg-accent/5 rounded-lg -mx-2 px-2 transition-colors">
-                      <div className="absolute left-[17px] top-1.5 h-3 w-3 -translate-x-1/2 rounded-full border-2 border-white bg-accent-light/40 transition-all z-10 group-hover:scale-125 group-hover:bg-accent-light group-hover:shadow-[0_0_8px_rgba(30,111,168,0.5)]" />
-                      <h3 className="font-body text-sm 2xl:text-base font-semibold text-gray-900">{item.title}</h3>
-                      <p className="mt-0.5 text-xs 2xl:text-sm leading-snug text-gray-500">{item.desc}</p>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-            {/* Card novo */}
-            <div className="flex-1 2xl:min-h-[284px] rounded-2xl border border-gray-200/70 bg-white/70 p-6 lg:p-4 xl:p-6 2xl:p-8 shadow-xl shadow-black/5 backdrop-blur-md">
-              <p className="font-body text-xs 2xl:text-sm text-gray-400">Conteúdo em breve</p>
-            </div>
-          </div>
+          <p className="mt-6 text-[clamp(1rem,1.528vw,1.375rem)] font-semibold text-white/90 max-w-2xl">
+            A plataforma de gestão para escolas de surf e desportos aquáticos.<br/>
+            Os alunos reservam online, tu geres tudo num só lugar.
+          </p>
+          <a href="/user-flow" className="group mt-8 flex w-56 md:w-60 items-center justify-center rounded-full bg-accent px-8 py-3.5 shadow-lg transition-all duration-300 ease-out hover:shadow-xl hover:scale-[1.04] hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-white">
+            <span className="font-body text-sm font-semibold text-black uppercase">Começar já</span>
+            <svg className="ml-2 h-4 w-4 text-black transition-transform duration-300 ease-out group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </a>
         </div>
       </section>
 
-      {/* Como funciona? section */}
-      <section
-        id="como-funciona"
-        className="bg-gray-50 px-5 py-16 sm:px-8 sm:py-24"
-      >
-        <div className="mx-auto max-w-3xl">
-          <h2 className="font-heading text-3xl font-bold text-gray-900">
-            Como funciona?
+      <section id="como-funciona" className="bg-gray-50 px-5 py-16 sm:px-8 sm:py-24 relative">
+        <div className="absolute top-0 bottom-0 left-1/2 w-px bg-blue-500/50 pointer-events-none z-10" />
+        <div className="mx-auto max-w-4xl">
+          <h2 className="font-heading text-[clamp(1.5rem,3vw,2.5rem)] font-bold text-gray-900 text-center mb-2">
+            E se gerir a tua escola fosse mais simples?
           </h2>
-          <p className="mt-4 text-gray-600">
-            Conteúdos sobre como a plataforma funciona serão adicionados aqui.
+          <p className="text-[clamp(1rem,1.3vw,1.125rem)] text-gray-700 text-center max-w-2xl mx-auto leading-relaxed">
+            Whatsapp, papéis, chamadas perdidas. Agora tudo no mesmo lugar.<br/>Com a Alaia gere as tuas aulas, as tuas reservas e os teus pagamentos. O resto é mar.
           </p>
+          <div className="mt-24 w-full">
+            <div className="flex flex-col md:flex-row gap-80">
+              <div className="flex-1 flex justify-end -mr-16">
+                <div className="overflow-hidden rounded-2xl w-fit flex-shrink-0 bg-white">
+                  <Image src={mockupImg} alt="Mockup da plataforma Alaia" width={555} height={1115} className="w-auto max-w-[240px] h-auto transition-transform duration-300 ease-out hover:scale-[1.02]" />
+                </div>
+              </div>
+              <div className="flex-1 flex justify-start -ml-24">
+                <div className="min-h-40 w-fit flex flex-col items-start">
+                  <h3 className="font-heading text-[clamp(1.25rem,2.5vw,2rem)] font-bold text-gray-900 whitespace-nowrap">Tudo na ponta dos teus dedos</h3>
+                  <p className="mt-1 text-[clamp(1rem,1.3vw,1.125rem)] text-gray-600">Menos tempo a organizar, mais tempo no mar.</p>
+                  <div className="relative mt-14 pl-8">
+                    <div className="absolute top-[12px] bottom-[12px] left-[11px] w-px bg-gradient-to-b from-accent-light via-accent-light/40 to-transparent z-0 pointer-events-none" />
+                    <div className="space-y-6">
+                      {[
+                        { title: "Reservas online a qualquer hora", desc: "Os teus alunos marcam aulas 24/7 sem te ligar." },
+                        { title: "Reduz os no-shows", desc: "Lembretes automáticos e política de cancelamento." },
+                        { title: "Sem Whatsapp. Sem papéis.", desc: "Tudo centralizado: calendário, alunos e pagamentos." },
+                      ].map((item, i) => (
+                        <div key={i} className="relative pl-4 group">
+                          <div className="absolute left-[-20px] top-1.5 h-3 w-3 -translate-x-1/2 rounded-full border-2 border-white bg-accent-light/40 transition-all z-10 group-hover:scale-125 group-hover:bg-accent-light group-hover:shadow-[0_0_8px_rgba(30,111,168,0.5)]" />
+                          <h3 className="font-heading text-[clamp(1rem,1.3vw,1.125rem)] font-semibold text-gray-900">{item.title}</h3>
+                          <p className="mt-0.5 text-[clamp(0.75rem,1vw,0.875rem)] leading-snug text-gray-700">{item.desc}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <a href="#" className="group mt-10 flex items-center gap-2 rounded-full bg-accent px-6 py-3 shadow-lg transition-all duration-300 ease-out hover:shadow-xl hover:scale-[1.04] hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-white">
+                    <span className="font-body text-sm font-semibold text-black">Como organizar melhor</span>
+                    <svg className="h-4 w-4 text-black transition-transform duration-300 ease-out group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -202,7 +187,7 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-gray-100 bg-white px-5 py-8 text-center text-sm text-gray-400">
+      <footer className="border-t border-gray-100 bg-white px-5 py-8 text-center text-sm text-gray-500">
         <p>Alaia — Marca sessões facilmente.</p>
       </footer>
     </div>

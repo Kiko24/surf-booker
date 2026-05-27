@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AuthShell } from "@/components/auth/auth-shell";
+import { createClient } from "@/lib/supabase/server";
 
 type Option = {
   title: string;
@@ -20,9 +21,13 @@ const options: Option[] = [
   },
 ];
 
-export default function UserFlowPage() {
+export default async function UserFlowPage() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const backHref = user ? "/dashboard" : "/";
+
   return (
-    <AuthShell backHref="/">
+    <AuthShell backHref={backHref}>
       <div className="mt-2 lg:flex lg:flex-1 lg:flex-col lg:justify-start lg:mt-8">
         <h1 className="text-center text-2xl font-heading font-medium lg:text-2xl">
           Registe-se / Iniciar sessão
