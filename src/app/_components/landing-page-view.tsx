@@ -4,6 +4,8 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import mockupImg from "@/components/images/mockup.png";
+import breakImg from "@/components/images/break.png";
+import { useRef, useState, useEffect } from "react";
 
 type UserInfo = {
   id: string;
@@ -13,6 +15,40 @@ type UserInfo = {
 
 export function LandingPageView({ user }: { user: UserInfo | null }) {
   const router = useRouter();
+  const sectionRef = useRef<HTMLDivElement>(null);
+  const imageRef = useRef<HTMLDivElement>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+  useEffect(() => {
+    const section = sectionRef.current;
+    const image = imageRef.current;
+    if (!section || !image) return;
+    if (isMobile) {
+      image.style.transform = "none";
+      return;
+    }
+    let ticking = false;
+    const update = () => {
+      const rect = section.getBoundingClientRect();
+      const progress = (window.innerHeight - rect.top) / (window.innerHeight + rect.height);
+      const clamped = Math.max(0, Math.min(1, progress));
+      const offset = (clamped - 0.5) * 2 * section.offsetHeight * 0.5 * 0.5;
+      image.style.transform = `translateY(${offset}px)`;
+      ticking = false;
+    };
+    const onScroll = () => { if (!ticking) { requestAnimationFrame(update); ticking = true; } };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    update();
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      image.style.transform = "none";
+    };
+  }, [isMobile]);
 
   async function handleSignOut() {
     const supabase = createClient();
@@ -126,7 +162,6 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
       </section>
 
       <section id="como-funciona" className="bg-gray-50 px-5 py-16 sm:px-8 sm:py-24 relative">
-        <div className="absolute top-0 bottom-0 left-1/2 w-px bg-blue-500/50 pointer-events-none z-10" />
         <div className="mx-auto max-w-4xl">
           <h2 className="font-heading text-[clamp(1.5rem,3vw,2.5rem)] font-bold text-gray-900 text-center mb-2">
             E se gerir a tua escola fosse mais simples?
@@ -136,8 +171,8 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
           </p>
           <div className="mt-24 w-full">
             <div className="flex flex-col md:flex-row gap-80">
-              <div className="flex-1 flex justify-end -mr-16">
-                <div className="overflow-hidden rounded-2xl w-fit flex-shrink-0 bg-white">
+              <div className="flex-1 flex justify-center">
+                <div className="w-fit flex-shrink-0 bg-white">
                   <Image src={mockupImg} alt="Mockup da plataforma Alaia" width={555} height={1115} className="w-auto max-w-[240px] h-auto transition-transform duration-300 ease-out hover:scale-[1.02]" />
                 </div>
               </div>
@@ -147,7 +182,7 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
                   <p className="mt-1 text-[clamp(1rem,1.3vw,1.125rem)] text-gray-600">Menos tempo a organizar, mais tempo no mar.</p>
                   <div className="relative mt-14 pl-8">
                     <div className="absolute top-[12px] bottom-[12px] left-[11px] w-px bg-gradient-to-b from-accent-light via-accent-light/40 to-transparent z-0 pointer-events-none" />
-                    <div className="space-y-6">
+                    <div className="space-y-12">
                       {[
                         { title: "Reservas online a qualquer hora", desc: "Os teus alunos marcam aulas 24/7 sem te ligar." },
                         { title: "Reduz os no-shows", desc: "Lembretes automáticos e política de cancelamento." },
@@ -171,6 +206,25 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Break Section */}
+      <section
+        ref={sectionRef}
+        className="relative overflow-hidden min-h-[250px] sm:min-h-[400px] flex items-center justify-center"
+      >
+        <div ref={imageRef} className="absolute inset-0 z-0 will-change-transform" style={{ top: "-10%", height: "120%" }}>
+          <Image src={breakImg} alt="" fill className="object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-black/20" />
+        </div>
+        <div className="relative z-10 text-center px-5 sm:px-8">
+          <p className="text-[clamp(1rem,1.8vw,1.375rem)] font-semibold text-white/90">
+            Deixa a gestão connosco.<br/>O surf é contigo.
+          </p>
+          <h2 className="mt-2 font-heading text-[clamp(1.5rem,3.5vw,3rem)] font-bold text-white whitespace-nowrap">
+            Não, não é magia, é Alaia!
+          </h2>
         </div>
       </section>
 
