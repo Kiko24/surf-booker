@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import mockupImg from "@/components/images/mockup.png";
 import breakImg from "@/components/images/break.png";
+import featuresImg from "@/components/images/features.png";
 import demoImg from "@/components/images/demo.png";
 import { useRef, useState, useEffect } from "react";
 import { useScrollReveal } from "./use-scroll-reveal";
@@ -81,6 +82,17 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
   const featuresReveal = useScrollReveal(0.2);
   const contactReveal = useScrollReveal(0.15);
   const breakTextReveal = useScrollReveal(0.2);
+
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
+
+  const faqs = [
+    { q: "Preciso de conhecimentos técnicos para usar a Alaia?", a: "Não. A Alaia foi desenhada para donos de escolas de surf que não querem perder tempo com tecnologia. Em poucos minutos tens tudo configurado." },
+    { q: "Posso experimentar antes de pagar?", a: "Para além da demonstração gratuita, ainda podemos oferecer 14 dias grátis para experimentar a plataforma." },
+    { q: "Os meus alunos conseguem reservar sem instalar nada?", a: "Sim, os alunos podem reservar através do vosso website ou da página da escola aqui na Alaia." },
+    { q: "Quais são as vantagens dos meus alunos terem conta?", a: "Eles podem acompanhar todo o histórico das aulas, reagendar com facilidade sem telefonar para a escola, comprar packs de aulas, entre outras vantagens!" },
+    { q: "E se precisar de ajuda?", a: "Estamos disponíveis por email e podes agendar uma demonstração personalizada para ver a plataforma ao vivo." },
+  ];
 
   async function handleSignOut() {
     const supabase = createClient();
@@ -218,9 +230,9 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
                   <p className="mt-1 text-[clamp(1rem,1.3vw,1.125rem)] text-gray-600">Menos tempo a organizar, mais tempo no mar.</p>
                   <div className="relative mt-14 pl-8">
                     <div className="absolute top-[12px] bottom-[12px] left-[11px] w-px bg-gradient-to-b from-accent-light via-accent-light/40 to-transparent z-0 pointer-events-none" />
-                    <div className="space-y-12">
+                    <div className="space-y-10">
                       {[
-                        { title: "Reservas online a qualquer hora", desc: "Os teus alunos marcam aulas 24/7 sem te ligar." },
+                        { title: "Reservas online a qualquer hora", desc: "Agenda as tuas aulas mais rapidamente. O resto é com os alunos." },
                         { title: "Reduz os no-shows", desc: "Lembretes automáticos e política de cancelamento." },
                         { title: "Sem Whatsapp. Sem papéis.", desc: "Tudo centralizado: calendário, alunos e pagamentos." },
                       ].map((item, i) => (
@@ -232,7 +244,7 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
                       ))}
                     </div>
                   </div>
-                  <a href="#" className="group mt-10 flex items-center gap-2 rounded-full bg-accent px-6 py-3 shadow-lg transition-all duration-300 ease-out hover:shadow-xl hover:scale-[1.04] hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-white">
+                  <a href="/como-organizar-melhor" className="group mt-10 flex items-center gap-2 rounded-full bg-accent px-6 py-3 shadow-lg transition-all duration-300 ease-out hover:shadow-xl hover:scale-[1.04] hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-white">
                     <span className="font-body text-sm font-semibold text-black">Como organizar melhor</span>
                     <svg className="h-4 w-4 text-black transition-transform duration-300 ease-out group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
@@ -317,14 +329,60 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
                 </div>
               </div>
               <div className="flex-1 flex justify-start -ml-24">
-                <div className="w-full min-h-full relative overflow-hidden rounded-[3rem] bg-gradient-to-br from-gray-100/80 via-gray-50 to-gray-100/60">
-                  <div className="absolute -top-12 -right-12 h-48 w-48 rounded-full bg-gradient-to-bl from-gray-200/60 to-transparent blur-xl" />
-                  <div className="absolute -bottom-8 -left-8 h-36 w-36 rounded-full bg-gradient-to-tr from-gray-200/40 to-transparent blur-lg" />
-                  <div className="absolute top-1/3 left-1/4 h-20 w-20 rounded-full bg-gray-200/30 blur-md" />
+                <div className="w-full min-h-full relative overflow-hidden rounded-[3rem]">
+                  <Image src={featuresImg} alt="" fill className="object-cover" />
                 </div>
               </div>
             </div>
           </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Calendar Modal */}
+      {showCalendar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-5" onClick={() => setShowCalendar(false)}>
+          <div className="relative w-full max-w-lg rounded-2xl bg-white p-6 pb-0 pt-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => setShowCalendar(false)} className="absolute right-4 top-4 text-gray-400 hover:text-gray-600 transition-colors">
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <h3 className="font-heading text-lg font-bold text-gray-900 mb-4">Agendar demonstração</h3>
+            <iframe
+              src="https://calendly.com/fmagalhes45/30min"
+              width="100%"
+              height="450"
+              frameBorder="0"
+              className="rounded-lg"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* FAQ Section */}
+      <section className="bg-gray-800 px-5 py-16 sm:px-8 sm:py-24">
+        <div className="mx-auto max-w-2xl">
+          <h2 className="font-heading text-[clamp(1.25rem,2.5vw,2rem)] font-bold text-white text-center">
+            Perguntas frequentes
+          </h2>
+          <div className="mt-8 space-y-3">
+            {faqs.map((faq, i) => (
+              <div key={i} className="overflow-hidden rounded-xl bg-white/10 backdrop-blur-sm">
+                <button
+                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                  className="flex w-full items-center justify-between px-5 py-4 text-left font-body font-semibold text-white transition-colors hover:bg-white/20"
+                >
+                  <span>{faq.q}</span>
+                  <svg className={`h-4 w-4 flex-shrink-0 transition-transform duration-300 ${openFaq === i ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {openFaq === i && (
+                  <div className="px-5 pb-4 mt-2 text-base font-body text-gray-300 leading-relaxed">{faq.a}</div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -391,12 +449,15 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
                   <h3 className="font-heading text-lg font-bold text-white">Explora a Alaia</h3>
                   <p className="mt-1 text-sm text-white/80 max-w-xs">Fala connosco em direto e nós orquestramos-te a visita. Depois decides se é para ti</p>
                   <div className="mt-auto pt-6">
-                    <a href="#" className="inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-semibold text-gray-900 shadow-sm transition-all duration-300 ease-out hover:shadow-md hover:scale-[1.04] hover:-translate-y-0.5">
+                    <button
+                      onClick={() => setShowCalendar(true)}
+                      className="inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-semibold text-gray-900 shadow-sm transition-all duration-300 ease-out hover:shadow-md hover:scale-[1.04] hover:-translate-y-0.5"
+                    >
                       Agendar demonstração
-                      <svg className="h-4 w-4 transition-transform duration-300 ease-out group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                       </svg>
-                    </a>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -407,8 +468,52 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-gray-100 bg-white px-5 py-8 text-center text-sm text-gray-500">
-        <p>Alaia — Marca sessões facilmente.</p>
+      <footer className="border-t border-gray-700 bg-gray-800 px-5 py-12 sm:px-8">
+        <div className="mx-auto max-w-4xl">
+          <div className="flex flex-col md:flex-row justify-between gap-8">
+            {/* Brand */}
+            <div className="max-w-xs">
+              <a href="/" className="font-heading text-xl font-bold text-white">
+                Alaia
+              </a>
+              <p className="mt-2 text-sm text-gray-300 leading-relaxed">
+                Plataforma de gestão para escolas de surf e desportos aquáticos.
+              </p>
+            </div>
+            {/* Links */}
+            <div className="flex flex-col gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">
+                Produto
+              </p>
+              <button
+                onClick={() => document.getElementById("como-funciona")?.scrollIntoView({ behavior: "smooth" })}
+                className="text-sm text-gray-300 text-left transition-colors hover:text-accent-light focus-visible:outline-2 focus-visible:outline-accent-light"
+              >
+                Como funciona?
+              </button>
+              <button
+                onClick={() => document.getElementById("contacto")?.scrollIntoView({ behavior: "smooth" })}
+                className="text-sm text-gray-300 text-left transition-colors hover:text-accent-light focus-visible:outline-2 focus-visible:outline-accent-light"
+              >
+                Contacto
+              </button>
+              <a
+                href="/signup-owner"
+                className="text-sm text-gray-300 transition-colors hover:text-accent-light focus-visible:outline-2 focus-visible:outline-accent-light"
+              >
+                Registar o seu negócio
+              </a>
+            </div>
+          </div>
+          {/* Divider + Copyright */}
+          <div className="mt-10 pt-6 border-t border-gray-700 flex flex-col sm:flex-row items-center justify-between gap-2">
+            <p className="text-xs text-gray-400">&copy; 2026 Alaia</p>
+            <div className="flex gap-4 text-xs text-gray-400">
+              <a href="/termos" className="hover:text-accent-light transition-colors focus-visible:outline-2 focus-visible:outline-accent-light">Termos</a>
+              <a href="/privacidade" className="hover:text-accent-light transition-colors focus-visible:outline-2 focus-visible:outline-accent-light">Privacidade</a>
+            </div>
+          </div>
+        </div>
       </footer>
     </div>
   );
