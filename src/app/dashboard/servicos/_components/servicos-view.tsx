@@ -16,6 +16,13 @@ type Props = {
 
 const MODALIDADES = ["Surf", "SUP", "Bodyboard", "Windsurf", "Kitesurf", "Longboard"];
 
+const CATEGORIAS = [
+  { value: "", label: "Sem categoria" },
+  { value: "aula", label: "Aula" },
+  { value: "pack", label: "Pack de Aulas" },
+  { value: "aluguer", label: "Aluguer" },
+] as const;
+
 function formatPrice(cents: number): string {
   return (cents / 100).toFixed(2).replace(".", ",") + "€";
 }
@@ -61,6 +68,7 @@ export function ServicosView({ sessions, schoolId }: Props) {
   // form fields
   const [nome, setNome] = useState("");
   const [modalidade, setModalidade] = useState("");
+  const [categoria, setCategoria] = useState("");
   const [duracao, setDuracao] = useState("");
   const [sobre, setSobre] = useState("");
   const [avulsoAtivo, setAvulsoAtivo] = useState(false);
@@ -71,6 +79,7 @@ export function ServicosView({ sessions, schoolId }: Props) {
   function resetForm() {
     setNome("");
     setModalidade("");
+    setCategoria("");
     setDuracao("");
     setSobre("");
     setAvulsoAtivo(false);
@@ -81,6 +90,7 @@ export function ServicosView({ sessions, schoolId }: Props) {
   function fillEditForm(s: ServicoRecord) {
     setNome(s.nome);
     setModalidade(s.modalidade);
+    setCategoria(s.categoria ?? "");
     setDuracao(String(s.duracao));
     setSobre(s.sobre);
     setAvulsoAtivo(s.avulsoDisponivel);
@@ -231,6 +241,13 @@ export function ServicosView({ sessions, schoolId }: Props) {
                 </div>
               )}
 
+              {selectedSession.categoria && (
+                <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
+                  <p className="font-body text-xs text-text-secondary">Categoria</p>
+                  <p className="font-body text-sm text-foreground capitalize">{selectedSession.categoria}</p>
+                </div>
+              )}
+
               <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
                 <p className="font-body text-xs text-text-secondary">Duração</p>
                 <p className="font-body text-sm text-foreground">{selectedSession.duracao} minutos</p>
@@ -333,6 +350,27 @@ export function ServicosView({ sessions, schoolId }: Props) {
                     <option value="" disabled>Selecionar modalidade</option>
                     {MODALIDADES.map((m) => (
                       <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted">
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </div>
+              </div>
+
+              {/* Categoria */}
+              <div>
+                <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+                  Categoria
+                </label>
+                <div className="relative">
+                  <select
+                    value={categoria}
+                    onChange={(e) => setCategoria(e.target.value)}
+                    className="w-full appearance-none rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground outline-none focus:outline-2 focus:outline-accent"
+                  >
+                    {CATEGORIAS.map((c) => (
+                      <option key={c.value} value={c.value}>{c.label}</option>
                     ))}
                   </select>
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted">
@@ -531,6 +569,7 @@ export function ServicosView({ sessions, schoolId }: Props) {
                         sobre,
                         avulsoDisponivel: avulsoAtivo,
                         avulsoPreco: Math.round(Number(avulsoPreco) * 100),
+                        categoria: (categoria || undefined) as "aula" | "pack" | "aluguer" | undefined,
                         packs: packData,
                       });
                       if (res.ok) {
@@ -546,6 +585,7 @@ export function ServicosView({ sessions, schoolId }: Props) {
                         sobre,
                         avulsoDisponivel: avulsoAtivo,
                         avulsoPreco: Math.round(Number(avulsoPreco) * 100),
+                        categoria: (categoria || undefined) as "aula" | "pack" | "aluguer" | undefined,
                         packs: packData,
                       });
                       if (res.ok) {

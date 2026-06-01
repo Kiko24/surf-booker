@@ -1,6 +1,7 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 
 export type PublicSchoolImage = {
   id: string;
@@ -19,6 +20,8 @@ export type PublicService = {
   description: string | null;
   duration_minutes: number;
   price_cents: number;
+  category: string | null;
+  modality: string;
 };
 
 export type PublicSession = {
@@ -39,6 +42,7 @@ export type PublicSchoolData = {
     description: string | null;
     location: string | null;
     logo_url: string | null;
+    phone: string | null;
     timezone: string;
   };
   images: PublicSchoolImage[];
@@ -62,7 +66,7 @@ export async function getPublicSchoolData(
   try {
     const res = await admin
       .from("schools")
-      .select("id, name, slug, description, location, logo_url, timezone")
+      .select("id, name, slug, description, location, logo_url, timezone, phone")
       .eq("slug", slug)
       .maybeSingle();
     school = res.data;
@@ -82,16 +86,37 @@ export async function getPublicSchoolData(
     { id: "ph-2", public_url: "https://placehold.co/800x600/2563EB/FFFFFF?text=Foto+2" },
     { id: "ph-3", public_url: "https://placehold.co/800x600/3B82F6/FFFFFF?text=Foto+3" },
   ];
+  let instructors: PublicInstructor[] = [
+    { name: "João Silva", level: "Instrutor Sénior", avatar_url: "https://placehold.co/120x120/1E6FA8/FFFFFF?text=JS" },
+    { name: "Maria Santos", level: "Instrutora", avatar_url: "https://placehold.co/120x120/2563EB/FFFFFF?text=MS" },
+    { name: "Rui Costa", level: "Instrutor", avatar_url: "https://placehold.co/120x120/3B82F6/FFFFFF?text=RC" },
+    { name: "Ana Pereira", level: "Instrutora Estagiária", avatar_url: "https://placehold.co/120x120/60A5FA/FFFFFF?text=AP" },
+  ];
   let services: PublicService[] = [];
+  let upcomingSessions: PublicSession[] = [];
 
   try {
-    const [servicesRes] = await Promise.all([
+    const AVATAR_BUCKET = "instructor-avatars";
+    const [servicesRes, instructorsRes, sessionsRes] = await Promise.all([
       admin
         .from("class_types")
-        .select("id, name, description, default_duration_minutes, price_cents")
+        .select("id, name, description, default_duration_minutes, price_cents, category, modality")
         .eq("school_id", school.id)
         .eq("is_active", true)
         .order("name", { ascending: true }),
+      admin
+        .from("instructors")
+        .select("name, level, avatar_url")
+        .eq("school_id", school.id)
+        .order("created_at", { ascending: true }),
+      admin
+        .from("sessions")
+        .select("id, starts_at, duration_minutes, price_cents, capacity, class_type_id, class_types(name)")
+        .eq("school_id", school.id)
+        .eq("status", "scheduled")
+        .gte("starts_at", new Date().toISOString())
+        .order("starts_at", { ascending: true })
+        .limit(20),
     ]);
 
     const realServices = (servicesRes.data ?? []).map((svc) => ({
@@ -100,13 +125,58 @@ export async function getPublicSchoolData(
       description: svc.description ?? null,
       duration_minutes: svc.default_duration_minutes,
       price_cents: svc.price_cents,
+      category: svc.category ?? null,
+      modality: svc.modality ?? "",
     }));
 
     services = realServices.length > 0 ? realServices : [
-      { id: "ph-svc-1", name: "Aula de Surf Iniciantes", description: null, duration_minutes: 90, price_cents: 3500 },
-      { id: "ph-svc-2", name: "Aula de Surf Intermédio", description: null, duration_minutes: 90, price_cents: 4000 },
-      { id: "ph-svc-3", name: "Pack 5 Aulas", description: null, duration_minutes: 90, price_cents: 15000 },
+      { id: "ph-svc-1", name: "Aula de Surf Iniciantes", description: null, duration_minutes: 90, price_cents: 3500, category: "aula", modality: "Surf" },
+      { id: "ph-svc-2", name: "Aula de Surf Intermédio", description: null, duration_minutes: 90, price_cents: 4000, category: "aula", modality: "Surf" },
+      { id: "ph-svc-3", name: "Pack 5 Aulas", description: null, duration_minutes: 90, price_cents: 15000, category: "pack", modality: "Surf" },
+      { id: "ph-svc-4", name: "Aluguer de Prancha", description: "Tábua de surf + leash", duration_minutes: 60, price_cents: 1500, category: "aluguer", modality: "Surf" },
     ];
+
+    const realInstructors: PublicInstructor[] = (instructorsRes.data ?? []).map((inst) => ({
+      name: inst.name,
+      level: inst.level || "",
+      avatar_url: inst.avatar_url
+        ? admin.storage
+            .from(AVATAR_BUCKET)
+            .getPublicUrl(inst.avatar_url).data.publicUrl
+        : null,
+    }));
+
+    instructors = realInstructors.length > 0 ? realInstructors : instructors;
+
+    const { data: sessionsData } = sessionsRes;
+    const realSessions: PublicSession[] = (sessionsData ?? []).map((s) => ({
+      id: s.id,
+      starts_at: s.starts_at,
+      duration_minutes: s.duration_minutes,
+      class_type_name: (s.class_types as { name: string }[] | null)?.[0]?.name ?? "",
+      price_cents: s.price_cents,
+      capacity: s.capacity ?? 0,
+      booked: 0,
+    }));
+
+    const sessionIds = realSessions.map((s) => s.id);
+    if (sessionIds.length > 0) {
+      const { data: bookings } = await admin
+        .from("bookings")
+        .select("session_id")
+        .in("session_id", sessionIds)
+        .eq("status", "confirmed");
+
+      const countMap: Record<string, number> = {};
+      for (const b of bookings ?? []) {
+        countMap[b.session_id] = (countMap[b.session_id] ?? 0) + 1;
+      }
+      for (const s of realSessions) {
+        s.booked = countMap[s.id] ?? 0;
+      }
+    }
+
+    upcomingSessions = realSessions;
   } catch (err) {
     console.error("[getPublicSchoolData] sub-queries error:", err);
   }
@@ -119,12 +189,13 @@ export async function getPublicSchoolData(
       description: "Descrição breve da escola. Aqui podes falar sobre a tua escola de surf, a tua missão e o que ofereces.",
       location: "Localização",
       logo_url: "https://placehold.co/120x120/1E6FA8/FFFFFF?text=Logo",
+      phone: school.phone ?? null,
       timezone: "Europe/Lisbon",
     },
     images,
-    instructors: [],
+    instructors,
     services,
-    upcomingSessions: [],
+    upcomingSessions,
   };
 }
 
@@ -200,4 +271,44 @@ export async function criarReservaPublica(
   }
 
   return { ok: true };
+}
+
+export async function toggleFavorite(
+  schoolId: string,
+  action: "add" | "remove"
+): Promise<{ ok: true; favorited: boolean } | { ok: false; error: string }> {
+  const supabase = await createClient();
+  const { data: { user }, error: authErr } = await supabase.auth.getUser();
+
+  if (authErr || !user) {
+    return { ok: false, error: "Apenas pessoas com conta conseguem adicionar escolas aos favoritos." };
+  }
+
+  if (action === "add") {
+    const { error } = await supabase
+      .from("favorites")
+      .insert({ user_id: user.id, school_id: schoolId });
+
+    if (error) {
+      if (error.code === "23505") {
+        // Already favorited — treat as success
+        return { ok: true, favorited: true };
+      }
+      return { ok: false, error: "Erro ao adicionar favorito." };
+    }
+
+    return { ok: true, favorited: true };
+  }
+
+  const { error } = await supabase
+    .from("favorites")
+    .delete()
+    .eq("user_id", user.id)
+    .eq("school_id", schoolId);
+
+  if (error) {
+    return { ok: false, error: "Erro ao remover favorito." };
+  }
+
+  return { ok: true, favorited: false };
 }

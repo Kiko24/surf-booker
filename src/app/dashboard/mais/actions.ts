@@ -407,7 +407,7 @@ export async function saveSchoolSettings(
 
 export async function saveSchoolInfo(
   schoolId: string,
-  data: { name: string; location: string; description: string }
+  data: { name: string; location: string; description: string; phone: string }
 ): Promise<{ ok: boolean; error?: string }> {
   const { supabase, user } = await requireOwner(schoolId);
 
@@ -420,6 +420,7 @@ export async function saveSchoolInfo(
       name: data.name,
       location: data.location || null,
       description: data.description || null,
+      phone: data.phone || null,
     })
     .eq("id", schoolId);
 

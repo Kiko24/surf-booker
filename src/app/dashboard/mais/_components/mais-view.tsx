@@ -14,11 +14,12 @@ type Props = {
   schoolLogoUrl: string | null;
   schoolLocation: string | null;
   schoolDescription: string | null;
+  schoolPhone: string | null;
   cancellationWindowHours: number;
   schoolId: string | null;
 };
 
-export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, schoolLocation, schoolDescription, cancellationWindowHours, schoolId }: Props) {
+export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, schoolLocation, schoolDescription, schoolPhone, cancellationWindowHours, schoolId }: Props) {
   const router = useRouter();
   const [showProfile, setShowProfile] = useState(false);
   const [profileName, setProfileName] = useState(fullName);
@@ -30,6 +31,7 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
   const [companyName, setCompanyName] = useState(schoolName ?? "");
   const [companyLocation, setCompanyLocation] = useState(schoolLocation ?? "");
   const [companyDescription, setCompanyDescription] = useState(schoolDescription ?? "");
+  const [companyPhone, setCompanyPhone] = useState(schoolPhone ?? "");
   const [showInstructors, setShowInstructors] = useState(false);
   const [instrutorNome, setInstrutorNome] = useState("");
   const [instrutorNivel, setInstrutorNivel] = useState("");
@@ -366,6 +368,10 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                       <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">Localização</label>
                       <input type="text" value={companyLocation} onChange={(e) => setCompanyLocation(e.target.value)} placeholder="Ex: Praia do Guincho, Cascais" className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent" />
                     </div>
+                    <div>
+                      <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">Contacto (WhatsApp)</label>
+                      <input type="text" value={companyPhone} onChange={(e) => setCompanyPhone(e.target.value)} placeholder="+351 9XXXXXXXX" className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent" />
+                    </div>
                   </div>
                   <div>
                     <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">Descrição</label>
@@ -416,7 +422,7 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                     <button type="button" disabled={companySaving} onClick={async () => {
                       if (!schoolId) return;
                       setCompanySaving(true);
-                      const res = await saveSchoolInfo(schoolId, { name: companyName, location: companyLocation, description: companyDescription });
+                      const res = await saveSchoolInfo(schoolId, { name: companyName, location: companyLocation, description: companyDescription, phone: companyPhone });
                       if (res.ok) setSelectedSection(null);
                       setCompanySaving(false);
                     }} className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95 disabled:opacity-50">
@@ -863,6 +869,7 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                       name: companyName,
                       location: companyLocation,
                       description: companyDescription,
+                      phone: companyPhone,
                     });
                     if (res.ok) setShowCompany(false);
                     setCompanySaving(false);

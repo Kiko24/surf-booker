@@ -18,6 +18,7 @@ export type SchoolInfo = {
   logo_url: string | null;
   location: string | null;
   description: string | null;
+  phone: string | null;
   cancellation_window_hours: number;
 };
 
@@ -28,7 +29,7 @@ export async function getSchoolInfo(): Promise<SchoolInfo | null> {
 
   const { data } = await supabase
     .from("schools")
-    .select("name, logo_url, location, description, cancellation_window_hours")
+    .select("name, logo_url, location, description, phone, cancellation_window_hours")
     .eq("owner_user_id", user.id)
     .maybeSingle();
 
