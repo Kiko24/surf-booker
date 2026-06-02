@@ -381,5 +381,3 @@ export async function getMetricas(
     instrutores,
   };
 }
-
-

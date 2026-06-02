@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useCallback, useRef, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { addSchoolImage, deleteImage, getImages, saveInstructor, deleteInstructor, getInstructors, getSchoolSettings, saveSchoolSettings, saveSchoolInfo, type SchoolImage, type Instructor, type SchoolSettings } from "../actions";
+import { addSchoolImage, deleteImage, getImages, saveInstructor, deleteInstructor, getInstructors, getSchoolSettings, saveSchoolSettings, saveSchoolInfo, saveProfile, saveSchoolLogo, type SchoolImage, type Instructor, type SchoolSettings } from "../actions";
 
 type Props = {
   fullName: string;
@@ -79,6 +79,10 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsError, setSettingsError] = useState("");
   const [companySaving, setCompanySaving] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileError, setProfileError] = useState("");
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoError, setLogoError] = useState("");
 
   useEffect(() => {
     if (showSettings && schoolId) {
@@ -132,22 +136,36 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
             type="file"
             accept="image/png,image/webp,image/jpeg"
             className="hidden"
-            onChange={(e) => {
+            onChange={async (e) => {
               const file = e.target.files?.[0];
-              if (!file) return;
+              if (!file || !schoolId) return;
               if (!["image/png", "image/webp", "image/jpeg"].includes(file.type)) {
-                console.error("Formato não permitido. Usa PNG, WebP ou JPEG");
+                setLogoError("Formato não permitido. Usa PNG, WebP ou JPEG");
                 return;
               }
-              if (file.size > 1024 * 1024) {
-                console.error("Logotipo demasiado grande. Máximo 1MB");
+              if (file.size > 2 * 1024 * 1024) {
+                setLogoError("Logotipo demasiado grande. Máximo 2MB");
                 return;
               }
               const reader = new FileReader();
               reader.onloadend = () => setLogoPreview(reader.result as string);
               reader.readAsDataURL(file);
+              setLogoError("");
+              setLogoUploading(true);
+              const res = await saveSchoolLogo(schoolId, file);
+              setLogoUploading(false);
+              if (!res.ok) {
+                setLogoError(res.error ?? "Erro ao guardar logotipo");
+                setLogoPreview(null);
+              }
             }}
           />
+          {logoUploading && (
+            <p className="font-body text-xs text-text-muted">A carregar logotipo...</p>
+          )}
+          {logoError && (
+            <p className="font-body text-xs text-error">{logoError}</p>
+          )}
           {schoolName && (
             <h1 className="font-heading text-xl font-bold text-foreground">
               {schoolName}
@@ -172,7 +190,7 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                 className={`flex items-center justify-between rounded-xl bg-surface p-4 text-left transition-colors hover:bg-[#2A2A2A] active:scale-[0.99] ${selectedSection === "profile" ? "border-l-4 border-accent" : ""}`}
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 shrink-0 text-accent">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`h-5 w-5 shrink-0 ${selectedSection === "profile" ? "text-accent" : "text-text-muted"}`}>
                     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                     <circle cx="12" cy="7" r="4" />
                   </svg>
@@ -210,7 +228,7 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                 className={`flex items-center justify-between rounded-xl bg-surface p-4 text-left transition-colors hover:bg-[#2A2A2A] active:scale-[0.99] ${selectedSection === "instructors" ? "border-l-4 border-accent" : ""}`}
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 shrink-0 text-text-muted">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`h-5 w-5 shrink-0 ${selectedSection === "instructors" ? "text-accent" : "text-text-muted"}`}>
                     <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
                     <circle cx="9" cy="7" r="4" />
                     <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
@@ -250,7 +268,7 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                 className={`flex items-center justify-between rounded-xl bg-surface p-4 text-left transition-colors hover:bg-[#2A2A2A] active:scale-[0.99] ${selectedSection === "settings" ? "border-l-4 border-accent" : ""}`}
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 shrink-0 text-text-muted">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`h-5 w-5 shrink-0 ${selectedSection === "settings" ? "text-accent" : "text-text-muted"}`}>
                     <circle cx="12" cy="12" r="3" />
                     <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
                   </svg>
@@ -286,7 +304,7 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
           </div>
 
           {/* Right column — desktop panel content */}
-          <div className="md:col-span-9 md:h-[calc(100vh-10rem)] md:overflow-hidden">
+          <div className="md:col-span-9 md:h-[calc(100vh-10rem)]">
             {!selectedSection && (
               <div className="h-full flex flex-col items-center justify-center text-center">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="h-12 w-12 text-text-muted mb-4">
@@ -299,17 +317,14 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
             )}
 
             {selectedSection === "profile" && (
-              <div className="rounded-xl bg-surface px-6 pt-6 pb-2 flex flex-col h-full overflow-hidden">
-                <div className="flex items-center gap-4 mb-6 shrink-0">
-                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-background text-xl font-bold text-accent">
-                    {getInitials(profileName)}
-                  </div>
+              <div className="rounded-xl bg-surface px-6 pt-6 pb-2 flex flex-col h-full">
+                <div className="flex items-center gap-4 mb-6 shrink-0 pl-3">
                   <div>
                     <h3 className="font-heading text-xl font-bold text-foreground">Perfil</h3>
                     <p className="font-body text-sm text-text-secondary">Alterar nome, email e palavra-passe</p>
                   </div>
                 </div>
-                <div className="space-y-6 overflow-y-auto pr-1 flex-1 min-h-0">
+                <div className="space-y-6 overflow-y-auto flex-1 min-h-0 pl-3 pr-3">
                   <div>
                     <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">Nome <span className="text-error">*</span></label>
                     <input type="text" value={profileName} onChange={(e) => setProfileName(e.target.value)} placeholder="O teu nome" className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent" />
@@ -336,33 +351,37 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                     </div>
                   </div>
                   <div className="flex gap-4 pt-2">
-                    <button type="button" onClick={() => setSelectedSection(null)} className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground">Fechar</button>
-                    <button type="button" className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95">Guardar</button>
+                    <button type="button" onClick={() => { setSelectedSection(null); setProfileError(""); }} className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground">Fechar</button>
+                    <button type="button" disabled={profileSaving} onClick={async () => {
+                      setProfileError("");
+                      if (profilePassword && profilePassword !== profileConfirmPassword) { setProfileError("As palavras-passe não coincidem"); return; }
+                      setProfileSaving(true);
+                      const res = await saveProfile({ name: profileName, email: profileEmail, phone: profilePhone, password: profilePassword || undefined });
+                      setProfileSaving(false);
+                      if (!res.ok) { setProfileError(res.error ?? "Erro ao guardar"); return; }
+                      setSelectedSection(null);
+                    }} className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95 disabled:opacity-50">
+                      {profileSaving ? "A guardar..." : "Guardar"}
+                    </button>
                   </div>
+                  {profileError && <p className="font-body text-sm text-error mt-2">{profileError}</p>}
                 </div>
               </div>
             )}
 
             {selectedSection === "company" && (
-              <div className="rounded-xl bg-surface px-6 pt-6 pb-4 flex flex-col h-full overflow-hidden">
-                <div className="flex items-center gap-4 mb-6 shrink-0">
-                  {schoolLogoUrl ? (
-                    <img src={schoolLogoUrl} alt="" className="h-14 w-14 shrink-0 rounded-full object-cover" />
-                  ) : (
-                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-background text-xl font-bold text-accent">
-                      {schoolName?.charAt(0).toUpperCase() ?? "E"}
-                    </div>
-                  )}
+              <div className="rounded-xl bg-surface px-6 pt-6 pb-4 flex flex-col h-full">
+                <div className="flex items-center gap-4 mb-6 shrink-0 pl-3">
                   <div>
                     <h3 className="font-heading text-xl font-bold text-foreground">Negócio</h3>
                     <p className="font-body text-sm text-text-secondary">Atualiza os dados do negócio</p>
                   </div>
                 </div>
-                <div className="space-y-6 overflow-y-auto pr-1 flex-1 min-h-0">
-                  <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-6 overflow-y-auto flex-1 min-h-0 pl-3 pr-3">
+                  <div className="grid grid-cols-3 gap-4">
                     <div>
                       <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">Nome do negócio <span className="text-error">*</span></label>
-                      <input type="text" value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Nome da escola" className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent" />
+                      <input type="text" value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Nome da escola" className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent focus:outline-offset-[-2px]" />
                     </div>
                     <div>
                       <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">Localização</label>
@@ -375,7 +394,7 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                   </div>
                   <div>
                     <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">Descrição</label>
-                    <textarea value={companyDescription} onChange={(e) => setCompanyDescription(e.target.value)} placeholder="Breve descrição da tua escola de surf" rows={4} className="w-full resize-none rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent" />
+                    <textarea value={companyDescription} onChange={(e) => setCompanyDescription(e.target.value)} placeholder="Breve descrição da tua escola de surf" rows={2} className="w-full resize-none rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent focus:outline-offset-[-2px]" />
                   </div>
                   {/* Images gallery */}
                   <div className="pt-4 border-t border-foreground/10">
@@ -392,7 +411,7 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                         const file = e.target.files?.[0];
                         if (!file || !schoolId) return;
                         if (!["image/png", "image/webp", "image/jpeg"].includes(file.type)) { alert("Formato não permitido. Usa PNG, WebP ou JPEG."); return; }
-                        if (file.size > 1024 * 1024) { alert("Imagem demasiado grande. Máximo 1MB."); return; }
+                        if (file.size > 2 * 1024 * 1024) { alert("Imagem demasiado grande. Máximo 2MB."); return; }
                         const res = await addSchoolImage(schoolId, file);
                         if (!res.ok) { console.error("upload error:", res.error); return; }
                         const data = await getImages(schoolId);
@@ -401,7 +420,7 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                     </div>
                     )}
                     {images.length === 0 ? (
-                      <p className="py-8 text-center font-body text-sm text-text-secondary">Nenhuma imagem adicionada ainda</p>
+                      <p className="py-4 text-center font-body text-sm text-text-secondary">Nenhuma imagem adicionada ainda</p>
                     ) : (
                       <div className="grid grid-cols-3 gap-2">
                         {images.map((img) => (
@@ -434,9 +453,9 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
             )}
 
             {selectedSection === "instructors" && (
-              <div className="rounded-xl bg-surface px-6 pt-6 pb-2 flex flex-col h-full overflow-hidden">
-                <h3 className="font-heading text-xl font-bold text-foreground mb-6 shrink-0">{editingInstrutorId !== null ? "Editar Instrutor" : "Instrutores"}</h3>
-                <div className="overflow-y-auto pr-1 flex-1 min-h-0">
+              <div className="rounded-xl bg-surface px-6 pt-6 pb-2 flex flex-col h-full">
+                <h3 className="font-heading text-xl font-bold text-foreground mb-6 shrink-0 pl-3">{editingInstrutorId !== null ? "Editar Instrutor" : "Instrutores"}</h3>
+                <div className="overflow-y-auto flex-1 min-h-0 pl-3 pr-3">
                 <div className="mb-8 flex justify-center">
                   <button type="button" onClick={() => instrutorFileRef.current?.click()} className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-2 border-dashed border-text-muted bg-[#2A2A2A] transition-colors hover:border-accent hover:bg-accent/10">
                     {instrutorFotoPreview ? (
@@ -518,10 +537,10 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
             )}
 
             {selectedSection === "settings" && (
-              <div className="rounded-xl bg-surface px-6 pt-6 pb-4 flex flex-col h-full overflow-hidden">
-                <h3 className="font-heading text-xl font-bold text-foreground mb-6 shrink-0">Definições</h3>
-                {settingsError && <p className="font-body text-sm text-error mb-4 shrink-0">{settingsError}</p>}
-                <div className="space-y-8 overflow-y-auto pr-1 flex-1 min-h-0">
+              <div className="rounded-xl bg-surface px-6 pt-6 pb-4 flex flex-col h-full">
+                <h3 className="font-heading text-xl font-bold text-foreground mb-6 shrink-0 pl-3">Definições</h3>
+                {settingsError && <p className="font-body text-sm text-error mb-4 shrink-0 pl-3">{settingsError}</p>}
+                <div className="space-y-8 overflow-y-auto flex-1 min-h-0 pl-3 pr-3">
                   <div className="rounded-xl bg-[#2A2A2A] p-6">
                     <p className="font-heading text-base font-bold text-foreground mb-2">Política de cancelamento</p>
                     <p className="font-body text-sm text-text-secondary mb-4">Os alunos podem cancelar e receber crédito de volta até</p>
@@ -608,9 +627,6 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
             <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted" />
 
             <div className="flex items-center gap-4 mb-6">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-background text-xl font-bold text-accent">
-                {getInitials(profileName)}
-              </div>
               <div>
                 <h3 className="font-heading text-xl font-bold text-foreground">Editar Perfil</h3>
                 <p className="font-body text-sm text-text-secondary">Atualiza os teus dados</p>
@@ -696,11 +712,22 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                 </button>
                 <button
                   type="button"
-                  className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95"
+                  disabled={profileSaving}
+                  onClick={async () => {
+                    setProfileError("");
+                    if (profilePassword && profilePassword !== profileConfirmPassword) { setProfileError("As palavras-passe não coincidem"); return; }
+                    setProfileSaving(true);
+                    const res = await saveProfile({ name: profileName, email: profileEmail, phone: profilePhone, password: profilePassword || undefined });
+                    setProfileSaving(false);
+                    if (!res.ok) { setProfileError(res.error ?? "Erro ao guardar"); return; }
+                    setShowProfile(false);
+                  }}
+                  className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95 disabled:opacity-50"
                 >
-                  Guardar
+                  {profileSaving ? "A guardar..." : "Guardar"}
                 </button>
               </div>
+              {profileError && <p className="font-body text-sm text-error mt-2">{profileError}</p>}
             </div>
           </div>
         </div>
@@ -755,14 +782,27 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
 
               <div>
                 <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+                  Contacto (WhatsApp) <span className="text-text-muted">(opcional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={companyPhone}
+                  onChange={(e) => setCompanyPhone(e.target.value)}
+                  placeholder="+351 9XXXXXXXX"
+                  className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+                />
+              </div>
+
+              <div>
+                <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
                   Descrição
                 </label>
                 <textarea
                   value={companyDescription}
                   onChange={(e) => setCompanyDescription(e.target.value)}
                   placeholder="Breve descrição da tua escola de surf"
-                  rows={4}
-                  className="w-full resize-none rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+                  rows={2}
+                  className="w-full resize-none rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent focus:outline-offset-[-2px]"
                 />
               </div>
 
@@ -797,8 +837,8 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                         alert("Formato não permitido. Usa PNG, WebP ou JPEG.");
                         return;
                       }
-                      if (file.size > 1024 * 1024) {
-                        alert("Imagem demasiado grande. Máximo 1MB.");
+                      if (file.size > 2 * 1024 * 1024) {
+                        alert("Imagem demasiado grande. Máximo 2MB.");
                         return;
                       }
                       const res = await addSchoolImage(schoolId, file);

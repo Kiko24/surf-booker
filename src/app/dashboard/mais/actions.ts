@@ -5,6 +5,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { rateLimitByUser } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
 import { validateImageContent } from "@/lib/utils/validate-image";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+const ALLOWED_LOGO_MIMES = ["image/png", "image/jpeg", "image/webp"];
+const LOGO_BUCKET = "school-logos";
 
 const BUCKET = "school-images";
 const MAX_IMAGES_PER_SCHOOL = 6;
@@ -403,6 +407,156 @@ export async function saveSchoolSettings(
   if (settingsErr.error) return { ok: false, error: settingsErr.error.message };
 
   return { ok: true };
+}
+
+async function ensureLogoBucketExists(admin: SupabaseClient) {
+  const { data: buckets } = await admin.storage.listBuckets();
+  if (buckets?.find((b) => b.name === LOGO_BUCKET)) return;
+
+  await admin.storage.createBucket(LOGO_BUCKET, {
+    public: true,
+    allowedMimeTypes: ALLOWED_LOGO_MIMES,
+    fileSizeLimit: 2 * 1024 * 1024,
+  });
+}
+
+async function requireAuth() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Não autenticado");
+  return { supabase, user };
+}
+
+export async function saveProfile(data: {
+  name: string;
+  email: string;
+  phone: string;
+  password?: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Não autenticado" };
+
+  const rl = await rateLimitByUser(user.id, "saveProfile");
+  if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
+
+  const trimmedName = data.name.trim();
+  if (!trimmedName || trimmedName.length < 2 || trimmedName.length > 80) {
+    return { ok: false, error: "Nome deve ter entre 2 e 80 caracteres" };
+  }
+  if (!/\S+\s+\S+/.test(trimmedName)) {
+    return { ok: false, error: "Insere o nome completo" };
+  }
+
+  const trimmedPhone = data.phone.trim();
+  if (!trimmedPhone || trimmedPhone.length < 6 || trimmedPhone.length > 20 || !/^[0-9+() /.\-]+$/.test(trimmedPhone)) {
+    return { ok: false, error: "Telemóvel inválido (6-20 caracteres)" };
+  }
+
+  const emailTrimmed = data.email.trim();
+  if (!emailTrimmed) return { ok: false, error: "Email é obrigatório" };
+  if (emailTrimmed.length > 160) return { ok: false, error: "Email demasiado longo" };
+
+  const admin = createAdminClient();
+
+  // Update profiles table
+  const { error: profileErr } = await admin
+    .from("profiles")
+    .update({ full_name: trimmedName, phone: trimmedPhone })
+    .eq("user_id", user.id);
+  if (profileErr) return { ok: false, error: profileErr.message };
+
+  // Update auth email if changed
+  if (emailTrimmed !== user.email) {
+    const { error: emailErr } = await admin.auth.admin.updateUserById(user.id, { email: emailTrimmed });
+    if (emailErr) return { ok: false, error: "Erro ao atualizar email: " + emailErr.message };
+  }
+
+  // Update password if provided
+  if (data.password) {
+    if (data.password.length < 6) return { ok: false, error: "Palavra-passe deve ter pelo menos 6 caracteres" };
+    const { error: pwdErr } = await admin.auth.admin.updateUserById(user.id, { password: data.password });
+    if (pwdErr) return { ok: false, error: "Erro ao atualizar palavra-passe: " + pwdErr.message };
+  }
+
+  logAudit({
+    schoolId: null,
+    userId: user.id,
+    action: "update_profile",
+    entityType: "profiles",
+    entityId: user.id,
+    metadata: { nameChanged: trimmedName !== user.user_metadata?.full_name },
+  });
+
+  return { ok: true };
+}
+
+export async function saveSchoolLogo(
+  schoolId: string,
+  file: File
+): Promise<{ ok: boolean; error?: string; url?: string }> {
+  const { supabase, user } = await requireAuth();
+
+  // Verify ownership
+  const { data: school } = await supabase
+    .from("schools")
+    .select("id, logo_url")
+    .eq("id", schoolId)
+    .eq("owner_user_id", user.id)
+    .maybeSingle();
+  if (!school) return { ok: false, error: "Escola não encontrada" };
+
+  const rl = await rateLimitByUser(user.id, "saveSchoolLogo");
+  if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
+
+  // Size check
+  if (file.size > 2 * 1024 * 1024) return { ok: false, error: "Logotipo demasiado grande. Máximo 2MB" };
+
+  // Validate content
+  const validation = await validateImageContent(file);
+  if (!validation.ok) return { ok: false, error: validation.reason };
+
+  const admin = createAdminClient();
+
+  // Ensure bucket exists
+  await ensureLogoBucketExists(admin);
+
+  const ext = validation.mime.split("/")[1].replace("jpeg", "jpg");
+  const path = `${schoolId}/logo.${ext}`;
+
+  // Remove old logo if exists
+  if (school.logo_url) {
+    const oldPath = school.logo_url.split("/").pop();
+    if (oldPath) {
+      await admin.storage.from(LOGO_BUCKET).remove([`${schoolId}/${oldPath}`]);
+    }
+  }
+
+  const { error: uploadError } = await admin.storage
+    .from(LOGO_BUCKET)
+    .upload(path, file, { upsert: true, contentType: validation.mime });
+  if (uploadError) return { ok: false, error: "Erro ao carregar o logotipo." };
+
+  const { data: { publicUrl } } = admin.storage.from(LOGO_BUCKET).getPublicUrl(path);
+
+  const { error: updateErr } = await supabase
+    .from("schools")
+    .update({ logo_url: publicUrl })
+    .eq("id", schoolId);
+  if (updateErr) {
+    await admin.storage.from(LOGO_BUCKET).remove([path]);
+    return { ok: false, error: updateErr.message };
+  }
+
+  logAudit({
+    schoolId,
+    userId: user.id,
+    action: "update_school_logo",
+    entityType: "schools",
+    entityId: schoolId,
+  });
+
+  return { ok: true, url: publicUrl };
 }
 
 export async function saveSchoolInfo(

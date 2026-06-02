@@ -5,7 +5,7 @@ import { useState } from "react";
 import {
   PlusIcon,
 } from "@/app/dashboard/_components/icons";
-import type { ServicoRecord, PackOption } from "../actions";
+import type { ServicoRecord } from "../actions";
 import { addServico, deleteServico, updateServico } from "../actions";
 
 type Props = {
@@ -17,8 +17,7 @@ type Props = {
 const MODALIDADES = ["Surf", "SUP", "Bodyboard", "Windsurf", "Kitesurf", "Longboard"];
 
 const CATEGORIAS = [
-  { value: "", label: "Sem categoria" },
-  { value: "aula", label: "Aula" },
+  { value: "aula", label: "Aulas Avulso" },
   { value: "pack", label: "Pack de Aulas" },
   { value: "aluguer", label: "Aluguer" },
 ] as const;
@@ -26,37 +25,6 @@ const CATEGORIAS = [
 function formatPrice(cents: number): string {
   return (cents / 100).toFixed(2).replace(".", ",") + "€";
 }
-
-function PlusCircleIcon({ className }: { className?: string }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <circle cx="12" cy="12" r="10" />
-      <path d="M12 8v8" />
-      <path d="M8 12h8" />
-    </svg>
-  );
-}
-
-function TrashIcon({ className }: { className?: string }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="M3 6h18" />
-      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-    </svg>
-  );
-}
-
-type PackFormEntry = {
-  tempId: string;
-  id?: string;
-  nome: string;
-  numeroAulas: string;
-  preco: string;
-};
-
-let packIdCounter = 0;
-function nextPackId() { return `pack_${++packIdCounter}`; }
 
 export function ServicosView({ sessions, schoolId }: Props) {
   const router = useRouter();
@@ -71,9 +39,10 @@ export function ServicosView({ sessions, schoolId }: Props) {
   const [categoria, setCategoria] = useState("");
   const [duracao, setDuracao] = useState("");
   const [sobre, setSobre] = useState("");
-  const [avulsoAtivo, setAvulsoAtivo] = useState(false);
-  const [avulsoPreco, setAvulsoPreco] = useState("");
-  const [packs, setPacks] = useState<PackFormEntry[]>([]);
+  const [totalLessons, setTotalLessons] = useState("");
+  const [preco, setPreco] = useState("");
+  const [duracaoAluguer, setDuracaoAluguer] = useState("");
+  const [unidadeAluguer, setUnidadeAluguer] = useState<"hora" | "dia">("hora");
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   function resetForm() {
@@ -82,9 +51,11 @@ export function ServicosView({ sessions, schoolId }: Props) {
     setCategoria("");
     setDuracao("");
     setSobre("");
-    setAvulsoAtivo(false);
-    setAvulsoPreco("");
-    setPacks([]);
+    setTotalLessons("");
+    setPreco("");
+    setDuracaoAluguer("");
+    setUnidadeAluguer("hora");
+    setFormErrors({});
   }
 
   function fillEditForm(s: ServicoRecord) {
@@ -93,34 +64,18 @@ export function ServicosView({ sessions, schoolId }: Props) {
     setCategoria(s.categoria ?? "");
     setDuracao(String(s.duracao));
     setSobre(s.sobre);
-    setAvulsoAtivo(s.avulsoDisponivel);
-    setAvulsoPreco(String(s.avulsoPreco / 100));
-    setPacks(
-      s.packs.map((p) => ({
-        tempId: nextPackId(),
-        id: p.id,
-        nome: p.nome,
-        numeroAulas: String(p.numeroAulas),
-        preco: String(p.preco / 100),
-      }))
-    );
-  }
-
-  function addPackEntry() {
-    setPacks((prev) => [
-      ...prev,
-      { tempId: nextPackId(), nome: "", numeroAulas: "", preco: "" },
-    ]);
-  }
-
-  function removePackEntry(tempId: string) {
-    setPacks((prev) => prev.filter((p) => p.tempId !== tempId));
-  }
-
-  function updatePackEntry(tempId: string, field: keyof Omit<PackFormEntry, "tempId" | "id">, value: string) {
-    setPacks((prev) =>
-      prev.map((p) => (p.tempId === tempId ? { ...p, [field]: value } : p))
-    );
+    setTotalLessons(s.totalLessons ? String(s.totalLessons) : "");
+    setPreco(String(s.avulsoPreco / 100));
+    if (s.categoria === "aluguer") {
+      const totalMinutes = s.duracao;
+      if (totalMinutes >= 1440) {
+        setDuracaoAluguer(String(totalMinutes / 1440));
+        setUnidadeAluguer("dia");
+      } else {
+        setDuracaoAluguer(String(totalMinutes / 60));
+        setUnidadeAluguer("hora");
+      }
+    }
   }
 
   return (
@@ -222,14 +177,6 @@ export function ServicosView({ sessions, schoolId }: Props) {
             <div className="flex items-center gap-4 mb-6">
               <div>
                 <h3 className="font-heading text-xl font-bold text-foreground">{selectedSession.nome}</h3>
-                <div className="flex items-center gap-2 mt-1">
-                  {selectedSession.avulsoDisponivel && (
-                    <span className="rounded-full bg-accent/20 px-2 py-0.5 text-xs font-semibold text-accent">Avulso</span>
-                  )}
-                  {selectedSession.packs.length > 0 && (
-                    <span className="rounded-full bg-blue-500/20 px-2 py-0.5 text-xs font-semibold text-blue-400">Pack</span>
-                  )}
-                </div>
               </div>
             </div>
 
@@ -250,24 +197,26 @@ export function ServicosView({ sessions, schoolId }: Props) {
 
               <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
                 <p className="font-body text-xs text-text-secondary">Duração</p>
-                <p className="font-body text-sm text-foreground">{selectedSession.duracao} minutos</p>
+                <p className="font-body text-sm text-foreground">
+                  {selectedSession.categoria === "aluguer"
+                    ? selectedSession.duracao >= 1440
+                      ? `${selectedSession.duracao / 1440} dia(s)`
+                      : `${selectedSession.duracao / 60} hora(s)`
+                    : `${selectedSession.duracao} minutos`}
+                </p>
               </div>
 
-              {selectedSession.avulsoDisponivel && (
-                <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
-                  <p className="font-body text-xs text-text-secondary">Preço avulso</p>
-                  <p className="font-body text-sm text-foreground">{formatPrice(selectedSession.avulsoPreco)}</p>
-                </div>
-              )}
+              <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
+                <p className="font-body text-xs text-text-secondary">
+                  {selectedSession.categoria === "pack" ? "Preço do pack" : "Preço"}
+                </p>
+                <p className="font-body text-sm text-foreground">{formatPrice(selectedSession.avulsoPreco)}</p>
+              </div>
 
-              {selectedSession.packs.length > 0 && (
+              {selectedSession.categoria === "pack" && selectedSession.totalLessons && (
                 <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
-                  <p className="font-body text-xs text-text-secondary mb-2">Packs disponíveis</p>
-                  {selectedSession.packs.map((p) => (
-                    <p key={p.id} className="font-body text-sm text-foreground">
-                      {p.nome}: {p.numeroAulas} aulas · {formatPrice(p.preco)}
-                    </p>
-                  ))}
+                  <p className="font-body text-xs text-text-secondary">Número de aulas</p>
+                  <p className="font-body text-sm text-foreground">{selectedSession.totalLessons} aulas</p>
                 </div>
               )}
 
@@ -312,9 +261,9 @@ export function ServicosView({ sessions, schoolId }: Props) {
 
       {/* Add / Edit Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-10 max-h-[90vh] overflow-y-auto">
-            <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted" />
+        <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center bg-black/50 md:px-5">
+          <div className="w-full max-w-md rounded-t-2xl md:rounded-2xl bg-surface p-6 pb-10 md:pb-6 max-h-[90vh] overflow-y-auto">
+            <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted md:hidden" />
 
             <h3 className="font-heading text-2xl font-bold text-foreground mb-6">
               {editingServico ? "Editar serviço" : "Adicionar serviço"}
@@ -361,7 +310,7 @@ export function ServicosView({ sessions, schoolId }: Props) {
               {/* Categoria */}
               <div>
                 <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
-                  Categoria
+                  Categoria <span className="text-error">*</span>
                 </label>
                 <div className="relative">
                   <select
@@ -379,8 +328,99 @@ export function ServicosView({ sessions, schoolId }: Props) {
                 </div>
               </div>
 
-              {/* Duração */}
-              <div>
+              {/* Preço + Nº aulas (lado a lado para packs) / Preço + Duração (lado a lado para aluguer) */}
+              {categoria === "pack" ? (
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+                      Preço do pack <span className="text-error">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={preco}
+                      onChange={(e) => { setPreco(e.target.value); setFormErrors((prev) => ({ ...prev, preco: "" })); }}
+                      placeholder="150"
+                      className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+                    />
+                    {formErrors.preco && <p className="mt-1 font-body text-sm text-error">{formErrors.preco}</p>}
+                  </div>
+                  <div className="flex-1">
+                    <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+                      Nº aulas <span className="text-error">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={totalLessons}
+                      onChange={(e) => { setTotalLessons(e.target.value); setFormErrors((prev) => ({ ...prev, totalLessons: "" })); }}
+                      placeholder="5"
+                      className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+                    />
+                    {formErrors.totalLessons && <p className="mt-1 font-body text-sm text-error">{formErrors.totalLessons}</p>}
+                  </div>
+                </div>
+              ) : categoria === "aluguer" ? (
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+                      Preço <span className="text-error">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={preco}
+                      onChange={(e) => { setPreco(e.target.value); setFormErrors((prev) => ({ ...prev, preco: "" })); }}
+                      placeholder="35"
+                      className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+                    />
+                    {formErrors.preco && <p className="mt-1 font-body text-sm text-error">{formErrors.preco}</p>}
+                  </div>
+                  <div>
+                    <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+                      Duração <span className="text-error">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={duracaoAluguer}
+                      onChange={(e) => { setDuracaoAluguer(e.target.value); setFormErrors((prev) => ({ ...prev, duracaoAluguer: "" })); }}
+                      placeholder="2"
+                      className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+                    />
+                    {formErrors.duracaoAluguer && <p className="mt-1 font-body text-sm text-error">{formErrors.duracaoAluguer}</p>}
+                  </div>
+                  <div className="mt-6">
+                    <select
+                      value={unidadeAluguer}
+                      onChange={(e) => setUnidadeAluguer(e.target.value as "hora" | "dia")}
+                      className="w-full appearance-none rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground outline-none focus:outline-2 focus:outline-accent"
+                    >
+                      <option value="hora">hora(s)</option>
+                      <option value="dia">dia(s)</option>
+                    </select>
+                  </div>
+                </div>
+              ) : categoria ? (
+                <div>
+                  <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+                    Preço <span className="text-error">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={preco}
+                    onChange={(e) => { setPreco(e.target.value); setFormErrors((prev) => ({ ...prev, preco: "" })); }}
+                    placeholder="Ex: 35"
+                    className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+                  />
+                  {formErrors.preco && <p className="mt-1 font-body text-sm text-error">{formErrors.preco}</p>}
+                </div>
+              ) : null}
+
+              {/* Duração (minutos) - oculto para aluguer */}
+              <div className={categoria === "aluguer" ? "hidden" : ""}>
                 <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
                   Duração <span className="text-text-muted">(minutos)</span> <span className="text-error">*</span>
                 </label>
@@ -410,122 +450,6 @@ export function ServicosView({ sessions, schoolId }: Props) {
                 />
               </div>
 
-              {/* Avulso toggle */}
-              <div className="flex items-center justify-between rounded-xl bg-[#2A2A2A] px-4 py-3">
-                <span className="font-body text-sm font-semibold text-foreground">Avulso disponível</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAvulsoAtivo(!avulsoAtivo);
-                    if (avulsoAtivo) setAvulsoPreco("");
-                  }}
-                  className={`relative h-6 w-11 rounded-full transition-colors ${avulsoAtivo ? "bg-accent" : "bg-text-muted"}`}
-                >
-                  <span className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${avulsoAtivo ? "translate-x-5" : ""}`} />
-                </button>
-              </div>
-
-              {avulsoAtivo && (
-                <div>
-                  <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
-                    Preço avulso <span className="text-error">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={avulsoPreco}
-                    onChange={(e) => { setAvulsoPreco(e.target.value); setFormErrors((prev) => ({ ...prev, avulsoPreco: "" })); }}
-                    placeholder="Ex: 35"
-                    className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
-                  />
-                  {formErrors.avulsoPreco && <p className="mt-1 font-body text-sm text-error">{formErrors.avulsoPreco}</p>}
-                </div>
-              )}
-
-              {/* Pack section */}
-              <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
-                {formErrors.packs && <p className="mb-2 font-body text-sm text-error">{formErrors.packs}</p>}
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-body text-sm font-semibold text-foreground">Pack disponível</span>
-                  {packs.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setPacks([])}
-                      className="text-xs text-text-secondary hover:text-error transition-colors"
-                    >
-                      Remover packs
-                    </button>
-                  )}
-                </div>
-
-                {packs.length === 0 ? (
-                  <button
-                    type="button"
-                    onClick={addPackEntry}
-                    className="flex items-center gap-2 text-sm text-accent hover:text-accent/80 transition-colors"
-                  >
-                    <PlusCircleIcon className="h-4 w-4" />
-                    Adicionar pack
-                  </button>
-                ) : (
-                  <div className="space-y-3">
-                    {packs.map((p) => (
-                      <div key={p.tempId} className="rounded-lg bg-surface p-3 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-semibold text-text-secondary">Pack</span>
-                          <button
-                            type="button"
-                            onClick={() => removePackEntry(p.tempId)}
-                            className="text-text-secondary hover:text-error transition-colors"
-                          >
-                            <TrashIcon className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                        <input
-                          type="text"
-                          value={p.nome}
-                          onChange={(e) => updatePackEntry(p.tempId, "nome", e.target.value)}
-                          placeholder="Nome do pack (ex: Pack 5 aulas)"
-                          className="w-full rounded-lg bg-[#2A2A2A] px-3 py-2 text-sm text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
-                        />
-                        <div className="flex gap-2">
-                          <div className="flex-1">
-                            <label className="text-xs text-text-secondary block mb-0.5">Nº aulas</label>
-                            <input
-                              type="number"
-                              min="1"
-                              value={p.numeroAulas}
-                              onChange={(e) => updatePackEntry(p.tempId, "numeroAulas", e.target.value)}
-                              placeholder="5"
-                              className="w-full rounded-lg bg-[#2A2A2A] px-3 py-2 text-sm text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
-                            />
-                          </div>
-                          <div className="flex-1">
-                            <label className="text-xs text-text-secondary block mb-0.5">Preço total</label>
-                            <input
-                              type="number"
-                              min="0"
-                              value={p.preco}
-                              onChange={(e) => updatePackEntry(p.tempId, "preco", e.target.value)}
-                              placeholder="150"
-                              className="w-full rounded-lg bg-[#2A2A2A] px-3 py-2 text-sm text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={addPackEntry}
-                      className="flex items-center gap-2 text-sm text-accent hover:text-accent/80 transition-colors"
-                    >
-                      <PlusCircleIcon className="h-4 w-4" />
-                      Adicionar outro pack
-                    </button>
-                  </div>
-                )}
-              </div>
-
               {/* Actions */}
               <div className="flex gap-3 pt-2">
                 <button
@@ -541,36 +465,34 @@ export function ServicosView({ sessions, schoolId }: Props) {
                     const errors: Record<string, string> = {};
                     if (!nome.trim()) errors.nome = "O nome é obrigatório";
                     if (!modalidade) errors.modalidade = "Seleciona a modalidade";
+                    if (!categoria) errors.categoria = "Seleciona a categoria";
                     if (!duracao || Number(duracao) < 15) errors.duracao = "A duração mínima é 15 minutos";
-                    if (avulsoAtivo && (!avulsoPreco || Number(avulsoPreco) < 1)) errors.avulsoPreco = "Define o preço avulso";
-
-                    const invalidPacks = packs.filter((p) => !p.nome || !p.numeroAulas || !p.preco);
-                    if (!avulsoAtivo && packs.length === 0) errors.packs = "Adiciona pelo menos um pack ou ativa o avulso";
-                    if (invalidPacks.length > 0) errors.packs = "Preenche nome, aulas e preço de cada pack";
+                    if (categoria && (!preco || Number(preco) < 1)) errors.preco = "O preço é obrigatório";
+                    if (categoria === "pack" && (!totalLessons || Number(totalLessons) < 1)) errors.totalLessons = "Número de aulas é obrigatório para packs";
+                    if (categoria === "aluguer" && (!duracaoAluguer || Number(duracaoAluguer) < 1)) errors.duracaoAluguer = "Duração é obrigatória";
 
                     setFormErrors(errors);
                     if (Object.keys(errors).length > 0) return;
                     if (!schoolId) return;
 
-                    const packData = packs
-                      .filter((p) => p.nome && p.numeroAulas && p.preco)
-                      .map((p) => ({
-                        id: p.id,
-                        nome: p.nome,
-                        numeroAulas: Number(p.numeroAulas),
-                        preco: Math.round(Number(p.preco) * 100),
-                      }));
+                    let duracaoFinal = Number(duracao);
+                    if (categoria === "aluguer") {
+                      duracaoFinal = unidadeAluguer === "dia"
+                        ? Number(duracaoAluguer) * 1440
+                        : Number(duracaoAluguer) * 60;
+                    }
 
                     if (editingServico) {
                       const res = await updateServico(editingServico.id, {
                         nome,
                         modalidade,
-                        duracao: Number(duracao),
+                        duracao: duracaoFinal,
                         sobre,
-                        avulsoDisponivel: avulsoAtivo,
-                        avulsoPreco: Math.round(Number(avulsoPreco) * 100),
+                        avulsoDisponivel: true,
+                        avulsoPreco: Math.round(Number(preco) * 100),
                         categoria: (categoria || undefined) as "aula" | "pack" | "aluguer" | undefined,
-                        packs: packData,
+                        totalLessons: categoria === "pack" ? Number(totalLessons) : undefined,
+                        packs: [],
                       });
                       if (res.ok) {
                         setShowModal(false);
@@ -581,12 +503,13 @@ export function ServicosView({ sessions, schoolId }: Props) {
                       const res = await addServico(schoolId, {
                         nome,
                         modalidade,
-                        duracao: Number(duracao),
+                        duracao: duracaoFinal,
                         sobre,
-                        avulsoDisponivel: avulsoAtivo,
-                        avulsoPreco: Math.round(Number(avulsoPreco) * 100),
+                        avulsoDisponivel: true,
+                        avulsoPreco: Math.round(Number(preco) * 100),
                         categoria: (categoria || undefined) as "aula" | "pack" | "aluguer" | undefined,
-                        packs: packData,
+                        totalLessons: categoria === "pack" ? Number(totalLessons) : undefined,
+                        packs: [],
                       });
                       if (res.ok) {
                         setShowModal(false);

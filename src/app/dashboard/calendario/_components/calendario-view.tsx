@@ -255,7 +255,7 @@ export function CalendarioView({ schoolId }: Props) {
                           }
                           setExpandedSession(null);
                         }}
-                        className={`flex flex-col items-center gap-px p-1 border-b border-r border-white/5 transition-colors hover:bg-[#2A2A2A]/80 min-h-[48px] xl:min-h-[56px] ${
+                        className={`flex flex-col items-center gap-px p-1 border-b border-r border-white/5 transition-colors hover:bg-accent/5 min-h-[48px] xl:min-h-[56px] ${
                           isSelected
                             ? "bg-accent/10 ring-1 ring-inset ring-accent"
                             : ""
@@ -274,12 +274,14 @@ export function CalendarioView({ schoolId }: Props) {
                         </span>
                         {daySessionsForCell.length > 0 && (
                           <div className="flex flex-col gap-px w-full mt-1.5">
+                            {totalCap > 0 && (
                             <div className="h-0.5 w-full rounded-full bg-[#2A2A2A] overflow-hidden">
                               <div
                                 className="h-full rounded-full bg-accent transition-all"
                                 style={{ width: `${occPct}%` }}
                               />
                             </div>
+                            )}
                             {daySessionsForCell.slice(0, 2).map((sess, si) => (
                               <span
                                 key={si}
@@ -324,7 +326,7 @@ export function CalendarioView({ schoolId }: Props) {
                             <button
                               type="button"
                               onClick={() => setExpandedSession(isExpanded ? null : si)}
-                              className="w-full flex items-center justify-between px-3 py-2.5 text-left transition-colors hover:bg-[#2A2A2A]/80"
+                              className="w-full flex items-center justify-between px-3 py-2.5 text-left transition-colors hover:bg-accent/10"
                             >
                               <div className="flex items-center gap-2.5 min-w-0">
                                 <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent/20">
@@ -413,13 +415,13 @@ export function CalendarioView({ schoolId }: Props) {
                                           setSelectedServicoId(session.class_type_id ?? "");
                                           const svc = servicos.find((sv) => sv.id === session.class_type_id);
                                           setDuracao(svc?.default_duration_minutes ? String(svc.default_duration_minutes) : "90");
-                                          setCapacidade(String(session.capacidade));
+                                          setCapacidade(session.capacidade ? String(session.capacidade) : "");
                                           setInstrutorSelecionadoId(session.instructor_id ?? "");
                                           setShowModal(true);
                                           fetchServicos();
                                           fetchInstrutores();
                                         }}
-                                        className="rounded-lg bg-[#2A2A2A] px-3 py-1.5 font-body text-[10px] font-semibold text-text-secondary transition-colors hover:bg-[#333]"
+                                        className="rounded-lg bg-[#2A2A2A] px-3 py-1.5 font-body text-[10px] font-semibold text-text-secondary transition-colors hover:bg-accent/10"
                                       >
                                         Editar
                                       </button>
@@ -484,7 +486,7 @@ export function CalendarioView({ schoolId }: Props) {
                         <button
                           type="button"
                           onClick={() => setExpandedSession(isExpanded ? null : si)}
-                          className="w-full flex items-center justify-between px-4 py-3 text-left transition-colors hover:bg-[#2A2A2A]/80"
+                          className="w-full flex items-center justify-between px-4 py-3 text-left transition-colors hover:bg-accent/10"
                         >
                           <div className="flex items-center gap-3 min-w-0">
                             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent/20">
@@ -587,13 +589,13 @@ export function CalendarioView({ schoolId }: Props) {
                                         setSelectedServicoId(session.class_type_id ?? "");
                                         const svc = servicos.find((sv) => sv.id === session.class_type_id);
                                         setDuracao(svc?.default_duration_minutes ? String(svc.default_duration_minutes) : "90");
-                                        setCapacidade(String(session.capacidade));
+                                        setCapacidade(session.capacidade ? String(session.capacidade) : "");
                                         setInstrutorSelecionadoId(session.instructor_id ?? "");
                                         setShowModal(true);
                                         fetchServicos();
                                         fetchInstrutores();
                                       }}
-                                      className="flex-1 rounded-lg bg-[#2A2A2A] py-2 font-body text-xs font-semibold text-text-secondary transition-colors hover:bg-[#333]"
+                                      className="flex-1 rounded-lg bg-[#2A2A2A] py-2 font-body text-xs font-semibold text-text-secondary transition-colors hover:bg-accent/10"
                                     >
                                       Editar
                                     </button>
@@ -984,9 +986,9 @@ export function CalendarioView({ schoolId }: Props) {
 
       {/* Modal — Create / Edit session */}
       {showModal && (
-        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-24">
-            <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted" />
+        <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center bg-black/50 md:px-5">
+          <div className="w-full max-w-md rounded-t-2xl md:rounded-2xl bg-surface p-6 pb-24 md:pb-6">
+            <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted md:hidden" />
 
             <h3 className="font-heading text-2xl font-bold text-foreground mb-6">
               {editingSession !== null ? "Editar aula" : "Nova aula"}
@@ -1093,19 +1095,18 @@ export function CalendarioView({ schoolId }: Props) {
               {/* Capacidade máxima */}
               <div>
                 <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
-                  Capacidade máxima <span className="text-error">*</span>
+                  Capacidade máxima
                 </label>
                 <input
                   type="number"
-                  min="1"
+                  min="0"
                   value={capacidade}
                   onChange={(e) => {
                     setCapacidade(e.target.value);
                     setFormErrors((prev) => ({ ...prev, capacidade: "" }));
                   }}
-                  placeholder="Ex: 8"
+                  placeholder="Ex: 8 (opcional)"
                   className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
-                  required
                 />
                 {formErrors.capacidade && (
                   <p className="mt-1 font-body text-sm text-error">
@@ -1167,9 +1168,6 @@ export function CalendarioView({ schoolId }: Props) {
                       errors.servico = "Seleciona um serviço";
                     if (!dataAula) errors.data = "Seleciona a data";
                     if (!horario) errors.horario = "Define o horário";
-                    if (!capacidade || Number(capacidade) < 1)
-                      errors.capacidade =
-                        "A capacidade deve ser pelo menos 1";
                     if (editingSession === null && dataAula) {
                       const hoje = new Date();
                       const dataLimite = new Date(

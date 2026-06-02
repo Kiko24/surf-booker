@@ -5,6 +5,7 @@ import type { PublicSchoolData } from "../actions";
 import { toggleFavorite } from "../actions";
 import { Lightbox } from "./lightbox";
 import { BookingModal } from "./booking-modal";
+import { PublicCalendar } from "./public-calendar";
 import { PublicNavbar } from "@/app/_components/public-navbar";
 import { createClient } from "@/lib/supabase/client";
 
@@ -30,12 +31,27 @@ export function EscolaView({ data }: Props) {
   const INITIAL_LIMIT = 5;
   const [showAllModal, setShowAllModal] = useState(false);
   const [showServicePicker, setShowServicePicker] = useState(false);
-  const [pickedServices, setPickedServices] = useState<Set<string>>(new Set());
+  const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
+  const [selectedSession, setSelectedSession] = useState<PublicSchoolData["upcomingSessions"][number] | null>(null);
+  const [showBookingForm, setShowBookingForm] = useState(false);
   const [displayCount, setDisplayCount] = useState(10);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const [favorited, setFavorited] = useState(false);
   const [favoriteLoading, setFavoriteLoading] = useState(false);
   const [favoriteError, setFavoriteError] = useState<string | null>(null);
+  const [userInfo, setUserInfo] = useState<{ name: string; email: string; phone: string } | null>(null);
+
+  const [packName, setPackName] = useState("");
+  const [packEmail, setPackEmail] = useState("");
+  const [packPhone, setPackPhone] = useState("");
+  const [packFormError, setPackFormError] = useState<string | null>(null);
+  const [packQuantity, setPackQuantity] = useState(1);
+
+  useEffect(() => {
+    if (!showServicePicker) return;
+    setPackQuantity(1);
+    setPackFormError(null);
+  }, [showServicePicker]);
 
   useEffect(() => {
     const check = async () => {
@@ -49,9 +65,30 @@ export function EscolaView({ data }: Props) {
         .eq("school_id", school.id)
         .maybeSingle();
       if (data) setFavorited(true);
+
+      // Fetch user profile
+      const { data: student } = await supabase
+        .from("students")
+        .select("full_name, email, phone")
+        .eq("auth_user_id", user.id)
+        .maybeSingle();
+
+      const userData = {
+        name: student?.full_name ?? user.user_metadata?.full_name ?? "",
+        email: student?.email ?? user.email ?? "",
+        phone: student?.phone ?? "",
+      };
+      setUserInfo(userData);
+      setPackName(userData.name);
+      setPackEmail(userData.email);
+      setPackPhone(userData.phone);
     };
     check();
   }, [school.id]);
+
+  const sanitizeName = (v: string) => v.replace(/[^a-zA-Zà-ÿÀ-ß '´`-]/g, "").slice(0, 80);
+  const sanitizeEmail = (v: string) => v.trim().toLowerCase().slice(0, 120);
+  const sanitizePhone = (v: string) => v.replace(/[^0-9+]/g, "").slice(0, 20);
 
   const handleToggleFavorite = useCallback(async () => {
     setFavoriteError(null);
@@ -204,7 +241,7 @@ export function EscolaView({ data }: Props) {
 
                     <div className="space-y-3">
                       {filteredServices.slice(0, INITIAL_LIMIT).map((svc) => (
-                        <ServiceCard key={svc.id} svc={svc} onClick={() => setSelectedService(svc)} onReservarClick={() => setShowServicePicker(true)} />
+                        <ServiceCard key={svc.id} svc={svc} onClick={() => setSelectedService(svc)} onReservarClick={() => { setSelectedServiceId(svc.id); setShowServicePicker(true); }} />
                       ))}
                       {filteredServices.length > INITIAL_LIMIT && (
                         <button
@@ -374,7 +411,7 @@ export function EscolaView({ data }: Props) {
                     key={svc.id}
                     svc={svc}
                     onClick={() => { setShowAllModal(false); setSelectedService(svc); }}
-                    onReservarClick={() => { setShowAllModal(false); setShowServicePicker(true); }}
+                    onReservarClick={() => { setShowAllModal(false); setSelectedServiceId(svc.id); setShowServicePicker(true); }}
                   />
                 ))}
                 {displayCount < filteredServices.length && (
@@ -420,7 +457,7 @@ export function EscolaView({ data }: Props) {
               </div>
               <button
                 type="button"
-                onClick={() => { setSelectedService(null); setShowServicePicker(true); }}
+                onClick={() => { setSelectedServiceId(selectedService.id); setSelectedService(null); setShowServicePicker(true); }}
                 className="shrink-0 rounded-full border-2 border-accent px-5 py-2 text-sm font-semibold text-black transition-transform hover:scale-105 hover:bg-accent hover:text-white"
               >
                 Reservar
@@ -506,55 +543,218 @@ export function EscolaView({ data }: Props) {
               )}
             </div>
 
-            {/* Service list */}
-            <div className="overflow-y-auto -mx-6 px-6">
-              <div className="space-y-3 pb-4">
-                {filteredServices.map((svc) => {
-                  const isPicked = pickedServices.has(svc.id);
-                  return (
-                    <div
-                      key={svc.id}
-                      className="flex items-center justify-between gap-4 rounded-2xl bg-white p-5 shadow-sm"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-heading font-semibold text-gray-900">
-                          {svc.name}
-                        </h4>
-                        <p className="text-sm text-gray-500">
-                          {svc.duration_minutes} min &middot; {(svc.price_cents / 100).toFixed(2).replace(".", ",")} €
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const next = new Set(pickedServices);
-                          if (isPicked) {
-                            next.delete(svc.id);
-                          } else {
-                            next.add(svc.id);
-                          }
-                          setPickedServices(next);
-                        }}
-                        className={`shrink-0 rounded-full border-2 px-5 py-1.5 text-sm font-semibold transition-all hover:scale-105 ${
-                          isPicked
-                            ? "border-accent bg-accent text-white"
-                            : "border-accent text-black hover:bg-accent hover:text-white"
+            {/* Services + Calendar */}
+            <div className="flex flex-row gap-6">
+              {/* Services list */}
+              <div className="flex-1 overflow-y-auto">
+                <div className="space-y-2">
+                  {filteredServices.map((svc) => {
+                    const isSelected = selectedServiceId === svc.id;
+                    const ctaLabel =
+                      svc.category === "pack" ? "Comprar"
+                      : svc.category === "aluguer" ? "Alugar"
+                      : "Reservar";
+                    const showCalendar = svc.category === "aula";
+
+                    return (
+                      <div
+                        key={svc.id}
+                        className={`flex items-center justify-between gap-4 rounded-2xl bg-white p-4 shadow-sm border transition-colors ${
+                          isSelected ? "border-accent" : "border-gray-100"
                         }`}
                       >
-                        {isPicked ? "Adicionado" : "Adicionar"}
-                      </button>
-                    </div>
-                  );
-                })}
-                {filteredServices.length === 0 && (
-                  <p className="py-8 text-center text-sm text-gray-400">
-                    Nenhum serviço disponível para esta categoria.
-                  </p>
-                )}
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-heading text-gray-900 text-sm">
+                            {svc.name}
+                          </h4>
+                          <p className="text-xs text-gray-500">
+                            {svc.duration_minutes} min &middot; {(svc.price_cents / 100).toFixed(2).replace(".", ",")} €
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isSelected) {
+                              setSelectedServiceId(null);
+                            } else {
+                              setSelectedServiceId(svc.id);
+                              if (!showCalendar) {
+                                setSelectedSession(null);
+                              }
+                            }
+                          }}
+                          className={`shrink-0 rounded-full border-2 px-4 py-1.5 text-sm transition-all hover:scale-105 ${
+                            isSelected
+                              ? "border-accent bg-accent text-white"
+                              : "border-accent text-black hover:bg-accent hover:text-white"
+                          }`}
+                        >
+                          {ctaLabel}
+                        </button>
+                      </div>
+                    );
+                  })}
+                  {filteredServices.length === 0 && (
+                    <p className="py-8 text-center text-sm text-gray-400">
+                      Nenhum serviço disponível para esta categoria.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Right column — calendar for aulas, form for packs/aluguer */}
+              <div className="w-[320px] shrink-0">
+                {(() => {
+                  const rightSvc = services.find(s => s.id === selectedServiceId);
+                  if (!rightSvc) return <div />;
+                  if (rightSvc.category === "aula") {
+                    return (
+                      <PublicCalendar
+                        schoolId={school.id}
+                        classTypeFilter={rightSvc.name}
+                        onSelectSession={(session) => setSelectedSession(session)}
+                      />
+                    );
+                  }
+                  if (rightSvc.category === "pack" || rightSvc.category === "aluguer") {
+                    return (
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-sm text-gray-700 mb-1">Nome</label>
+                          <input
+                            type="text"
+                            value={packName}
+                            onChange={(e) => { setPackFormError(null); setPackName(sanitizeName(e.target.value)); }}
+                            className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-accent"
+                            placeholder="O teu nome"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm text-gray-700 mb-1">Email</label>
+                          <input
+                            type="email"
+                            value={packEmail}
+                            onChange={(e) => { setPackFormError(null); setPackEmail(sanitizeEmail(e.target.value)); }}
+                            className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-accent"
+                            placeholder="O teu email"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm text-gray-700 mb-1">Telemóvel</label>
+                          <input
+                            type="tel"
+                            value={packPhone}
+                            onChange={(e) => { setPackFormError(null); setPackPhone(sanitizePhone(e.target.value)); }}
+                            className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-accent"
+                            placeholder="O teu telemóvel"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm text-gray-700 mb-1">Quantidade</label>
+                          <div className="flex items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={() => setPackQuantity(Math.max(1, packQuantity - 1))}
+                              className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 text-gray-600 transition-colors hover:border-accent hover:text-accent"
+                            >
+                              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M20 12H4" />
+                              </svg>
+                            </button>
+                            <span className="w-8 text-center text-sm font-semibold text-gray-900">{packQuantity}</span>
+                            <button
+                              type="button"
+                              onClick={() => setPackQuantity(Math.min(99, packQuantity + 1))}
+                              className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 text-gray-600 transition-colors hover:border-accent hover:text-accent"
+                            >
+                              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                        {packFormError && (
+                          <p className="text-xs text-red-500">{packFormError}</p>
+                        )}
+                      </div>
+                    );
+                  }
+                  return <div />;
+                })()}
               </div>
             </div>
+
+            {/* Bottom bar: selected service info + Continuar */}
+            {(() => {
+              const selSvc = services.find(s => s.id === selectedServiceId);
+              if (!selectedServiceId || !selSvc) return null;
+              const isAula = selSvc.category === "aula";
+              const isPack = selSvc.category === "pack" || selSvc.category === "aluguer";
+              const qty = isPack ? packQuantity : 1;
+              const priceCents = selectedSession ? selectedSession.price_cents : selSvc.price_cents;
+              const displayPrice = isPack ? priceCents * qty : priceCents;
+              const itemName = selectedSession ? selectedSession.class_type_name : selSvc.name;
+              const sessionTime = selectedSession
+                ? (() => {
+                    const d = new Date(selectedSession.starts_at);
+                    const day = d.getDate().toString().padStart(2, "0");
+                    const month = (d.getMonth() + 1).toString().padStart(2, "0");
+                    const year = d.getFullYear();
+                    const time = d.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
+                    return `${day}/${month}/${year}, ${time}`;
+                  })()
+                : null;
+              const canContinue = isAula ? !!selectedSession : (packName.trim().length >= 2 && packEmail.trim().includes("@") && packPhone.trim().length >= 6);
+
+              const handleContinue = () => {
+                if (isAula && selectedSession) {
+                  setShowBookingForm(true);
+                } else if (isPack) {
+                  const name = packName.trim();
+                  const email = packEmail.trim();
+                  const phone = packPhone.trim();
+                  if (name.length < 2) { setPackFormError("Nome deve ter pelo menos 2 caracteres."); return; }
+                  if (!email.includes("@") || !email.includes(".")) { setPackFormError("Email inválido."); return; }
+                  if (phone.length < 6) { setPackFormError("Telemóvel deve ter pelo menos 6 dígitos."); return; }
+                  setPackFormError(null);
+                  setShowBookingForm(true);
+                }
+              };
+
+              return (
+                <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
+                  <p className="text-sm text-gray-900">
+                    <span>{qty > 1 ? `${qty}x ` : ""}{itemName}</span>
+                    <span className="mx-1.5">=</span>
+                    <span className="font-semibold">{(displayPrice / 100).toFixed(2).replace(".", ",")} €</span>
+                    {sessionTime && <span className="mx-1.5">·</span>}
+                    {sessionTime && <span>{sessionTime}</span>}
+                  </p>
+                  <button
+                    type="button"
+                    disabled={!canContinue}
+                    onClick={handleContinue}
+                    className={`rounded-full border-2 px-6 py-2 text-sm transition-all ${
+                      canContinue
+                        ? "border-accent text-black hover:scale-105 hover:bg-accent hover:text-white"
+                        : "border-gray-200 text-gray-300"
+                    }`}
+                  >
+                    Continuar
+                  </button>
+                </div>
+              );
+            })()}
           </div>
         </div>
+      )}
+
+      {showBookingForm && selectedSession && (
+        <BookingModal
+          sessionId={selectedSession.id}
+          schoolId={school.id}
+          onClose={() => { setShowBookingForm(false); setShowServicePicker(false); }}
+        />
       )}
 
       {bookingSession && (
@@ -624,13 +824,13 @@ function ServiceCard({ svc, onClick, onReservarClick }: { svc: PublicSchoolData[
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick(); }}
       role="button"
       tabIndex={0}
-      className="w-full text-left rounded-2xl bg-white p-5 transition-all cursor-pointer
+      className="w-full text-left rounded-2xl border border-gray-200 bg-white p-5 transition-all cursor-pointer
         hover:[&:not(:has(.reservar-btn:hover))]:scale-[1.01]
         hover:[&:not(:has(.reservar-btn:hover))]:shadow-md"
     >
       <div className="flex items-center justify-between gap-4">
         <div className="flex-1 min-w-0">
-          <h3 className="font-heading font-semibold text-gray-900">
+          <h3 className="font-heading text-gray-900">
             {svc.name}
           </h3>
           {svc.description && (
@@ -645,9 +845,9 @@ function ServiceCard({ svc, onClick, onReservarClick }: { svc: PublicSchoolData[
           tabIndex={0}
           onClick={(e) => { e.stopPropagation(); onReservarClick(); }}
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onReservarClick(); } }}
-          className="reservar-btn shrink-0 rounded-full border-2 border-accent px-5 py-1.5 text-sm text-black transition-transform hover:scale-105 hover:bg-accent hover:text-white"
+          className="reservar-btn shrink-0 flex h-8 w-8 items-center justify-center rounded-full border-2 border-accent text-lg text-black transition-transform hover:scale-110 hover:bg-accent hover:text-white"
         >
-          Reservar
+          +
         </span>
       </div>
     </div>

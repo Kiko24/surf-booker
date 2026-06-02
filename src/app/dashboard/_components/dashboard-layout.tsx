@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { type ReactNode, useState, useEffect } from "react";
+import { type ReactNode, useState, useEffect, useCallback } from "react";
 import { NAV_ITEMS } from "./constants";
 import { getSchoolInfo } from "../actions";
 
@@ -22,6 +22,22 @@ export function DashboardLayout({ children }: Props) {
         setSchoolName(info.name);
         setSchoolLogo(info.logo_url);
       }
+    });
+  }, []);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("theme");
+    const isDark = saved ? saved === "dark" : true;
+    setDark(isDark);
+    document.documentElement.classList.toggle("light", !isDark);
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    setDark((prev) => {
+      const next = !prev;
+      document.documentElement.classList.toggle("light", !next);
+      localStorage.setItem("theme", next ? "dark" : "light");
+      return next;
     });
   }, []);
 
@@ -84,7 +100,7 @@ export function DashboardLayout({ children }: Props) {
           </button>
           <button
             type="button"
-            onClick={() => setDark(!dark)}
+            onClick={toggleTheme}
             className="flex h-9 w-9 items-center justify-center rounded-lg text-text-secondary transition-colors hover:text-foreground"
             aria-label={dark ? "Modo claro" : "Modo escuro"}
           >

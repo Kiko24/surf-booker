@@ -64,7 +64,9 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [addName, setAddName] = useState("");
   const [addPhone, setAddPhone] = useState("");
+  const [addEmail, setAddEmail] = useState("");
   const [addPackId, setAddPackId] = useState("");
+  const [addRemainingLessons, setAddRemainingLessons] = useState("");
   const [addSaving, setAddSaving] = useState(false);
   const [addError, setAddError] = useState("");
   const [addPacks, setAddPacks] = useState<AvailablePack[]>([]);
@@ -124,7 +126,9 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
                   onClick={async () => {
                     setAddName("");
                     setAddPhone("");
+                    setAddEmail("");
                     setAddPackId("");
+                    setAddRemainingLessons("");
                     setAddError("");
                     const packs = await getAvailablePacks(schoolId);
                     setAddPacks(packs);
@@ -142,7 +146,9 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
                   onClick={async () => {
                     setAddName("");
                     setAddPhone("");
+                    setAddEmail("");
                     setAddPackId("");
+                    setAddRemainingLessons("");
                     setAddError("");
                     const packs = await getAvailablePacks(schoolId);
                     setAddPacks(packs);
@@ -502,9 +508,9 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
 
       {/* Add student modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-10">
-            <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted" />
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 md:px-5">
+          <div className="w-full max-w-md rounded-t-2xl md:rounded-2xl bg-surface p-6 pb-10 md:pb-6">
+            <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted md:hidden" />
             <h3 className="font-heading text-2xl font-bold text-foreground mb-6">Adicionar aluno</h3>
 
             <div className="space-y-4">
@@ -537,22 +543,52 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
 
               <div>
                 <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
-                  Pack <span className="text-text-muted">(opcional)</span>
+                  Email <span className="text-text-muted">(opcional)</span>
                 </label>
-                <div className="relative">
-                  <select
-                    value={addPackId}
-                    onChange={(e) => setAddPackId(e.target.value)}
-                    className="w-full appearance-none rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground outline-none focus:outline-2 focus:outline-accent"
-                  >
-                    <option value="">Sem pack</option>
-                    {addPacks.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name} — {p.total_lessons} aulas ({(p.price_cents / 100).toFixed(2).replace(".", ",")}€)</option>
-                    ))}
-                  </select>
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted">
-                    <path d="m6 9 6 6 6-6" />
-                  </svg>
+                <input
+                  type="email"
+                  value={addEmail}
+                  onChange={(e) => setAddEmail(e.target.value)}
+                  placeholder="Ex: aluno@email.com"
+                  className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+                />
+              </div>
+
+              <div>
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+                      Pack <span className="text-text-muted">(opcional)</span>
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={addPackId}
+                        onChange={(e) => setAddPackId(e.target.value)}
+                        className="w-full appearance-none rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground outline-none focus:outline-2 focus:outline-accent"
+                      >
+                        <option value="">Sem pack</option>
+                        {addPacks.map((p) => (
+                          <option key={p.id} value={p.id}>{p.name} — {p.total_lessons} aulas</option>
+                        ))}
+                      </select>
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted">
+                        <path d="m6 9 6 6 6-6" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+                      Aulas restantes <span className="text-text-muted">(opcional)</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={addRemainingLessons}
+                      onChange={(e) => setAddRemainingLessons(e.target.value)}
+                      placeholder="Ex: 10"
+                      className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -575,7 +611,7 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
                     if (!addName.trim()) { setAddError("O nome é obrigatório"); return; }
                     setAddSaving(true);
                     setAddError("");
-                    const res = await createStudent(addName.trim(), addPhone.trim() || undefined, addPackId || undefined, schoolId);
+                    const res = await createStudent(addName.trim(), addPhone.trim() || undefined, addEmail.trim() || undefined, addPackId || undefined, addRemainingLessons || undefined, schoolId);
                     if (!res.ok) { setAddError(res.error ?? "Erro ao adicionar aluno"); setAddSaving(false); return; }
                     setShowAddModal(false);
                     setAddSaving(false);

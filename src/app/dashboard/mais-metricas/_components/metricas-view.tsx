@@ -123,10 +123,10 @@ export function MetricasView() {
             <p className="font-body text-sm text-text-muted">Sem dados disponíveis</p>
           </div>
         ) : (
-          <div className="space-y-5 pb-4">
+          <div className="space-y-5 md:space-y-0 md:grid md:grid-cols-2 md:gap-5 pb-4">
 
             {/* ─── BLOCO 1: RECEITA ─────────────────── */}
-            <section className="rounded-xl border border-accent/10 bg-surface p-5 shadow-md">
+            <section className="rounded-xl border border-accent/10 bg-surface p-5 md:p-6">
               <h2 className="font-heading text-lg font-bold text-foreground mb-1">Receita</h2>
               <div className="mb-3 flex items-baseline gap-3">
                 <span className="font-heading text-3xl text-foreground">{formatCents(d.receita.total)}</span>
@@ -155,11 +155,11 @@ export function MetricasView() {
             </section>
 
             {/* ─── BLOCO 2: OCUPAÇÃO ───────────────── */}
-            <section className="rounded-xl border border-accent/10 bg-surface p-5 shadow-md">
+            <section className="rounded-xl border border-accent/10 bg-surface p-5 md:p-6">
               <h2 className="font-heading text-lg font-bold text-foreground mb-1">Ocupação</h2>
               <div className="mb-3">
                 <span className="font-heading text-3xl text-foreground">{d.ocupacao.taxa_media}%</span>
-                <span className="ml-2 font-body text-sm text-text-secondary">taxa de onda média</span>
+                <span className="ml-2 font-body text-sm text-text-secondary">taxa de ocupação média</span>
               </div>
               <div className="grid grid-cols-2 gap-3 mb-3">
                 <div className="rounded-lg bg-[#2A2A2A] p-3 text-center">
@@ -186,7 +186,7 @@ export function MetricasView() {
             </section>
 
             {/* ─── BLOCO 3: ALUNOS ────────────────── */}
-            <section className="rounded-xl border border-accent/10 bg-surface p-5 shadow-md">
+            <section className="rounded-xl border border-accent/10 bg-surface p-5 md:p-6">
               <h2 className="font-heading text-lg font-bold text-foreground mb-3">Alunos</h2>
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-lg bg-[#2A2A2A] p-3 text-center">
@@ -209,7 +209,7 @@ export function MetricasView() {
             </section>
 
             {/* ─── BLOCO 4: NO-SHOWS ──────────────── */}
-            <section className="rounded-xl border border-accent/10 bg-surface p-5 shadow-md">
+            <section className="rounded-xl border border-accent/10 bg-surface p-5 md:p-6">
               <h2 className="font-heading text-lg font-bold text-foreground mb-1">No-Shows</h2>
               <div className="mb-3 flex items-baseline gap-3">
                 <span className="font-heading text-3xl text-foreground">{d.noshow.taxa}%</span>
@@ -232,7 +232,8 @@ export function MetricasView() {
 
             {/* ─── BLOCO 5: SAZONALIDADE ──────────── */}
             {(activeFilter === "epoca_alta" || activeFilter === "personalizado") && (
-              <section className="rounded-xl border border-accent/10 bg-surface p-5 shadow-md">
+              <div className="md:col-span-2">
+                <section className="rounded-xl border border-accent/10 bg-surface p-5 md:p-6">
                 <h2 className="font-heading text-lg font-bold text-foreground mb-3">Sazonalidade</h2>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between rounded-lg bg-[#2A2A2A] px-4 py-3">
@@ -269,10 +270,12 @@ export function MetricasView() {
                   )}
                 </div>
               </section>
+            </div>
             )}
 
             {/* Instrutores */}
-            <section className="rounded-xl bg-surface p-5">
+            <div className="md:col-span-2">
+            <section className="rounded-xl border border-accent/10 bg-surface p-5 md:p-6">
               <h2 className="font-heading text-lg font-bold text-foreground mb-3">Instrutores</h2>
               {d.instrutores.length === 0 ? (
                 <p className="font-body text-sm text-text-muted">Os instrutores não têm aulas registadas</p>
@@ -289,15 +292,16 @@ export function MetricasView() {
                 </div>
               )}
             </section>
+            </div>
 
           </div>
         )}
       </main>
 
           {showCustom && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-10">
-            <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted" />
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50">
+          <div className="w-full max-w-md rounded-t-2xl md:rounded-2xl bg-surface p-6 pb-10 md:pb-6">
+            <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted md:hidden" />
             <h3 className="font-heading text-2xl font-bold text-foreground mb-6">Filtro personalizado</h3>
             <div className="space-y-4">
               <div>

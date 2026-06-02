@@ -40,7 +40,7 @@ export default async function RootLayout({
   const isDashboard = pathname.startsWith("/dashboard");
 
   return (
-    <html lang="pt-PT" className={`${oswald.variable} ${lato.variable}${isDashboard ? " dashboard-scale" : ""}`}>
+    <html lang="pt-PT" suppressHydrationWarning className={`${oswald.variable} ${lato.variable}${isDashboard ? " dashboard-scale" : ""}`}>
       <body className="bg-background text-foreground antialiased">
         {children}
       </body>

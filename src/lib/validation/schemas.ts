@@ -171,7 +171,7 @@ export const sessionSchema = z
     school_id: uuidSchema,
     starts_at: z.coerce.date(),
     duration_minutes: z.number().int().min(15).max(240).default(90),
-    capacity: z.number().int().min(1).max(50).nullable().optional(),
+    capacity: z.number().int().min(0).max(50).nullable().optional(),
     price_cents: priceCentsSchema,
     status: sessionStatusSchema.default('scheduled'),
     cancelled_at: z.coerce.date().nullable().optional(),
@@ -195,7 +195,7 @@ export const sessionUpdateSchema = z
   .object({
     starts_at: z.coerce.date(),
     duration_minutes: z.number().int().min(15).max(480),
-    capacity: z.number().int().min(1).max(100).nullable(),
+    capacity: z.number().int().min(0).max(100).nullable(),
     price_cents: priceCentsSchema,
     status: sessionStatusSchema,
     cancelled_at: z.coerce.date().nullable(),

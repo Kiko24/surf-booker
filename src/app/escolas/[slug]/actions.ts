@@ -130,7 +130,7 @@ export async function getPublicSchoolData(
     }));
 
     services = realServices.length > 0 ? realServices : [
-      { id: "ph-svc-1", name: "Aula de Surf Iniciantes", description: null, duration_minutes: 90, price_cents: 3500, category: "aula", modality: "Surf" },
+      { id: "ph-svc-1", name: "Aula de Surf Nível 1", description: null, duration_minutes: 90, price_cents: 3500, category: "aula", modality: "Surf" },
       { id: "ph-svc-2", name: "Aula de Surf Intermédio", description: null, duration_minutes: 90, price_cents: 4000, category: "aula", modality: "Surf" },
       { id: "ph-svc-3", name: "Pack 5 Aulas", description: null, duration_minutes: 90, price_cents: 15000, category: "pack", modality: "Surf" },
       { id: "ph-svc-4", name: "Aluguer de Prancha", description: "Tábua de surf + leash", duration_minutes: 60, price_cents: 1500, category: "aluguer", modality: "Surf" },
@@ -153,7 +153,7 @@ export async function getPublicSchoolData(
       id: s.id,
       starts_at: s.starts_at,
       duration_minutes: s.duration_minutes,
-      class_type_name: (s.class_types as { name: string }[] | null)?.[0]?.name ?? "",
+      class_type_name: (s.class_types as unknown as { name: string } | null)?.name ?? "",
       price_cents: s.price_cents,
       capacity: s.capacity ?? 0,
       booked: 0,
@@ -197,6 +197,64 @@ export async function getPublicSchoolData(
     services,
     upcomingSessions,
   };
+}
+
+export async function getPublicSessionsForMonth(
+  schoolId: string,
+  year: number,
+  month: number
+): Promise<Record<number, PublicSession[]>> {
+  const admin = createAdminClient();
+
+  const startDate = new Date(year, month - 1, 1).toISOString().split("T")[0];
+  const endDate = new Date(year, month, 0).toISOString().split("T")[0];
+
+  const { data: sessions, error } = await admin
+    .from("sessions")
+    .select("id, starts_at, duration_minutes, price_cents, capacity, class_type_id, class_types(name)")
+    .eq("school_id", schoolId)
+    .eq("status", "scheduled")
+    .gte("starts_at", startDate)
+    .lte("starts_at", `${endDate}T23:59:59`)
+    .order("starts_at", { ascending: true });
+
+  if (error || !sessions) {
+    console.error("[getPublicSessionsForMonth] error:", error);
+    return {};
+  }
+
+  const sessionIds = sessions.map((s) => s.id);
+  const countMap: Record<string, number> = {};
+
+  if (sessionIds.length > 0) {
+    const { data: bookings } = await admin
+      .from("bookings")
+      .select("session_id")
+      .in("session_id", sessionIds)
+      .eq("status", "confirmed");
+
+    for (const b of bookings ?? []) {
+      countMap[b.session_id] = (countMap[b.session_id] ?? 0) + 1;
+    }
+  }
+
+  const byDay: Record<number, PublicSession[]> = {};
+
+  for (const s of sessions) {
+    const day = new Date(s.starts_at).getDate();
+    if (!byDay[day]) byDay[day] = [];
+    byDay[day].push({
+      id: s.id,
+      starts_at: s.starts_at,
+      duration_minutes: s.duration_minutes,
+      price_cents: s.price_cents,
+      capacity: s.capacity ?? 0,
+      booked: countMap[s.id] ?? 0,
+      class_type_name: (s.class_types as unknown as { name: string } | null)?.name ?? "",
+    });
+  }
+
+  return byDay;
 }
 
 export async function criarReservaPublica(

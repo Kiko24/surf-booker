@@ -91,7 +91,7 @@ export async function getSessionsForMonth(
       id: s.id,
       nome: (s.class_types as unknown as { name: string } | null)?.name ?? "Aula",
       time: `${hours}:${minutes}`,
-      capacidade: s.capacity ?? 10,
+      capacidade: s.capacity ?? 0,
       alunos: bData.count,
       alunosList: bData.alunos,
       class_type_id: s.class_type_id,
@@ -111,6 +111,7 @@ export async function getAvulsoServicos(schoolId: string): Promise<AvulsoServico
     .select("id, name, default_duration_minutes, price_cents")
     .eq("school_id", schoolId)
     .eq("is_active", true)
+    .or("category.eq.aula,category.is.null")
     .order("created_at", { ascending: false });
   return data ?? [];
 }
@@ -143,11 +144,13 @@ export async function createSession(formData: {
     return { ok: false, error: "Não é possível criar aulas em dias anteriores ao dia de hoje" };
   }
 
+  const capacity = formData.capacidade > 0 ? formData.capacidade : null;
+
   const { data: createdSession, error } = await supabase.from("sessions").insert({
     school_id: formData.schoolId,
     starts_at: startsAt.toISOString(),
     duration_minutes: formData.duracao,
-    capacity: formData.capacidade,
+    capacity,
     price_cents: 0,
     class_type_id: formData.class_type_id,
     instructor_id: formData.instructor_id,
@@ -372,12 +375,14 @@ export async function updateSession(
     return { ok: false, error: "Data ou horário inválidos" };
   }
 
+  const capacity = formData.capacidade > 0 ? formData.capacidade : null;
+
   const { error } = await supabase
     .from("sessions")
     .update({
       starts_at: startsAt.toISOString(),
       duration_minutes: formData.duracao,
-      capacity: formData.capacidade,
+      capacity,
       class_type_id: formData.class_type_id,
       instructor_id: formData.instructor_id,
     })
@@ -842,19 +847,57 @@ export type AvailablePack = {
 
 export async function getAvailablePacks(schoolId: string): Promise<AvailablePack[]> {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("packs")
+
+  const { data: packClassTypeIds } = await supabase
+    .from("class_types")
+    .select("id")
+    .eq("school_id", schoolId)
+    .eq("category", "pack");
+
+  const packCtIdList = packClassTypeIds?.map((ct) => ct.id) ?? [];
+
+  const { data: packsFromTable } = packCtIdList.length > 0
+    ? await supabase
+        .from("packs")
+        .select("id, name, total_lessons, price_cents")
+        .eq("school_id", schoolId)
+        .eq("is_active", true)
+        .in("class_type_id", packCtIdList)
+        .order("name")
+    : { data: [] as { id: string; name: string; total_lessons: number; price_cents: number }[] };
+
+  const { data: packClassTypes } = await supabase
+    .from("class_types")
     .select("id, name, total_lessons, price_cents")
     .eq("school_id", schoolId)
-    .eq("is_active", true)
-    .order("name");
-  return data ?? [];
+    .eq("category", "pack")
+    .eq("is_active", true);
+
+  const result: AvailablePack[] = [];
+
+  if (packsFromTable) result.push(...packsFromTable);
+
+  if (packClassTypes) {
+    for (const ct of packClassTypes) {
+      if (ct.total_lessons) {
+        result.push({
+          id: ct.id,
+          name: ct.name,
+          total_lessons: ct.total_lessons,
+          price_cents: ct.price_cents,
+        });
+      }
+    }
+  }
+
+  return result;
 }
 
 export async function buyPack(
   studentId: string,
   packId: string,
-  schoolId: string
+  schoolId: string,
+  lessonsOverride?: number
 ): Promise<{ ok: boolean; error?: string }> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -871,11 +914,15 @@ export async function buyPack(
     .single();
   if (!pack) return { ok: false, error: "Pack não encontrado" };
 
+  if (lessonsOverride !== undefined && (isNaN(lessonsOverride) || lessonsOverride < 1 || lessonsOverride > 100)) {
+    return { ok: false, error: "Número de aulas inválido" };
+  }
+
   const { error } = await supabase.from("pack_purchases").insert({
     school_id: schoolId,
     pack_id: packId,
     student_id: studentId,
-    lessons_remaining: pack.total_lessons,
+    lessons_remaining: lessonsOverride ?? pack.total_lessons,
   });
 
   if (error) return { ok: false, error: error.message };

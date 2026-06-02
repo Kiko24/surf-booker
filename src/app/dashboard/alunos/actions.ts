@@ -218,7 +218,9 @@ export async function deleteStudent(studentId: string): Promise<{ ok: boolean; e
 export async function createStudent(
   name: string,
   phone: string | undefined,
+  email: string | undefined,
   packId: string | undefined,
+  lessonsRemaining: string | undefined,
   schoolId: string
 ): Promise<{ ok: boolean; error?: string; studentId?: string }> {
   const supabase = await createClient();
@@ -236,13 +238,24 @@ export async function createStudent(
     .maybeSingle();
   if (!school) return { ok: false, error: "Escola não encontrada" };
 
-  if (!name.trim()) return { ok: false, error: "Nome é obrigatório" };
+  const trimmedName = name.trim();
+  if (!trimmedName) return { ok: false, error: "Nome é obrigatório" };
+  if (trimmedName.length > 120) return { ok: false, error: "Nome demasiado longo (máx. 120 caracteres)" };
+
+  if (phone && !/^[0-9\s]+$/.test(phone)) return { ok: false, error: "Telemóvel inválido — apenas dígitos e espaços" };
+  if (phone && (phone.replace(/\s/g, "").length < 6 || phone.replace(/\s/g, "").length > 20)) return { ok: false, error: "Telemóvel deve ter entre 6 e 20 dígitos" };
+
+  if (email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) return { ok: false, error: "Email inválido" };
+    if (email.length > 160) return { ok: false, error: "Email demasiado longo (máx. 160 caracteres)" };
+  }
 
   const admin = createAdminClient();
 
   const { data: student, error: sErr } = await admin
     .from("students")
-    .insert({ full_name: name.trim(), is_guest: true, ...(phone ? { phone } : {}) })
+    .insert({ full_name: trimmedName, is_guest: true, ...(phone ? { phone } : {}), ...(email ? { email } : {}) })
     .select("id")
     .single();
   if (sErr) return { ok: false, error: sErr.message };
@@ -253,7 +266,12 @@ export async function createStudent(
   if (ssErr) return { ok: false, error: ssErr.message };
 
   if (packId) {
-    const res = await buyPack(student.id, packId, schoolId);
+    let remaining: number | undefined;
+    if (lessonsRemaining) {
+      remaining = parseInt(lessonsRemaining, 10);
+      if (isNaN(remaining) || remaining < 1 || remaining > 100) return { ok: false, error: "Aulas restantes deve ser um número entre 1 e 100" };
+    }
+    const res = await buyPack(student.id, packId, schoolId, remaining);
     if (!res.ok) return { ok: false, error: res.error };
   }
 
@@ -263,7 +281,7 @@ export async function createStudent(
     action: "create_student",
     entityType: "student",
     entityId: student.id,
-    metadata: { studentName: name.trim(), hasPack: !!packId },
+    metadata: { studentName: trimmedName, hasPack: !!packId, hasEmail: !!email },
   });
 
   return { ok: true, studentId: student.id };

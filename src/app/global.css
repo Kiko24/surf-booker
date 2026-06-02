@@ -36,6 +36,85 @@
   --breakpoint-2xl: 1440px;
 }
 
+/* ─── LIGHT MODE ──────────────────────────────────── */
+html.light {
+  --color-background: #F7FAFC;
+  --color-surface: #FFFFFF;
+  --color-foreground: #111827;
+  --color-text-primary: #111827;
+  --color-text-secondary: #4B5563;
+  --color-text-muted: #9CA1A6;
+  --color-accent: #1E6FA8;
+  --color-accent-light: #81CAFA;
+  --color-border: #E5E7EB;
+  --color-primary: #111827;
+  --color-primary-foreground: #FFFFFF;
+  --color-error: #EF4444;
+  --color-error-foreground: #FFFFFF;
+  --color-success: #16A34A;
+}
+
+html.light ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+}
+html.light ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+/* Override: hardcoded bg-[#2A2A2A] → light gray */
+html.light .bg-\[\#2A2A2A\] {
+  background-color: #F3F4F6;
+}
+
+/* Override: inputs com bg-[#2A2A2A] → brancos com borda */
+html.light input.bg-\[\#2A2A2A\],
+html.light textarea.bg-\[\#2A2A2A\],
+html.light select.bg-\[\#2A2A2A\] {
+  background-color: #FFFFFF;
+  border: 1px solid #E5E7EB;
+}
+
+/* Override: border-white/5 e border-white/10 → gray-200 */
+html.light .border-white\/5,
+html.light .border-white\/10 {
+  border-color: #E5E7EB;
+}
+
+/* Override: md:border-white/10 → black (sidebar divider) */
+@media (width >= 768px) {
+  html.light .md\:border-white\/10 {
+    border-color: #111827;
+  }
+}
+
+/* Override: hover bg-[#2A2A2A] → accent + white text (LP style) */
+html.light .hover\:bg-\[\#2A2A2A\]:hover,
+html.light .hover\:bg-\[\#333\]:hover {
+  background-color: #1E6FA8 !important;
+}
+html.light .hover\:bg-\[\#2A2A2A\]:hover *,
+html.light .hover\:bg-\[\#333\]:hover * {
+  color: #FFFFFF !important;
+}
+
+/* Override: border-foreground/10 (divider) → gray-200 */
+html.light .border-foreground\/10 {
+  border-color: #E5E7EB;
+}
+
+/* Override: border-accent/10 mais visível + shadow LP-style */
+html.light .border-accent\/10 {
+  border-color: color-mix(in srgb, #1E6FA8 20%, transparent);
+}
+html.light .rounded-xl.border-accent\/10 {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+/* Override: cartões bg-surface sem border → azul claro LP */
+html.light .rounded-xl.bg-surface {
+  border: 1px solid color-mix(in srgb, #1E6FA8 20%, transparent);
+}
+
 * {
   box-sizing: border-box;
 }

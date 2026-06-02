@@ -22,6 +22,7 @@ const servicoBaseSchema = z.object({
   avulsoPreco: z.number().int().min(0).max(500000),
   categoria: z.enum(["aula", "pack", "aluguer"]).optional(),
   packs: z.array(packSchema).max(20),
+  totalLessons: z.number().int().min(1).max(100).optional(),
 });
 
 export type PackOption = {
@@ -40,6 +41,7 @@ export type ServicoRecord = {
   avulsoDisponivel: boolean;
   avulsoPreco: number;
   categoria: string | null;
+  totalLessons: number | null;
   packs: PackOption[];
   vezesUsado: number;
 };
@@ -49,7 +51,7 @@ export async function getServicos(schoolId: string): Promise<ServicoRecord[]> {
 
   const { data: classTypes } = await supabase
     .from("class_types")
-    .select("id, name, modality, default_duration_minutes, description, price_cents, avulso_enabled, category")
+    .select("id, name, modality, default_duration_minutes, description, price_cents, avulso_enabled, category, total_lessons")
     .eq("school_id", schoolId)
     .eq("is_active", true)
     .order("created_at", { ascending: false });
@@ -138,6 +140,7 @@ export async function getServicos(schoolId: string): Promise<ServicoRecord[]> {
       avulsoDisponivel: ct.avulso_enabled,
       avulsoPreco: ct.price_cents,
       categoria: ct.category ?? null,
+      totalLessons: ct.total_lessons,
       packs: ctPacks,
       vezesUsado,
     });
@@ -156,6 +159,7 @@ export async function addServico(
     avulsoDisponivel: boolean;
     avulsoPreco: number;
     categoria?: "aula" | "pack" | "aluguer";
+    totalLessons?: number;
     packs: { nome: string; numeroAulas: number; preco: number }[];
   }
 ): Promise<{ ok: boolean; error?: string }> {
@@ -182,6 +186,7 @@ export async function addServico(
       avulso_enabled: data.avulsoDisponivel,
       description: data.sobre ?? "",
       category: data.categoria ?? null,
+      total_lessons: data.totalLessons ?? null,
     })
     .select("id")
     .single();
@@ -254,6 +259,7 @@ export async function updateServico(
     avulsoDisponivel: boolean;
     avulsoPreco: number;
     categoria?: "aula" | "pack" | "aluguer";
+    totalLessons?: number;
     packs: { id?: string; nome: string; numeroAulas: number; preco: number }[];
   }
 ): Promise<{ ok: boolean; error?: string }> {
@@ -279,6 +285,7 @@ export async function updateServico(
       avulso_enabled: data.avulsoDisponivel,
       description: data.sobre ?? "",
       category: data.categoria ?? null,
+      total_lessons: data.totalLessons ?? null,
     })
     .eq("id", id);
 
