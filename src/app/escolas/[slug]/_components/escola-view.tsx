@@ -167,163 +167,174 @@ export function EscolaView({ data }: Props) {
       )}
 
       {/* Galeria + Serviços */}
-      {images.length > 0 && (
-        <section className="px-5 pt-8 pb-8 sm:px-8 sm:pb-12">
-          <div className="mx-auto max-w-5xl">
-            <div className="flex flex-col gap-3 md:flex-row md:items-start">
-              {/* Coluna esquerda: foto grande + serviços */}
-              <div className="flex flex-col gap-8 md:w-[65%]">
-                <button
-                  type="button"
-                  onClick={() => setLightboxIndex(0)}
-                  className="overflow-hidden rounded-xl md:h-[420px]"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
+      <section className="px-5 pt-8 pb-8 sm:px-8 sm:pb-12">
+        <div className="mx-auto max-w-5xl">
+          <div className="flex flex-col gap-3 md:flex-row md:items-start">
+            {/* Coluna esquerda: foto grande + serviços */}
+            <div className="flex flex-col gap-8 md:w-[65%]">
+              <button
+                type="button"
+                onClick={images[0] ? () => setLightboxIndex(0) : undefined}
+                className="overflow-hidden rounded-xl md:h-[420px]"
+              >
+                {images[0] ? (
                   <img
                     src={images[0].public_url}
                     alt=""
                     className="h-full w-full object-cover"
                     style={{ minHeight: 280 }}
                   />
-                </button>
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-gray-100" style={{ minHeight: 280 }}>
+                    <svg className="h-12 w-12 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z" />
+                    </svg>
+                  </div>
+                )}
+              </button>
 
-                {services.length > 0 && (
-                  <div>
-                    <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-                      <h2 className="font-heading text-2xl font-bold text-gray-900 shrink-0 py-1">
-                        Serviços
-                      </h2>
-                      <div className="flex flex-wrap items-center gap-2">
+              {services.length > 0 && (
+                <div>
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                    <h2 className="font-heading text-2xl font-bold text-gray-900 shrink-0 py-1">
+                      Serviços
+                    </h2>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedCategory(null)}
+                        className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                          selectedCategory === null
+                            ? "bg-accent text-white"
+                            : "bg-white text-gray-600 border border-gray-200 hover:border-accent"
+                        }`}
+                      >
+                        Todas
+                      </button>
+                      {["aula", "pack", "aluguer"].map((cat) => (
                         <button
+                          key={cat}
                           type="button"
-                          onClick={() => setSelectedCategory(null)}
-                          className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                            selectedCategory === null
+                          onClick={() => setSelectedCategory(cat)}
+                          className={`rounded-full px-4 py-1.5 text-sm font-medium capitalize transition-colors ${
+                            selectedCategory === cat
                               ? "bg-accent text-white"
                               : "bg-white text-gray-600 border border-gray-200 hover:border-accent"
                           }`}
                         >
-                          Todas
+                          {cat === "aula" ? "Aulas" : cat === "pack" ? "Packs de Aulas" : "Alugueres"}
                         </button>
-                        {["aula", "pack", "aluguer"].map((cat) => (
-                          <button
-                            key={cat}
-                            type="button"
-                            onClick={() => setSelectedCategory(cat)}
-                            className={`rounded-full px-4 py-1.5 text-sm font-medium capitalize transition-colors ${
-                              selectedCategory === cat
-                                ? "bg-accent text-white"
-                                : "bg-white text-gray-600 border border-gray-200 hover:border-accent"
-                            }`}
-                          >
-                            {cat === "aula" ? "Aulas" : cat === "pack" ? "Packs de Aulas" : "Alugueres"}
-                          </button>
-                        ))}
-                        {allModalities.length > 0 && (
-                          <div className="relative">
-                            <select
-                              value={selectedModality ?? ""}
-                              onChange={(e) => setSelectedModality(e.target.value || null)}
-                              className="appearance-none rounded-full border border-gray-200 bg-white px-4 py-1.5 pr-8 text-sm text-gray-600 outline-none focus:border-accent"
-                            >
-                              <option value="">Todas as modalidades</option>
-                              {allModalities.map((mod) => (
-                                <option key={mod} value={mod}>{mod}</option>
-                              ))}
-                            </select>
-                            <svg className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      {filteredServices.slice(0, INITIAL_LIMIT).map((svc) => (
-                        <ServiceCard key={svc.id} svc={svc} onClick={() => setSelectedService(svc)} onReservarClick={() => { setSelectedServiceId(svc.id); setShowServicePicker(true); }} />
                       ))}
-                      {filteredServices.length > INITIAL_LIMIT && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setDisplayCount(10);
-                            setShowAllModal(true);
-                          }}
-                          className="w-full text-center rounded-2xl border-2 border-dashed border-gray-200 bg-white p-4 text-sm font-semibold text-gray-500 transition-colors hover:border-accent hover:text-accent"
-                        >
-                          Ver mais (+{filteredServices.length - INITIAL_LIMIT})
-                        </button>
+                      {allModalities.length > 0 && (
+                        <div className="relative">
+                          <select
+                            value={selectedModality ?? ""}
+                            onChange={(e) => setSelectedModality(e.target.value || null)}
+                            className="appearance-none rounded-full border border-gray-200 bg-white px-4 py-1.5 pr-8 text-sm text-gray-600 outline-none focus:border-accent"
+                          >
+                            <option value="">Todas as modalidades</option>
+                            {allModalities.map((mod) => (
+                              <option key={mod} value={mod}>{mod}</option>
+                            ))}
+                          </select>
+                          <svg className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
                       )}
                     </div>
                   </div>
-                )}
 
-                {instructors.length > 0 && (
-                  <div>
-                    <h2 className="font-heading text-2xl font-bold text-gray-900 mb-4">
-                      Instrutores
-                    </h2>
-                    <div className="flex flex-wrap gap-6">
-                      {instructors.map((inst, i) => (
-                        <div key={i} className="flex flex-col items-center text-center w-[calc(50%-12px)] sm:w-[calc(25%-18px)]">
-                          <div className="h-16 w-16 overflow-hidden rounded-full bg-gray-200">
-                            {inst.avatar_url ? (
-                              <img
-                                src={inst.avatar_url}
-                                alt={inst.name}
-                                className="h-full w-full object-cover"
-                              />
-                            ) : (
-                              <div className="flex h-full w-full items-center justify-center text-lg font-bold text-gray-500">
-                                {inst.name.charAt(0)}
-                              </div>
-                            )}
-                          </div>
-                          <p className="mt-2 text-sm font-semibold text-gray-900 text-center leading-tight">
-                            {inst.name}
-                          </p>
-                          <p className="text-xs text-gray-500 text-center leading-tight">
-                            {inst.level}
-                          </p>
+                  <div className="space-y-3">
+                    {filteredServices.slice(0, INITIAL_LIMIT).map((svc) => (
+                      <ServiceCard key={svc.id} svc={svc} onClick={() => setSelectedService(svc)} onReservarClick={() => { setSelectedServiceId(svc.id); setShowServicePicker(true); }} />
+                    ))}
+                    {filteredServices.length > INITIAL_LIMIT && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDisplayCount(10);
+                          setShowAllModal(true);
+                        }}
+                        className="w-full text-center rounded-2xl border-2 border-dashed border-gray-200 bg-white p-4 text-sm font-semibold text-gray-500 transition-colors hover:border-accent hover:text-accent"
+                      >
+                        Ver mais (+{filteredServices.length - INITIAL_LIMIT})
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {instructors.length > 0 && (
+                <div>
+                  <h2 className="font-heading text-2xl font-bold text-gray-900 mb-4">
+                    Instrutores
+                  </h2>
+                  <div className="flex flex-wrap gap-6">
+                    {instructors.map((inst, i) => (
+                      <div key={i} className="flex flex-col items-center text-center w-[calc(50%-12px)] sm:w-[calc(25%-18px)]">
+                        <div className="h-16 w-16 overflow-hidden rounded-full bg-gray-200">
+                          {inst.avatar_url ? (
+                            <img
+                              src={inst.avatar_url}
+                              alt={inst.name}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-lg font-bold text-gray-500">
+                              {inst.name.charAt(0)}
+                            </div>
+                          )}
                         </div>
-                      ))}
-                    </div>
+                        <p className="mt-2 text-sm font-semibold text-gray-900 text-center leading-tight">
+                          {inst.name}
+                        </p>
+                        <p className="text-xs text-gray-500 text-center leading-tight">
+                          {inst.level}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Coluna direita: 2 fotos + info card */}
+            <div className="flex flex-col gap-6 md:w-[35%]">
+              <div className="flex flex-col gap-3 md:h-[420px]">
+                {images[1] ? (
+                  <button
+                    type="button"
+                    onClick={() => setLightboxIndex(1)}
+                    className="overflow-hidden rounded-xl flex-1 h-0"
+                  >
+                    <img
+                      src={images[1].public_url}
+                      alt=""
+                      className="h-full w-full object-cover"
+                      style={{ height: "100%", objectFit: "cover" }}
+                    />
+                  </button>
+                ) : (
+                  <div className="flex flex-1 h-0 items-center justify-center overflow-hidden rounded-xl bg-gray-100">
+                    <svg className="h-8 w-8 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z" />
+                    </svg>
                   </div>
                 )}
-              </div>
-
-              {/* Coluna direita: 2 fotos + info card */}
-              <div className="flex flex-col gap-6 md:w-[35%]">
-                <div className="flex flex-col gap-3 md:h-[420px]">
-                  {images[1] && (
-                    <button
-                      type="button"
-                      onClick={() => setLightboxIndex(1)}
-                      className="overflow-hidden rounded-xl flex-1 h-0"
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={images[1].public_url}
-                        alt=""
-                        className="h-full w-full object-cover"
-                        style={{ height: "100%", objectFit: "cover" }}
-                      />
-                    </button>
-                  )}
-                  {images[2] && (
-                    <button
-                      type="button"
-                      onClick={() => setLightboxIndex(2)}
-                      className="overflow-hidden rounded-xl flex-1 h-0 relative"
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={images[2].public_url}
-                        alt=""
-                        className="h-full w-full object-cover"
-                        style={{ height: "100%", objectFit: "cover" }}
-                      />
+                {images[2] ? (
+                  <button
+                    type="button"
+                    onClick={() => setLightboxIndex(2)}
+                    className="overflow-hidden rounded-xl flex-1 h-0 relative"
+                  >
+                    <img
+                      src={images[2].public_url}
+                      alt=""
+                      className="h-full w-full object-cover"
+                      style={{ height: "100%", objectFit: "cover" }}
+                    />
+                    {images.length > 3 && (
                       <div className="absolute inset-0 flex items-end justify-center bg-black/30 rounded-xl pb-4">
                         <span className="flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow transition-transform hover:scale-105">
                           Ver mais fotos
@@ -332,45 +343,51 @@ export function EscolaView({ data }: Props) {
                           </svg>
                         </span>
                       </div>
-                    </button>
-                  )}
-                </div>
-                <div className="rounded-xl bg-white p-5 shadow-sm md:mt-14">
-                  <h3 className="font-heading font-semibold text-gray-900 text-[32px]">
-                    {school.name}
-                  </h3>
-                  {school.location && (
-                    <p className="mt-2 flex items-center gap-1.5 text-sm text-gray-600">
-                      <svg className="h-4 w-4 shrink-0" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
-                      </svg>
-                      {school.location}
-                    </p>
-                  )}
-                  {school.description && (
-                    <p className="mt-2 text-sm text-gray-600 leading-relaxed">
-                      {school.description}
-                    </p>
-                  )}
-                  {school.location && (
-                    <div className="mt-4 overflow-hidden rounded-xl">
-                      <iframe
-                        src={`https://www.google.com/maps?q=${encodeURIComponent(`${school.name}, ${school.location}`)}&output=embed`}
-                        width="100%"
-                        height="180"
-                        style={{ border: 0 }}
-                        allowFullScreen
-                        loading="lazy"
-                        title="Localização da escola"
-                      />
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </button>
+                ) : (
+                  <div className="flex flex-1 h-0 items-center justify-center overflow-hidden rounded-xl bg-gray-100">
+                    <svg className="h-8 w-8 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z" />
+                    </svg>
+                  </div>
+                )}
+              </div>
+              <div className="rounded-xl bg-white p-5 shadow-sm md:mt-14">
+                <h3 className="font-heading font-semibold text-gray-900 text-[32px]">
+                  {school.name}
+                </h3>
+                {school.location && (
+                  <p className="mt-2 flex items-center gap-1.5 text-sm text-gray-600">
+                    <svg className="h-4 w-4 shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
+                    </svg>
+                    {school.location}
+                  </p>
+                )}
+                {school.description && (
+                  <p className="mt-2 text-sm text-gray-600 leading-relaxed">
+                    {school.description}
+                  </p>
+                )}
+                {school.location && (
+                  <div className="mt-4 overflow-hidden rounded-xl">
+                    <iframe
+                      src={`https://www.google.com/maps?q=${encodeURIComponent(`${school.name}, ${school.location}`)}&output=embed`}
+                      width="100%"
+                      height="180"
+                      style={{ border: 0 }}
+                      allowFullScreen
+                      loading="lazy"
+                      title="Localização da escola"
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </div>
-        </section>
-      )}
+        </div>
+      </section>
 
       {lightboxIndex !== null && (
         <Lightbox
@@ -568,7 +585,7 @@ export function EscolaView({ data }: Props) {
                             {svc.name}
                           </h4>
                           <p className="text-xs text-gray-500">
-                            {svc.duration_minutes} min &middot; {(svc.price_cents / 100).toFixed(2).replace(".", ",")} €
+                            {svc.duration_minutes} min · {(svc.price_cents / 100).toFixed(2).replace(".", ",")} €
                           </p>
                         </div>
                         <button
@@ -838,7 +855,7 @@ function ServiceCard({ svc, onClick, onReservarClick }: { svc: PublicSchoolData[
               {svc.description}
             </p>
           )}
-          <p className="mt-1 text-sm text-gray-500">{svc.duration_minutes} min &middot; {(svc.price_cents / 100).toFixed(2).replace(".", ",")} €</p>
+          <p className="mt-1 text-sm text-gray-500">{svc.duration_minutes} min · {(svc.price_cents / 100).toFixed(2).replace(".", ",")} €</p>
         </div>
         <span
           role="button"

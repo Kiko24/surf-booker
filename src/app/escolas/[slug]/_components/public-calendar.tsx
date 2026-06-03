@@ -215,7 +215,7 @@ export function PublicCalendar({ schoolId, classTypeFilter, onSelectSession }: P
                       {session.class_type_name}
                     </p>
                     <p className="text-xs text-gray-500">
-                      {time} &middot; {isFull ? "Completo" : `${vagas} ${vagas === 1 ? "vaga" : "vagas"}`}
+                      {time} · {isFull ? "Completo" : `${vagas} ${vagas === 1 ? "vaga" : "vagas"}`}
                     </p>
                   </div>
                   {!isFull && (

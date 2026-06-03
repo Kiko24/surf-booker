@@ -87,7 +87,11 @@ export async function saveInstructor(
       return { ok: false, error: "Formato não permitido. Usa PNG, WebP ou JPEG" };
     }
     if (avatarFile.size > MAX_AVATAR_SIZE) {
-      return { ok: false, error: "Foto demasiado grande. Máximo 1MB" };
+      return { ok: false, error: `Foto demasiado grande. Máximo ${MAX_AVATAR_SIZE / (1024 * 1024)}MB` };
+    }
+    const validation = await validateImageContent(avatarFile);
+    if (!validation.ok) {
+      return { ok: false, error: validation.reason };
     }
   }
 
@@ -106,7 +110,8 @@ export async function saveInstructor(
       });
 
     if (uploadError) {
-      return { ok: false, error: "Erro ao carregar a foto." };
+      console.error("[saveInstructor] upload error:", uploadError);
+      return { ok: false, error: `Erro ao carregar a foto: ${uploadError.message}` };
     }
     avatarUrl = filePath;
   }

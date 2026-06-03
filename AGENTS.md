@@ -37,8 +37,16 @@ This version has breaking changes — APIs, conventions, and file structure may 
 |--------|------|-------|
 | id | uuid PK | default gen_random_uuid() |
 | owner_user_id | uuid FK → auth.users | NOT NULL, UNIQUE |
-| name | text | |
+| name | text | NOT NULL, 2-100 chars |
+| slug | text | UNIQUE, 3-60 chars, lowercase, hyphens only |
+| description | text? | max 1000 |
+| location | text? | max 100 |
+| logo_url | text? | max 500 |
+| phone | text? | min 6 (added 0014) |
+| timezone | text | default 'Europe/Lisbon' |
+| cancellation_window_hours | int | default 24 |
 | created_at | timestamptz | |
+| updated_at | timestamptz | |
 
 ### `students`
 | Column | Type | Notes |
@@ -65,9 +73,31 @@ This version has breaking changes — APIs, conventions, and file structure may 
 | id | uuid PK | |
 | school_id | uuid FK → schools | |
 | name | text | |
+| description | text? | max 1000 (added manually, migration 0019) |
 | default_duration_minutes | int | |
 | price_cents | int | |
+| category | text? | 'aula' / 'pack' / 'aluguer' (added 0013) |
+| modality | text | default '' (added 0007) |
+| total_lessons | int? | for packs (added 0016) |
 | is_active | boolean | default true |
+
+### `instructors`
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid PK | |
+| school_id | uuid FK → schools | CASCADE |
+| name | text | |
+| level | text | default '' |
+| avatar_url | text? | path in instructor-avatars bucket |
+| created_at | timestamptz | |
+
+### `school_images`
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid PK | |
+| school_id | uuid FK → schools | CASCADE |
+| file_path | text | path in school-images bucket |
+| created_at | timestamptz | |
 
 ### `sessions`
 | Column | Type | Notes |
@@ -122,6 +152,26 @@ This version has breaking changes — APIs, conventions, and file structure may 
 | metadata | jsonb | additional context |
 | created_at | timestamptz | indexed desc |
 
+### `favorites`
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid PK | |
+| user_id | uuid FK → auth.users | |
+| school_id | uuid FK → schools | CASCADE |
+| created_at | timestamptz | |
+| UNIQUE | (user_id, school_id) | |
+
+### `school_settings`
+| Column | Type | Notes |
+|--------|------|-------|
+| school_id | uuid PK FK → schools | CASCADE |
+| cancellation_window_hours | int | default 24 |
+| low_occupancy_threshold | int | default 40 |
+| notify_email_confirmation | boolean | default true |
+| notify_reminder_24h | boolean | default true |
+| notify_sms_cancellation | boolean | default false |
+| notify_new_schedule | boolean | default true |
+
 ## Security Score: 10/10
 
 | Aspeto | Estado |
@@ -145,9 +195,28 @@ This version has breaking changes — APIs, conventions, and file structure may 
 ### `school_students`
 - SELECT, INSERT, UPDATE, DELETE — all check `schools.owner_user_id = auth.uid()`
 
+### `schools`
+- SELECT: public (anon can see active schools, rows with `owner_user_id IS NOT NULL`)
+- UPDATE: only owner (`owner_user_id = auth.uid()`)
+- INSERT: only authenticated
+- DELETE: only owner (CASCADE to related data)
+
 ### `sessions`
-- SELECT, INSERT, UPDATE — all check `schools.owner_user_id = auth.uid()`
+- **Public**: `sessions_select_public` — anon can see scheduled sessions (used by public page)
+- Dashboard: SELECT, INSERT, UPDATE — all check `schools.owner_user_id = auth.uid()`
 - **DELETE**: `sessions_delete_owner` (added in migration 0004)
+
+### `class_types`
+- Dashboard: SELECT, INSERT, UPDATE, DELETE — all check `schools.owner_user_id = auth.uid()`
+- Public: `class_types_select_public` — anon can see active class_types for approved schools (used by public page)
+
+### `instructors`
+- Dashboard: SELECT, INSERT, UPDATE, DELETE — all check `schools.owner_user_id = auth.uid()`
+- Public: `instructors_select_public` — anon can see instructors for approved schools
+
+### `school_images`
+- Dashboard: SELECT, INSERT, DELETE — all check `schools.owner_user_id = auth.uid()`
+- Public: `school_images_select_public` — anon can see images for approved schools
 
 ### `booking_groups`
 - SELECT, INSERT, UPDATE — all check `schools.owner_user_id = auth.uid()`
@@ -163,7 +232,16 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - **SELECT**: `audit_logs_select_owner` — school owner can view logs
 - **INSERT**: none — apenas service_role (admin client) escreve
 
-## File Structure (Dashboard)
+### Storage Buckets (3 buckets, all public for read / RLS for write)
+- `school-logos`: public read (CDN), INSERT/DELETE via RLS (owner only, migration 0018)
+- `school-images`: public read (CDN), INSERT/DELETE via RLS (owner only, migration 0018)
+- `instructor-avatars`: public read (CDN), INSERT/DELETE via RLS (owner only, migration 0018)
+
+### Schools SELECT (anon)
+- Applied to `schools` table for public directory page
+- Allows anon SELECT on rows where `owner_user_id IS NOT NULL` and `deleted_at IS NULL`
+
+## File Structure
 
 ```
 src/
@@ -173,44 +251,85 @@ src/
 │   │   ├── client.ts         # createClient() — browser
 │   │   └── admin.ts          # createAdminClient() — service_role
 │   ├── rate-limit.ts         # Rate limiting via Upstash Redis
-│   └── audit.ts              # Audit logging utility
-└── app/dashboard/
-    ├── page.tsx                          # Dashboard home (KPI cards, quick actions)
-├── _components/
-│   ├── dashboard-view.tsx            # Dashboard home client component
-│   └── icons.tsx                     # Custom SVG icon components
-├── calendario/
-│   ├── page.tsx                      # Server component, fetches schoolId
-│   ├── actions.ts                    # Server actions: CRUD sessions, bookings, guests
-│   └── _components/
-│       └── calendario-view.tsx       # Calendar UI: month grid, sessions list, modals
-├── alunos/
-│   ├── page.tsx                      # Server component, fetches schoolId + students
-│   ├── actions.ts                    # Server actions: getStudents, deleteStudent, createStudent, toggleWaiver
-│   └── _components/
-│       └── alunos-view.tsx           # Students list UI, search, filter, student popup, add student modal
-├── equipamento/                      # (not implemented yet)
-│   └── page.tsx
-└── mais/                             # (not implemented yet)
-    └── page.tsx
+│   ├── audit.ts              # Audit logging utility
+│   └── utils/
+│       └── validate-image.ts # Magic bytes validation (PNG/JPEG/WEBP)
+│
+├── app/
+│   ├── layout.tsx                       # Root layout (includes PublicNavbar)
+│   ├── page.tsx                         # Landing page
+│   │
+│   ├── _components/
+│   │   └── public-navbar.tsx            # Shared navbar: "Pesquisar escolas" search | Alaia | Entrar + Registar
+│   │
+│   ├── escolas/
+│   │   ├── page.tsx                     # (directory — 404s, not implemented)
+│   │   ├── actions.ts                   # searchSchools() — debounced search, 5+5 results
+│   │   └── [slug]/
+│   │       ├── page.tsx                 # Public school page (server component, fetches data)
+│   │       ├── actions.ts               # getPublicSchoolData(), getPublicSessionsForMonth(), criarReservaPublica()
+│   │       └── _components/
+│   │           ├── escola-view.tsx      # Main layout: gallery, info card, services, service picker modal, instructors
+│   │           ├── public-calendar.tsx  # Calendar with month nav, day grid, session list, "+" buttons, bottom bar
+│   │           ├── booking-modal.tsx    # Booking modal — not yet fully wired
+│   │           └── lightbox.tsx         # Image lightbox with keyboard nav
+│   │
+│   └── dashboard/
+│       ├── page.tsx                     # Dashboard home (KPI cards, quick actions)
+│       ├── _components/
+│       │   ├── dashboard-view.tsx       # Dashboard home client component
+│       │   └── icons.tsx                # Custom SVG icon components
+│       ├── calendario/
+│       │   ├── page.tsx                 # Server component, fetches schoolId
+│       │   ├── actions.ts               # Server actions: CRUD sessions, bookings, guests
+│       │   └── _components/
+│       │       └── calendario-view.tsx  # Calendar UI: month grid, sessions list, modals
+│       ├── alunos/
+│       │   ├── page.tsx                 # Server component, fetches schoolId + students
+│       │   ├── actions.ts               # Server actions: getStudents, deleteStudent, createStudent, toggleWaiver
+│       │   └── _components/
+│       │       └── alunos-view.tsx      # Students list UI, search, filter, student popup, add student modal
+│       ├── equipamento/                 # (not implemented yet)
+│       │   └── page.tsx
+│       └── mais/
+│           ├── page.tsx                 # Server component, fetches school info
+│           ├── actions.ts               # saveSchoolInfo(), saveInstructor(), addSchoolImage() + magic bytes validation
+│           └── _components/
+│               └── mais-view.tsx        # Business info form, instructor upload (desktop + mobile), showcase images
+│
+└── supabase/
+    ├── migrations/                      # SQL migration files (0001-0019)
+    │   ├── 0001_schools_rls.sql
+    │   ├── 0002_students_school_students.sql
+    │   ├── 0003_sessions.sql
+    │   ├── 0004_sessions_cascade.sql
+    │   ├── 0005_booking_groups.sql
+    │   ├── 0006_bookings.sql
+    │   ├── 0007_audit_logs_class_types.sql
+    │   ├── 0008_schools_table.sql
+    │   ├── 0009_school_slug.sql
+    │   ├── 0010_school_slug_check.sql
+    │   ├── 0011_favorites_rls.sql
+    │   ├── 0012_schools_public_policies.sql
+    │   ├── 0013_class_types_category.sql
+    │   ├── 0014_schools_phone.sql
+    │   ├── 0015_instructors_table.sql
+    │   ├── 0016_class_types_total_lessons.sql
+    │   ├── 0017_school_images.sql
+    │   ├── 0018_storage_bucket_policies.sql
+    │   └── 0019_class_types_description.sql
+    └── seed-test-session.sql            # Test sessions for June 4-5 2026 (BSS)
 ```
 
-## Supabase Clients
+## Supabase Client Usage
 
-### `src/lib/supabase/server.ts`
-- `createClient()` — async, reads cookies via `next/headers`, uses anon key
-- **Usar em**: server actions, server components (default)
+| Client | Key | When to use |
+|--------|-----|-------------|
+| `createClient()` (server.ts) | anon key + cookies | Server actions, server components (default) |
+| `createClient()` (client.ts) | anon key | Browser client components |
+| `createAdminClient()` (admin.ts) | service_role | Public page data (bypass RLS), DB operations on tables without school_id column — always after server-side auth + ownership check |
 
-### `src/lib/supabase/client.ts`
-- `createClient()` — browser client for client components (`"use client"`)
-- **Usar em**: client components that need direct Supabase access
 
-### `src/lib/supabase/admin.ts`
-- `createAdminClient()` — sync, uses `SUPABASE_SERVICE_ROLE_KEY`, bypasses ALL RLS
-- **Usar APENAS quando não há política RLS OU quando a tabela não tem coluna para verificar ownership**:
-  - `addGuestToSession()` in calendario/actions.ts (students table não tem school_id, impossível verificar ownership via RLS; validação feita server-side antes do insert)
-  - `deleteStudent()` in alunos/actions.ts (deletes across 4 tables)
-  - `createStudent()` in alunos/actions.ts (students table insert — same reason as addGuestToSession)
 
 ## UI Patterns & Conventions
 
@@ -339,7 +458,7 @@ SELECT id, full_name FROM students WHERE id IN (...);
 
 ## What Has Been Built
 
-### Completed
+### Dashboard
 - Dashboard home with KPI counts, scroll shadow, quick actions
 - Calendar page with month navigation, day grid, event dots, session list
 - Session CRUD (create, edit, delete with confirmation)
@@ -355,13 +474,68 @@ SELECT id, full_name FROM students WHERE id IN (...);
 - Students page: Add student modal with name, phone (optional), and pack purchase (optional)
 - `createStudent()` server action in alunos/actions.ts (inserts student + school_student + optional buyPack)
 
+### Mais / Settings
+- `mais-view.tsx`: Business info form (name, description, location, phone), instructor upload (desktop panel + mobile bottom sheet), showcase image gallery (grid-cols-3 md:grid-cols-6, max 6 images)
+- `saveSchoolInfo()`: updates schools table (name, description, location, phone) with server-side auth + ownership check
+- `saveInstructor()`: inserts instructor row, uploads avatar to `instructor-avatars` bucket, validates file type/size/magic bytes (1MB max)
+- `addSchoolImage()`: inserts school_images row, uploads to `school-images` bucket, validates file type/size/magic bytes, enforces max 6 images per school
+- `validateImageContent()`: checks first 12 bytes for PNG/JPEG/WEBP magic bytes
+- Instructor file input `onChange` errors (format/size) displayed via `setInstrutorError()` with `bg-error/10` and warning icon
+- Storage buckets: `school-logos`, `school-images`, `instructor-avatars` — all public for read (CDN), RLS policies for INSERT/DELETE (owner only, migration 0018)
+- Migration 0019: `description` column on `class_types` (max 1000 chars, applied)
+- `getSchoolInfo()` in dashboard/actions.ts — needs phone in query
+
+### Public School Page (`/escolas/[slug]`)
+- `getPublicSchoolData()`: server action using `createAdminClient()` (bypass RLS), fetches real data: school info, class_types with categories/modalities, instructors with avatar URLs, school_images with public storage URLs — no placeholders
+- Gallery: always renders (even without images), 65%/35% split (image 1 vs images 2+3), missing images shown as gray placeholder with camera icon, "Ver mais fotos" overlay only when `images.length > 3`
+- Info card: school name at 32px (`text-[32px]`), description, Google Maps iframe (`q={name},{location}`)
+- Instructors section: query, mapping, 4-column flex layout, circular placeholders with initials
+- Category filter buttons always visible (Todas/Aulas/Packs de Aulas/Alugueres) — values: `aula`/`pack`/`aluguer`
+- Modality filter dropdown alongside category buttons — only shown when modalities exist
+- Service limit 5 on page + bottom-sheet "Ver mais" modal with IntersectionObserver infinite scroll (10 in 10)
+- `ServiceCard`: `<div>` with `hover:[&:not(:has(.reservar-btn:hover))]:scale-[1.01] shadow-md` — scales on hover unless hovering reservar button; `reservar-btn` class on "+" button with `hover:scale-105 hover:bg-accent hover:text-white`
+- Service detail modal: name, duration, description, price + "Reservar" CTA (border-2 border-accent, outline style)
+- Service picker modal: centered max-w-5xl, flex-row (service list flex-1 + right column 320px)
+- Right column: calendar for "aula" services, form for pack/aluguer services
+- `PublicCalendar`: month nav, 7-col day grid with proper alignment, session list with `border border-gray-100 bg-gray-50`
+- Session time format: `dd/mm/aaaa, HH:MM` (zero-padded)
+- Full sessions: `opacity-50`, no "+" button, "Completo" text
+- "+" button selects session → bottom bar shows `{item} = {price} · {time}` (removed "1x " prefix)
+- Bottom bar always visible when service selected; "Continuar" CTA (border-2 border-accent outline, disabled state `border-gray-200 text-gray-300`)
+- Pack/aluguer form: name/email/phone inputs with sanitization (name: letters/accented max 80; email: lowercase max 120; phone: digits/+ max 20)
+- Form validation: name ≥ 2 chars, email must include @ and ., phone ≥ 6 digits; error message below inputs
+- Logged-in user auto-fill from `students` table or auth metadata
+
+### Public Navbar
+- Minimal: "Pesquisar escolas" (opens search dropdown) | Alaia (center) | Entrar + Registar (right)
+- Search dropdown: input with 300ms debounce, 5 results + "Ver mais" (+5), 64×64 school logo thumbnails, sanitized input (accented chars allowed, max 100, strips special chars)
+- `searchSchools()` server action in `src/app/escolas/actions.ts`
+
+### Database Schema Updates
+- 19 migrations applied (0001–0019)
+- `schools`: slug, description, location, logo_url, phone, timezone, cancellation_window_hours
+- `class_types`: category (`aula`/`pack`/`aluguer`), modality, total_lessons, description
+- `instructors`: table with name, level, avatar_url (created in migration 0015)
+- `school_images`: table with file_path (created in migration 0017)
+- 3 storage buckets with RLS policies (migration 0018)
+- Seed SQL: test sessions for June 4-5 2026 (BSS school)
+
+### Known Issues
+- `/escolas` directory page 404s if visited directly
+- Pack/aluguer "Continuar" action not fully wired — currently calls `setShowBookingForm(true)` but `BookingModal` expects `sessionId`
+- No full end-to-end validation with all features working
+- BSS school has 4 class_types with categories; Oporto school has 0 class_types, 0 instructors, 0 images
+
 ### Not Started / Pending
 - Equipment page (`/dashboard/equipamento`)
-- More/Settings page (`/dashboard/mais`)
-- Instructor management
 - Check-in / attendance marking
 - Email/notification system
 - Student profile page with full history
+- Wire pack/aluguer "Continuar" action — decide what happens on form submit
+- Wire `booking-modal.tsx` to `criarReservaPublica()` for aula sessions
+- Create test school via onboarding to validate end-to-end
+- SEO: meta tags, Open Graph, JSON-LD for school page
+- `getSchoolInfo()` needs phone field in query
 
 ## Key Decisions
 1. **Admin client with server-side validation** for operations on tables that can't enforce ownership via RLS (e.g. `students` has no `school_id` column). The server action always verifies `auth.getUser()` + `schools.owner_user_id` before using admin client.
@@ -372,6 +546,21 @@ SELECT id, full_name FROM students WHERE id IN (...);
 6. **Service role key** stored in `SUPABASE_SERVICE_ROLE_KEY` env var
 7. **Calendar sidebar outside main flow** — positioned `absolute` outside `<main>` to prevent calendar from shrinking when sidebar appears
 8. **Past session buttons** — sidebar shows "Realizada"/"Cancelada" (no "Editar") when `session.starts_at < new Date()`
+9. **Public page uses `createAdminClient()` (service_role)** — necessary because public RLS policies don't exist for all tables; server-side safety via `getPublicSchoolData()` being a server action
+10. **Dashboard uses `createClient()` (anon key)** — respects RLS for all dashboard operations
+11. **All storage uploads use `createAdminClient()` (service_role)** — RLS policies on buckets exist as defense-in-depth, not as primary auth mechanism
+12. **Storage buckets are public for read (CDN)** — necessary for public page images to load without auth tokens
+13. **ServiceCard: `<div>` with `role="button"` instead of `<button>`** — allows nested clickable "Reservar"/"+" span with `e.stopPropagation()`
+14. **Hover logic on ServiceCard** — card scales on hover except when hovering the reservar button (`:has(.reservar-btn:hover)`)
+15. **Calendar only for "aula" services** — packs/aluguer get a contact form instead (name/email/phone)
+16. **Session selection via "+" button** — clicking the whole session row does not select it
+17. **Bottom bar always visible when service selected** — even before session is picked; "Continuar" disabled for aula without session, always enabled for pack/aluguer
+18. **Category values in DB**: `aula`, `pack`, `aluguer` — display text: "Aulas", "Packs de Aulas", "Alugueres"
+19. **Gallery section always renders** even without images — missing images shown as gray placeholder with camera icon
+20. **All `&middot;` replaced with Unicode `·`** in JSX
+21. **Instructor file validation** runs both client-side (`onChange`) and server-side (`saveInstructor`): file type, size (1MB), magic bytes
+22. **Error color**: `--color-error: #EF4444`; `text-error` works in Tailwind v4 via `@theme` custom color
+23. **Category filter buttons always visible** regardless of data; modality dropdown only if modalities exist
 
 ## Before Making Changes
 1. Read this file first
@@ -380,6 +569,8 @@ SELECT id, full_name FROM students WHERE id IN (...);
 4. Match existing UI patterns (bottom sheets, Tailwind classes, naming)
 5. Build with `npx next build` before finishing
 6. Only commit when explicitly asked
+7. For public page work: always use `createAdminClient()` for data fetching (bypass RLS); never send service_role key to client
+8. All copy must be in Portuguese (PT)
 
 ## Security Checks
 1. Security is the most important thing on the software, NEVER compromise it for whatever reason.

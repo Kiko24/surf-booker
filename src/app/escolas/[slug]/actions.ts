@@ -81,23 +81,20 @@ export async function getPublicSchoolData(
     return null;
   }
 
-  let images: PublicSchoolImage[] = [
-    { id: "ph-1", public_url: "https://placehold.co/800x600/1E6FA8/FFFFFF?text=Foto+1" },
-    { id: "ph-2", public_url: "https://placehold.co/800x600/2563EB/FFFFFF?text=Foto+2" },
-    { id: "ph-3", public_url: "https://placehold.co/800x600/3B82F6/FFFFFF?text=Foto+3" },
-  ];
-  let instructors: PublicInstructor[] = [
-    { name: "João Silva", level: "Instrutor Sénior", avatar_url: "https://placehold.co/120x120/1E6FA8/FFFFFF?text=JS" },
-    { name: "Maria Santos", level: "Instrutora", avatar_url: "https://placehold.co/120x120/2563EB/FFFFFF?text=MS" },
-    { name: "Rui Costa", level: "Instrutor", avatar_url: "https://placehold.co/120x120/3B82F6/FFFFFF?text=RC" },
-    { name: "Ana Pereira", level: "Instrutora Estagiária", avatar_url: "https://placehold.co/120x120/60A5FA/FFFFFF?text=AP" },
-  ];
+  let images: PublicSchoolImage[] = [];
+  let instructors: PublicInstructor[] = [];
   let services: PublicService[] = [];
   let upcomingSessions: PublicSession[] = [];
 
   try {
+    const IMAGE_BUCKET = "school-images";
     const AVATAR_BUCKET = "instructor-avatars";
-    const [servicesRes, instructorsRes, sessionsRes] = await Promise.all([
+    const [imagesRes, servicesRes, instructorsRes, sessionsRes] = await Promise.all([
+      admin
+        .from("school_images")
+        .select("id, file_path")
+        .eq("school_id", school.id)
+        .order("created_at", { ascending: true }),
       admin
         .from("class_types")
         .select("id, name, description, default_duration_minutes, price_cents, category, modality")
@@ -119,7 +116,12 @@ export async function getPublicSchoolData(
         .limit(20),
     ]);
 
-    const realServices = (servicesRes.data ?? []).map((svc) => ({
+    images = (imagesRes.data ?? []).map((img) => ({
+      id: img.id,
+      public_url: admin.storage.from(IMAGE_BUCKET).getPublicUrl(img.file_path).data.publicUrl,
+    }));
+
+    services = (servicesRes.data ?? []).map((svc) => ({
       id: svc.id,
       name: svc.name,
       description: svc.description ?? null,
@@ -129,14 +131,7 @@ export async function getPublicSchoolData(
       modality: svc.modality ?? "",
     }));
 
-    services = realServices.length > 0 ? realServices : [
-      { id: "ph-svc-1", name: "Aula de Surf Nível 1", description: null, duration_minutes: 90, price_cents: 3500, category: "aula", modality: "Surf" },
-      { id: "ph-svc-2", name: "Aula de Surf Intermédio", description: null, duration_minutes: 90, price_cents: 4000, category: "aula", modality: "Surf" },
-      { id: "ph-svc-3", name: "Pack 5 Aulas", description: null, duration_minutes: 90, price_cents: 15000, category: "pack", modality: "Surf" },
-      { id: "ph-svc-4", name: "Aluguer de Prancha", description: "Tábua de surf + leash", duration_minutes: 60, price_cents: 1500, category: "aluguer", modality: "Surf" },
-    ];
-
-    const realInstructors: PublicInstructor[] = (instructorsRes.data ?? []).map((inst) => ({
+    instructors = (instructorsRes.data ?? []).map((inst) => ({
       name: inst.name,
       level: inst.level || "",
       avatar_url: inst.avatar_url
@@ -145,8 +140,6 @@ export async function getPublicSchoolData(
             .getPublicUrl(inst.avatar_url).data.publicUrl
         : null,
     }));
-
-    instructors = realInstructors.length > 0 ? realInstructors : instructors;
 
     const { data: sessionsData } = sessionsRes;
     const realSessions: PublicSession[] = (sessionsData ?? []).map((s) => ({
@@ -184,13 +177,13 @@ export async function getPublicSchoolData(
   return {
     school: {
       id: school.id,
-      name: "Nome da Escola",
+      name: school.name || "Nome da Escola",
       slug: school.slug,
-      description: "Descrição breve da escola. Aqui podes falar sobre a tua escola de surf, a tua missão e o que ofereces.",
-      location: "Localização",
-      logo_url: "https://placehold.co/120x120/1E6FA8/FFFFFF?text=Logo",
+      description: school.description || null,
+      location: school.location || null,
+      logo_url: school.logo_url || null,
       phone: school.phone ?? null,
-      timezone: "Europe/Lisbon",
+      timezone: school.timezone || "Europe/Lisbon",
     },
     images,
     instructors,

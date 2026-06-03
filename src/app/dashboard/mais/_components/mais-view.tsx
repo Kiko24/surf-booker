@@ -422,7 +422,7 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                     {images.length === 0 ? (
                       <p className="py-4 text-center font-body text-sm text-text-secondary">Nenhuma imagem adicionada ainda</p>
                     ) : (
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
                         {images.map((img) => (
                           <div key={img.id} className="relative aspect-square overflow-hidden rounded-xl bg-[#2A2A2A]">
                             <button type="button" onClick={() => setLightboxImage(img.public_url)} className="h-full w-full">
@@ -467,10 +467,11 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                     )}
                   </button>
                   <input ref={instrutorFileRef} type="file" accept="image/png,image/webp,image/jpeg" className="hidden" onChange={(e) => {
+                    setInstrutorError("");
                     const file = e.target.files?.[0];
                     if (!file) return;
-                    if (!["image/png", "image/webp", "image/jpeg"].includes(file.type)) { console.error("Formato não permitido. Usa PNG, WebP ou JPEG"); return; }
-                    if (file.size > 1024 * 1024) { console.error("Foto demasiado grande. Máximo 1MB"); return; }
+                    if (!["image/png", "image/webp", "image/jpeg"].includes(file.type)) { setInstrutorError("Formato não permitido. Usa PNG, WebP ou JPEG"); return; }
+                    if (file.size > 1024 * 1024) { setInstrutorError(`Foto demasiado grande. Máximo ${(1024 * 1024) / (1024 * 1024)}MB`); return; }
                     setInstrutorFotoFile(file);
                     const reader = new FileReader();
                     reader.onloadend = () => setInstrutorFotoPreview(reader.result as string);
@@ -478,7 +479,6 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                   }} />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  {instrutorError && <p className="font-body text-sm text-error col-span-full">{instrutorError}</p>}
                   <div>
                     <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">Nome do instrutor <span className="text-error">*</span></label>
                     <input type="text" value={instrutorNome} onChange={(e) => setInstrutorNome(e.target.value)} placeholder="Ex: João Silva" className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent" />
@@ -512,8 +512,16 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                   </div>
                   </div>
                 )}
+                {instrutorError && (
+                  <div className="flex items-center gap-2 rounded-xl bg-error/10 px-4 py-3 mt-4">
+                    <svg className="h-4 w-4 shrink-0 text-error" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+                    </svg>
+                    <p className="font-body text-sm text-error">{instrutorError}</p>
+                  </div>
+                )}
                 <div className="flex gap-4 pt-6">
-                  <button type="button" onClick={() => { setSelectedSection(null); setInstrutorNome(""); setInstrutorNivel(""); setInstrutorFotoFile(null); setInstrutorFotoPreview(null); setEditingInstrutorId(null); }} className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground">Fechar</button>
+                  <button type="button" onClick={() => { setSelectedSection(null); setInstrutorNome(""); setInstrutorNivel(""); setInstrutorFotoFile(null); setInstrutorFotoPreview(null); setEditingInstrutorId(null); setInstrutorError(""); }} className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground">Fechar</button>
                   <button type="button" disabled={instrutorSaving} onClick={async () => {
                     setInstrutorError("");
                     if (!instrutorNome.trim()) { setInstrutorError("O nome é obrigatório"); return; }
@@ -1072,16 +1080,11 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                 accept="image/png,image/webp,image/jpeg"
                 className="hidden"
                  onChange={(e) => {
+                  setInstrutorError("");
                   const file = e.target.files?.[0];
                   if (!file) return;
-                  if (!["image/png", "image/webp", "image/jpeg"].includes(file.type)) {
-                    console.error("Formato não permitido. Usa PNG, WebP ou JPEG");
-                    return;
-                  }
-                  if (file.size > 1024 * 1024) {
-                    console.error("Foto demasiado grande. Máximo 1MB");
-                    return;
-                  }
+                  if (!["image/png", "image/webp", "image/jpeg"].includes(file.type)) { setInstrutorError("Formato não permitido. Usa PNG, WebP ou JPEG"); return; }
+                  if (file.size > 1024 * 1024) { setInstrutorError(`Foto demasiado grande. Máximo ${(1024 * 1024) / (1024 * 1024)}MB`); return; }
                   setInstrutorFotoFile(file);
                   const reader = new FileReader();
                   reader.onloadend = () => setInstrutorFotoPreview(reader.result as string);
