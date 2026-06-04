@@ -255,7 +255,7 @@ export function CalendarioView({ schoolId }: Props) {
                           }
                           setExpandedSession(null);
                         }}
-                        className={`flex flex-col items-center gap-px p-1 border-b border-r border-white/5 transition-colors hover:bg-accent/5 min-h-[48px] xl:min-h-[56px] ${
+                        className={`flex flex-col items-center gap-px p-1 border-b border-r border-white/5 transition-colors hover:bg-accent/5 min-h-[48px] max-md:min-h-[56px] xl:min-h-[56px] ${
                           isSelected
                             ? "bg-accent/10 ring-1 ring-inset ring-accent"
                             : ""
@@ -322,133 +322,142 @@ export function CalendarioView({ schoolId }: Props) {
                       daySessions.map((session, si) => {
                         const isExpanded = expandedSession === si;
                         return (
-                          <div key={si}>
+                          <div key={session.id} className="border-b border-white/5 last:border-b-0">
                             <button
                               type="button"
                               onClick={() => setExpandedSession(isExpanded ? null : si)}
-                              className="w-full flex items-center justify-between px-3 py-2.5 text-left transition-colors hover:bg-accent/10"
+                              className="w-full flex items-center justify-between gap-2 px-3 py-2.5 text-left transition-colors hover:bg-accent/10"
                             >
-                              <div className="flex items-center gap-2.5 min-w-0">
-                                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent/20">
-                                  <span className="font-body text-xs font-bold text-accent">{session.alunos}</span>
-                                </div>
-                                <div className="min-w-0">
-                                  <p className="font-body text-xs font-semibold text-foreground truncate">{session.nome}</p>
-                                  <p className="font-body text-[10px] text-text-secondary">
-                                    {session.time}{session.capacidade > 0 && <> · {session.alunos}/{session.capacidade}</>}
-                                  </p>
-                                </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="font-body text-xs font-semibold text-foreground truncate">{session.nome}</p>
+                                <p className="font-body text-[10px] text-text-secondary">{session.time}</p>
                               </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <span className="font-body text-xs text-text-muted">Inscritos</span>
+                                <span className="rounded-md bg-accent/15 px-2 py-0.5 font-body text-xs font-bold text-accent">
+                                  {session.alunos}{session.capacidade > 0 ? `/${session.capacidade}` : ""}
+                                </span>
+                              </div>
+                              <ChevronRightIcon className={`h-3.5 w-3.5 shrink-0 text-text-secondary transition-transform ${isExpanded ? "rotate-90" : ""}`} />
                             </button>
                             {isExpanded && (
-                              <div className="px-3 pb-3 space-y-2">
+                              <div className="px-3 pb-3 space-y-3">
                                 {session.alunosList.length > 0 && (
                                   <div className="flex flex-wrap gap-1.5">
                                     {session.alunosList.map((aluno, ai) => (
-                                      <span key={ai} className="inline-flex items-center gap-1 rounded-full bg-[#2A2A2A] px-2 py-0.5 font-body text-[10px] text-text-secondary">
+                                      <span key={ai} className="inline-flex items-center gap-1 rounded-full bg-[#2A2A2A] px-2.5 py-1 font-body text-xs text-text-secondary">
                                         {aluno.name}
-                                        {aluno.paymentStatus === "paid_offline" ? (
-                                          <svg className="h-2.5 w-2.5 text-success" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
-                                        ) : aluno.paymentStatus === "unpaid" ? (
-                                          <svg className="h-2.5 w-2.5 text-error" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-                                        ) : null}
+                                        {aluno.paymentStatus === "paid_offline" && (
+                                          <svg className="h-3 w-3 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                          </svg>
+                                        )}
+                                        {aluno.paymentStatus === "unpaid" && (
+                                          <svg className="h-3 w-3 text-error" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                          </svg>
+                                        )}
                                       </span>
                                     ))}
                                     {session.alunos < session.capacidade && (
                                       <button
                                         type="button"
                                         onClick={(e) => { e.stopPropagation(); setGuestSessionId(session.id); setShowGuestModal(true); }}
-                                        className="inline-flex items-center gap-1 rounded-full bg-accent/10 px-2 py-0.5 font-body text-[10px] text-accent transition-colors hover:bg-accent/20"
+                                        className="inline-flex items-center gap-1 rounded-full bg-accent/10 px-2.5 py-1 font-body text-xs text-accent transition-colors hover:bg-accent/20"
                                       >
-                                        + Aluno
+                                        <PlusIcon className="h-3 w-3" /> Aluno
                                       </button>
                                     )}
                                   </div>
                                 )}
                                 {session.instructorName && (
                                   <div className="flex items-center gap-2">
-                                    <span className="font-body text-[10px] text-text-muted">Instrutor:</span>
-                                    <span className="inline-flex items-center gap-1 rounded-full bg-[#2A2A2A] px-2 py-0.5 font-body text-[10px] text-text-secondary">{session.instructorName}</span>
+                                    <span className="font-body text-xs text-text-muted">Instrutor:</span>
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-[#2A2A2A] px-2.5 py-1 font-body text-xs text-text-secondary">{session.instructorName}</span>
                                   </div>
                                 )}
-                                {(() => {
-                                  const isPast = new Date(session.starts_at) < new Date();
-                                  if (isPast) {
+                                {session.capacidade > 0 && (
+                                  <div>
+                                    <div className="flex items-center justify-between mb-1">
+                                      <span className="font-body text-xs text-text-muted">Ocupação</span>
+                                      <span className="font-body text-xs text-text-muted">{Math.round((session.alunos / session.capacidade) * 100)}%</span>
+                                    </div>
+                                    <div className="h-1.5 w-full rounded-full bg-[#2A2A2A] overflow-hidden">
+                                      <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${Math.round((session.alunos / session.capacidade) * 100)}%` }} />
+                                    </div>
+                                  </div>
+                                )}
+                                <div className="flex flex-nowrap gap-2 pt-1">
+                                  {(() => {
+                                    const isPast = new Date(session.starts_at) < new Date();
+                                    if (isPast) {
+                                      return (
+                                        <>
+                                          <button
+                                            type="button"
+                                            onClick={(e) => { e.stopPropagation(); setCompletingSession(si); setShowCompleteConfirm(true) }}
+                                            className="flex-1 rounded-lg bg-success/20 py-2 font-body text-xs font-semibold text-success transition-colors hover:bg-success/30"
+                                          >
+                                            Realizada
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={(e) => { e.stopPropagation(); setDeletingSession(si); setShowDeleteConfirm(true) }}
+                                            className="flex-1 rounded-lg bg-error/20 py-2 font-body text-xs font-semibold text-error transition-colors hover:bg-error/30"
+                                          >
+                                            Cancelada
+                                          </button>
+                                        </>
+                                      );
+                                    }
                                     return (
-                                      <div className="flex gap-2 pt-1">
+                                      <>
                                         <button
                                           type="button"
-                                          onClick={(e) => { e.stopPropagation(); setCompletingSession(si); setShowCompleteConfirm(true) }}
-                                          className="flex-1 rounded-lg bg-success/20 py-1.5 font-body text-[10px] font-semibold text-success transition-colors hover:bg-success/30"
+                                          onClick={(e) => { e.stopPropagation(); setGuestSessionId(session.id); setShowGuestModal(true); }}
+                                          className="flex-1 rounded-lg bg-accent/10 py-2 font-body text-xs font-semibold text-accent transition-colors hover:bg-accent/20"
                                         >
-                                          Realizada
-                                      </button>
-                                      {session.alunos > 0 && (
-                                        <button
-                                          type="button"
-                                          onClick={(e) => { e.stopPropagation(); setCompletingSession(si); setShowCompleteConfirm(true); }}
-                                          className="rounded-lg bg-success/10 px-3 py-1.5 font-body text-[10px] font-semibold text-success transition-colors hover:bg-success/20"
-                                        >
-                                          Concluir
+                                          + Convidado
                                         </button>
-                                      )}
-                                      <button
+                                        <button
+                                          type="button"
+                                          onClick={(e) => { e.stopPropagation(); setShowGroupModal(true); setGroupSessionId(session.id); }}
+                                          className="flex-1 rounded-lg bg-accent/10 py-2 font-body text-xs font-semibold text-accent transition-colors hover:bg-accent/20"
+                                        >
+                                          + Grupo
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setEditingSession(si);
+                                            setDataAula(`${year}-${String(month + 1).padStart(2, "0")}-${String(selectedDay).padStart(2, "0")}`);
+                                            const [h, m] = session.time.split(":");
+                                            setHorario(`${h.padStart(2, "0")}:${(m ?? "00").padStart(2, "0")}`);
+                                            setSelectedServicoId(session.class_type_id ?? "");
+                                            const svc = servicos.find((sv) => sv.id === session.class_type_id);
+                                            setDuracao(svc?.default_duration_minutes ? String(svc.default_duration_minutes) : "90");
+                                            setCapacidade(session.capacidade ? String(session.capacidade) : "");
+                                            setInstrutorSelecionadoId(session.instructor_id ?? "");
+                                            setShowModal(true);
+                                            fetchServicos();
+                                            fetchInstrutores();
+                                          }}
+                                          className="flex-1 rounded-lg bg-[#2A2A2A] py-2 font-body text-xs font-semibold text-text-secondary transition-colors hover:bg-accent/10"
+                                        >
+                                          Editar
+                                        </button>
+                                        <button
                                           type="button"
                                           onClick={(e) => { e.stopPropagation(); setDeletingSession(si); setShowDeleteConfirm(true) }}
-                                          className="flex-1 rounded-lg bg-error/20 py-1.5 font-body text-[10px] font-semibold text-error transition-colors hover:bg-error/30"
+                                          className="flex-1 rounded-lg bg-error/10 py-2 font-body text-xs font-semibold text-error transition-colors hover:bg-error/20"
                                         >
-                                          Cancelada
+                                          Cancelar
                                         </button>
-                                      </div>
+                                      </>
                                     );
-                                  }
-                                  return (
-                                    <div className="flex flex-wrap gap-2 pt-1">
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setEditingSession(si);
-                                          setDataAula(`${year}-${String(month + 1).padStart(2, "0")}-${String(selectedDay).padStart(2, "0")}`);
-                                          const [h, m] = session.time.split(":");
-                                          setHorario(`${h.padStart(2, "0")}:${(m ?? "00").padStart(2, "0")}`);
-                                          setSelectedServicoId(session.class_type_id ?? "");
-                                          const svc = servicos.find((sv) => sv.id === session.class_type_id);
-                                          setDuracao(svc?.default_duration_minutes ? String(svc.default_duration_minutes) : "90");
-                                          setCapacidade(session.capacidade ? String(session.capacidade) : "");
-                                          setInstrutorSelecionadoId(session.instructor_id ?? "");
-                                          setShowModal(true);
-                                          fetchServicos();
-                                          fetchInstrutores();
-                                        }}
-                                        className="rounded-lg bg-[#2A2A2A] px-3 py-1.5 font-body text-[10px] font-semibold text-text-secondary transition-colors hover:bg-accent/10"
-                                      >
-                                        Editar
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={(e) => { e.stopPropagation(); setGuestSessionId(session.id); setShowGuestModal(true); }}
-                                        className="rounded-lg bg-accent/10 px-3 py-1.5 font-body text-[10px] font-semibold text-accent transition-colors hover:bg-accent/20"
-                                      >
-                                        + Convidado
-                                      </button>
-                                      <button
-                                        type="button"
-                                          onClick={(e) => { e.stopPropagation(); setShowGroupModal(true); setGroupSessionId(session.id); }}
-                                        className="rounded-lg bg-accent/10 px-3 py-1.5 font-body text-[10px] font-semibold text-accent transition-colors hover:bg-accent/20"
-                                      >
-                                        + Grupo
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={(e) => { e.stopPropagation(); setDeletingSession(si); setShowDeleteConfirm(true) }}
-                                        className="rounded-lg bg-error/10 px-3 py-1.5 font-body text-[10px] font-semibold text-error transition-colors hover:bg-error/20"
-                                      >
-                                        Cancelar
-                                      </button>
-                                    </div>
-                                  );
-                                })()}
+                                  })()}
+                                </div>
                               </div>
                             )}
                           </div>
@@ -462,7 +471,6 @@ export function CalendarioView({ schoolId }: Props) {
                   </div>
                 </div>
               )}
-
         {/* Sessions sidebar — same height as calendar */}
         {showSidebar && (
           <div className="max-md:hidden absolute left-[calc(100%+24px)] top-0 bottom-0 w-[380px] flex flex-col overflow-hidden xl:z-10 pt-20">
@@ -486,21 +494,21 @@ export function CalendarioView({ schoolId }: Props) {
                         <button
                           type="button"
                           onClick={() => setExpandedSession(isExpanded ? null : si)}
-                          className="w-full flex items-center justify-between px-4 py-3 text-left transition-colors hover:bg-accent/10"
+                          className="w-full flex items-center justify-between gap-2 px-4 py-3 text-left transition-colors hover:bg-accent/10"
                         >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent/20">
-                              <span className="font-body text-sm font-bold text-accent">{session.alunos}</span>
-                            </div>
-                            <div className="min-w-0">
-                              <p className="font-body text-sm font-semibold text-foreground truncate">{session.nome}</p>
-                              <p className="font-body text-xs text-text-secondary">
-                                {session.time}
-                                {session.capacidade > 0 && <> &middot; {session.alunos}/{session.capacidade}</>}
-                              </p>
-                            </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-body text-sm font-semibold text-foreground truncate">{session.nome}</p>
+                            <p className="font-body text-xs text-text-secondary">{session.time}</p>
                           </div>
-                          <ChevronRightIcon className={`h-4 w-4 shrink-0 text-text-secondary transition-transform ${isExpanded ? "rotate-90" : ""}`} />
+                          <div className="flex items-center gap-3 shrink-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-body text-sm text-text-muted">Inscritos</span>
+                              <span className="rounded-md bg-accent/15 px-2.5 py-0.5 font-body text-sm font-bold text-accent">
+                                {session.alunos}{session.capacidade > 0 ? `/${session.capacidade}` : ""}
+                              </span>
+                            </div>
+                            <ChevronRightIcon className={`h-4 w-4 text-text-secondary transition-transform ${isExpanded ? "rotate-90" : ""}`} />
+                          </div>
                         </button>
 
                         {isExpanded && (
@@ -553,7 +561,7 @@ export function CalendarioView({ schoolId }: Props) {
                               </div>
                             )}
 
-                            <div className="flex gap-2 pt-1">
+                            <div className="flex flex-nowrap gap-2 pt-1">
                               {(() => {
                                 const isPast = new Date(session.starts_at) < new Date();
                                 if (isPast) {
@@ -580,6 +588,20 @@ export function CalendarioView({ schoolId }: Props) {
                                   <>
                                     <button
                                       type="button"
+                                      onClick={(e) => { e.stopPropagation(); setGuestSessionId(session.id); setShowGuestModal(true); }}
+                                      className="flex-1 rounded-lg bg-accent/10 py-2 font-body text-xs font-semibold text-accent transition-colors hover:bg-accent/20"
+                                    >
+                                      + Convidado
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); setShowGroupModal(true); setGroupSessionId(session.id); }}
+                                      className="flex-1 rounded-lg bg-accent/10 py-2 font-body text-xs font-semibold text-accent transition-colors hover:bg-accent/20"
+                                    >
+                                      + Grupo
+                                    </button>
+                                    <button
+                                      type="button"
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         setEditingSession(si);
@@ -599,24 +621,13 @@ export function CalendarioView({ schoolId }: Props) {
                                     >
                                       Editar
                                     </button>
-                                    {daySessions.length > 0 && (
-                                      <button
-                                        type="button"
-                                        onClick={(e) => { e.stopPropagation(); setDeletingSession(si); setShowDeleteConfirm(true) }}
-                                        className="flex-1 rounded-lg bg-error/10 py-2 font-body text-xs font-semibold text-error transition-colors hover:bg-error/20"
-                                      >
-                                        Cancelar
-                                      </button>
-                                    )}
-                                    {daySessions.length > 0 && session.alunos > 0 && (
-                                      <button
-                                        type="button"
-                                        onClick={(e) => { e.stopPropagation(); setCompletingSession(si); setShowCompleteConfirm(true) }}
-                                        className="flex-1 rounded-lg bg-success/10 py-2 font-body text-xs font-semibold text-success transition-colors hover:bg-success/20"
-                                      >
-                                        Concluir
-                                      </button>
-                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); setDeletingSession(si); setShowDeleteConfirm(true) }}
+                                      className="flex-1 rounded-lg bg-error/10 py-2 font-body text-xs font-semibold text-error transition-colors hover:bg-error/20"
+                                    >
+                                      Cancelar
+                                    </button>
                                   </>
                                 );
                               })()}
