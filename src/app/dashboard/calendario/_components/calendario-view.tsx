@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams, useRouter } from "next/navigation";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   getSessionsForMonth,
   createSession,
@@ -128,6 +128,25 @@ export function CalendarioView({ schoolId }: Props) {
   const [groupPeople, setGroupPeople] = useState("2");
   const [groupError, setGroupError] = useState("");
 
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [fabRight, setFabRight] = useState(0);
+
+  useEffect(() => {
+    function updateFabPosition() {
+      if (!wrapperRef.current) return;
+      const rect = wrapperRef.current.getBoundingClientRect();
+      setFabRight(window.innerWidth - rect.right - 4);
+    }
+    updateFabPosition();
+    window.addEventListener("resize", updateFabPosition);
+    const observer = new ResizeObserver(updateFabPosition);
+    if (wrapperRef.current) observer.observe(wrapperRef.current);
+    return () => {
+      window.removeEventListener("resize", updateFabPosition);
+      observer.disconnect();
+    };
+  }, []);
+
   useEffect(() => {
     if (searchParams.get("nova") === "true") {
       setShowModal(true);
@@ -160,17 +179,17 @@ export function CalendarioView({ schoolId }: Props) {
 
   return (
     <>
-      <div className="relative" style={{ maxWidth: "800px" }}>
+      <div ref={wrapperRef} className="relative max-w-[800px] lg:max-w-[1100px] xl:mx-auto">
         <main
-          className="px-5 pt-4 flex flex-col gap-3 md:overflow-hidden md:h-[95vh]"
+          className="px-5 pt-4 md:pt-8 2xl:pt-2 flex flex-col max-md:gap-8 gap-3 md:overflow-hidden max-md:h-[80vh] md:h-[70vh] 2xl:h-[85vh]"
         >
           {/* Title + Month nav */}
-          <div className="flex flex-col md:flex-row md:items-start gap-0 mt-4 shrink-0">
+          <div className="flex flex-col items-start gap-0 max-md:mt-4 shrink-0 md:pb-5">
 
-            <h1 className="max-md:hidden font-heading text-2xl xl:text-3xl font-bold text-foreground shrink-0">
+            <h1 className="font-heading text-2xl font-bold text-foreground shrink-0 md:fixed md:left-[288px] md:top-[48px] 2xl:top-2 md:z-10">
               Calendário
             </h1>
-            <div className="flex items-center gap-1.5 self-center md:self-auto md:ml-6 md:mt-[6px] mt-4">
+            <div className="flex items-center gap-1.5 self-center mt-8 md:mt-4 2xl:mt-0">
               <button
                 type="button"
                 onClick={prevMonth}
@@ -179,7 +198,7 @@ export function CalendarioView({ schoolId }: Props) {
               >
                 <ChevronLeftIcon className="h-4 w-4" />
               </button>
-              <h2 className="font-heading text-base xl:text-lg font-bold uppercase tracking-widest text-foreground min-w-[140px] text-center">
+              <h2 className="font-heading max-md:text-base md:text-lg font-bold uppercase tracking-widest text-foreground min-w-[140px] text-center">
                 {monthLabel}
               </h2>
               <button
@@ -308,16 +327,16 @@ export function CalendarioView({ schoolId }: Props) {
 
         {/* Mobile: session card */}
         {showSidebar && (
-          <div className="md:hidden mx-5 bg-surface border border-white/5 rounded-xl flex flex-col overflow-hidden max-h-[40vh] mt-6">
-                  <div className="p-3 border-b border-white/5 shrink-0">
-                    <h3 className="font-heading text-sm font-bold text-foreground">
+          <div className="mx-5 bg-surface border border-white/5 rounded-xl flex flex-col overflow-hidden max-h-[40vh] lg:max-h-[55vh] mt-6">
+                  <div className="p-3 lg:p-5 border-b border-white/5 shrink-0">
+                    <h3 className="font-heading text-sm lg:text-base font-bold text-foreground">
                       {eventCount > 0 ? `${eventCount} ${eventCount === 1 ? "sessão" : "sessões"}` : "Nenhuma sessão"}
                     </h3>
-                    <p className="font-body text-xs text-text-secondary">
+                    <p className="font-body text-xs lg:text-sm text-text-secondary">
                       {selectedDay} de {MONTHS[month]} de {year}
                     </p>
                   </div>
-                  <div className="flex-1 overflow-y-auto max-h-[30vh]">
+                  <div className="flex-1 overflow-y-auto max-h-[30vh] lg:max-h-[40vh]">
                     {daySessions.length > 0 ? (
                       daySessions.map((session, si) => {
                         const isExpanded = expandedSession === si;
@@ -326,26 +345,26 @@ export function CalendarioView({ schoolId }: Props) {
                             <button
                               type="button"
                               onClick={() => setExpandedSession(isExpanded ? null : si)}
-                              className="w-full flex items-center justify-between gap-2 px-3 py-2.5 text-left transition-colors hover:bg-accent/10"
+                              className="w-full flex items-center justify-between gap-2 px-3 lg:px-5 py-2.5 lg:py-3.5 text-left transition-colors hover:bg-accent/10"
                             >
                               <div className="min-w-0 flex-1">
-                                <p className="font-body text-xs font-semibold text-foreground truncate">{session.nome}</p>
-                                <p className="font-body text-[10px] text-text-secondary">{session.time}</p>
+                                <p className="font-body text-xs lg:text-sm font-semibold text-foreground truncate">{session.nome}</p>
+                                <p className="font-body text-[10px] lg:text-xs text-text-secondary">{session.time}</p>
                               </div>
                               <div className="flex items-center gap-1.5 shrink-0">
-                                <span className="font-body text-xs text-text-muted">Inscritos</span>
-                                <span className="rounded-md bg-accent/15 px-2 py-0.5 font-body text-xs font-bold text-accent">
+                                <span className="font-body text-xs lg:text-sm text-text-muted">Inscritos</span>
+                                <span className="rounded-md bg-accent/15 px-2 py-0.5 font-body text-xs lg:text-sm font-bold text-accent">
                                   {session.alunos}{session.capacidade > 0 ? `/${session.capacidade}` : ""}
                                 </span>
                               </div>
                               <ChevronRightIcon className={`h-3.5 w-3.5 shrink-0 text-text-secondary transition-transform ${isExpanded ? "rotate-90" : ""}`} />
                             </button>
                             {isExpanded && (
-                              <div className="px-3 pb-3 space-y-3">
+                              <div className="px-3 lg:px-5 pb-3 lg:pb-4 space-y-3">
                                 {session.alunosList.length > 0 && (
                                   <div className="flex flex-wrap gap-1.5">
                                     {session.alunosList.map((aluno, ai) => (
-                                      <span key={ai} className="inline-flex items-center gap-1 rounded-full bg-[#2A2A2A] px-2.5 py-1 font-body text-xs text-text-secondary">
+                                      <span key={ai} className="inline-flex items-center gap-1 rounded-full bg-[#2A2A2A] px-2.5 py-1 font-body text-xs lg:text-sm text-text-secondary">
                                         {aluno.name}
                                         {aluno.paymentStatus === "paid_offline" && (
                                           <svg className="h-3 w-3 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -363,7 +382,7 @@ export function CalendarioView({ schoolId }: Props) {
                                       <button
                                         type="button"
                                         onClick={(e) => { e.stopPropagation(); setGuestSessionId(session.id); setShowGuestModal(true); }}
-                                        className="inline-flex items-center gap-1 rounded-full bg-accent/10 px-2.5 py-1 font-body text-xs text-accent transition-colors hover:bg-accent/20"
+className="inline-flex items-center gap-1 rounded-full bg-accent/10 px-2.5 py-1 font-body text-xs lg:text-sm text-accent transition-colors hover:bg-accent/20"
                                       >
                                         <PlusIcon className="h-3 w-3" /> Aluno
                                       </button>
@@ -372,15 +391,15 @@ export function CalendarioView({ schoolId }: Props) {
                                 )}
                                 {session.instructorName && (
                                   <div className="flex items-center gap-2">
-                                    <span className="font-body text-xs text-text-muted">Instrutor:</span>
-                                    <span className="inline-flex items-center gap-1 rounded-full bg-[#2A2A2A] px-2.5 py-1 font-body text-xs text-text-secondary">{session.instructorName}</span>
+                                    <span className="font-body text-xs lg:text-sm text-text-muted">Instrutor:</span>
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-[#2A2A2A] px-2.5 py-1 font-body text-xs lg:text-sm text-text-secondary">{session.instructorName}</span>
                                   </div>
                                 )}
                                 {session.capacidade > 0 && (
                                   <div>
                                     <div className="flex items-center justify-between mb-1">
-                                      <span className="font-body text-xs text-text-muted">Ocupação</span>
-                                      <span className="font-body text-xs text-text-muted">{Math.round((session.alunos / session.capacidade) * 100)}%</span>
+                                      <span className="font-body text-xs lg:text-sm text-text-muted">Ocupação</span>
+                                      <span className="font-body text-xs lg:text-sm text-text-muted">{Math.round((session.alunos / session.capacidade) * 100)}%</span>
                                     </div>
                                     <div className="h-1.5 w-full rounded-full bg-[#2A2A2A] overflow-hidden">
                                       <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${Math.round((session.alunos / session.capacidade) * 100)}%` }} />
@@ -396,14 +415,14 @@ export function CalendarioView({ schoolId }: Props) {
                                           <button
                                             type="button"
                                             onClick={(e) => { e.stopPropagation(); setCompletingSession(si); setShowCompleteConfirm(true) }}
-                                            className="flex-1 rounded-lg bg-success/20 py-2 font-body text-xs font-semibold text-success transition-colors hover:bg-success/30"
+                                            className="flex-1 rounded-lg bg-success/20 py-2 lg:py-2.5 font-body text-xs lg:text-sm font-semibold text-success transition-colors hover:bg-success/30"
                                           >
                                             Realizada
                                           </button>
                                           <button
                                             type="button"
                                             onClick={(e) => { e.stopPropagation(); setDeletingSession(si); setShowDeleteConfirm(true) }}
-                                            className="flex-1 rounded-lg bg-error/20 py-2 font-body text-xs font-semibold text-error transition-colors hover:bg-error/30"
+                                            className="flex-1 rounded-lg bg-error/20 py-2 lg:py-2.5 font-body text-xs lg:text-sm font-semibold text-error transition-colors hover:bg-error/30"
                                           >
                                             Cancelada
                                           </button>
@@ -415,14 +434,14 @@ export function CalendarioView({ schoolId }: Props) {
                                         <button
                                           type="button"
                                           onClick={(e) => { e.stopPropagation(); setGuestSessionId(session.id); setShowGuestModal(true); }}
-                                          className="flex-1 rounded-lg bg-accent/10 py-2 font-body text-xs font-semibold text-accent transition-colors hover:bg-accent/20"
+                                          className="flex-1 rounded-lg bg-accent/10 py-2 lg:py-2.5 font-body text-xs lg:text-sm font-semibold text-accent transition-colors hover:bg-accent/20"
                                         >
                                           + Convidado
                                         </button>
                                         <button
                                           type="button"
                                           onClick={(e) => { e.stopPropagation(); setShowGroupModal(true); setGroupSessionId(session.id); }}
-                                          className="flex-1 rounded-lg bg-accent/10 py-2 font-body text-xs font-semibold text-accent transition-colors hover:bg-accent/20"
+                                          className="flex-1 rounded-lg bg-accent/10 py-2 lg:py-2.5 font-body text-xs lg:text-sm font-semibold text-accent transition-colors hover:bg-accent/20"
                                         >
                                           + Grupo
                                         </button>
@@ -443,14 +462,14 @@ export function CalendarioView({ schoolId }: Props) {
                                             fetchServicos();
                                             fetchInstrutores();
                                           }}
-                                          className="flex-1 rounded-lg bg-[#2A2A2A] py-2 font-body text-xs font-semibold text-text-secondary transition-colors hover:bg-accent/10"
+className="flex-1 rounded-lg bg-[#2A2A2A] py-2 lg:py-2.5 font-body text-xs lg:text-sm font-semibold text-text-secondary transition-colors hover:bg-accent/10"
                                         >
                                           Editar
                                         </button>
                                         <button
                                           type="button"
                                           onClick={(e) => { e.stopPropagation(); setDeletingSession(si); setShowDeleteConfirm(true) }}
-                                          className="flex-1 rounded-lg bg-error/10 py-2 font-body text-xs font-semibold text-error transition-colors hover:bg-error/20"
+className="flex-1 rounded-lg bg-error/10 py-2 lg:py-2.5 font-body text-xs lg:text-sm font-semibold text-error transition-colors hover:bg-error/20"
                                         >
                                           Cancelar
                                         </button>
@@ -473,7 +492,7 @@ export function CalendarioView({ schoolId }: Props) {
               )}
         {/* Sessions sidebar — same height as calendar */}
         {showSidebar && (
-          <div className="max-md:hidden absolute left-[calc(100%+24px)] top-0 bottom-0 w-[380px] flex flex-col overflow-hidden xl:z-10 pt-20">
+          <div className="hidden absolute left-[calc(100%+24px)] top-0 bottom-0 w-[380px] flex flex-col overflow-hidden 2xl:z-10 pt-20">
             <div className="rounded-2xl bg-surface border border-white/5 flex flex-col overflow-hidden flex-1 min-h-0">
               <div className="p-4 border-b border-white/5 shrink-0">
                 <h3 className="font-heading text-lg font-bold text-foreground">
@@ -589,14 +608,14 @@ export function CalendarioView({ schoolId }: Props) {
                                     <button
                                       type="button"
                                       onClick={(e) => { e.stopPropagation(); setGuestSessionId(session.id); setShowGuestModal(true); }}
-                                      className="flex-1 rounded-lg bg-accent/10 py-2 font-body text-xs font-semibold text-accent transition-colors hover:bg-accent/20"
+                                      className="flex-1 rounded-lg bg-accent/10 py-2 lg:py-2.5 font-body text-xs lg:text-sm font-semibold text-accent transition-colors hover:bg-accent/20"
                                     >
                                       + Convidado
                                     </button>
                                     <button
                                       type="button"
                                       onClick={(e) => { e.stopPropagation(); setShowGroupModal(true); setGroupSessionId(session.id); }}
-                                      className="flex-1 rounded-lg bg-accent/10 py-2 font-body text-xs font-semibold text-accent transition-colors hover:bg-accent/20"
+                                      className="flex-1 rounded-lg bg-accent/10 py-2 lg:py-2.5 font-body text-xs lg:text-sm font-semibold text-accent transition-colors hover:bg-accent/20"
                                     >
                                       + Grupo
                                     </button>
@@ -691,13 +710,12 @@ export function CalendarioView({ schoolId }: Props) {
           fetchServicos();
           fetchInstrutores();
         }}
-        className="fixed bottom-24 md:bottom-12 right-6 md:right-12 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-primary-foreground shadow-2xl active:scale-90 transition-all duration-200"
+        className="fixed bottom-24 md:bottom-12 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-primary-foreground shadow-2xl active:scale-90 transition-all duration-200"
+        style={{ right: `${fabRight}px` }}
         aria-label="Adicionar evento"
       >
         <PlusIcon className="h-6 w-6" />
       </button>
-
-      {/* Cancel confirmation */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-5">
           <div className="w-full max-w-sm rounded-2xl bg-surface p-6 text-center">
@@ -997,8 +1015,8 @@ export function CalendarioView({ schoolId }: Props) {
 
       {/* Modal — Create / Edit session */}
       {showModal && (
-        <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center bg-black/50 md:px-5">
-          <div className="w-full max-w-md rounded-t-2xl md:rounded-2xl bg-surface p-6 pb-24 md:pb-6">
+        <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center bg-black/50 md:px-5" onClick={() => setShowModal(false)}>
+          <div className="w-full max-w-md rounded-t-2xl md:rounded-2xl bg-surface p-6 pb-24 md:pb-6" onClick={(e) => e.stopPropagation()}>
             <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted md:hidden" />
 
             <h3 className="font-heading text-2xl font-bold text-foreground mb-6">

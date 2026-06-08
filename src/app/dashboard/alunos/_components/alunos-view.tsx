@@ -73,10 +73,29 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
   const [showBuyPack, setShowBuyPack] = useState(false);
   const [availablePacks, setAvailablePacks] = useState<AvailablePack[]>([]);
   const [buyingPackId, setBuyingPackId] = useState<string | null>(null);
+  const [displayCount, setDisplayCount] = useState(20);
+  const sentinelRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const filteredByFilter = filterStudents(students, activeFilter);
   const filtered = searchStudents(filteredByFilter, searchQuery);
+  const displayed = filtered.slice(0, displayCount);
+
+  useEffect(() => {
+    if (displayCount >= filtered.length) return;
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setDisplayCount((prev) => Math.min(prev + 20, filtered.length));
+        }
+      },
+      { rootMargin: "200px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [displayCount, filtered.length]);
 
   useEffect(() => {
     if (searchOpen) searchRef.current?.focus();
@@ -93,8 +112,9 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
 
   return (
     <>
-      <main className="px-5 pt-4 flex flex-col min-h-screen">
-        <section className="mt-6 mb-6 flex items-center justify-between">
+      <div className="relative max-w-[800px] lg:max-w-[1100px] xl:mx-auto">
+        <main className="px-5 pt-4 flex flex-col max-md:fixed max-md:inset-0 max-md:overflow-hidden max-md:pb-24 md:min-h-screen">
+        <section className="shrink-0 mt-6 mb-6 flex items-center justify-between">
           {searchOpen ? (
               <div className="flex w-full items-center gap-4">
               <div className="relative flex-1">
@@ -186,7 +206,7 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
           )}
         </section>
 
-        <nav className="flex gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden">
+        <nav className="shrink-0 flex gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden">
           {FILTERS.map((f) => (
             <button
               key={f}
@@ -204,10 +224,10 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
         </nav>
 
         {/* Mobile View: List */}
-        <div className="md:hidden mt-6 w-full rounded-2xl bg-surface text-foreground overflow-hidden flex-1 mb-24">
-          <div className="h-full overflow-y-auto [&::-webkit-scrollbar]:hidden px-5 pt-2 pb-4">
+        <div className="md:hidden mt-6 w-full rounded-2xl bg-surface text-foreground overflow-hidden flex flex-col flex-1 min-h-0">
+          <div className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden px-5 pt-2 pb-4">
             <div className="divide-y divide-foreground/10">
-              {filtered.map((s) => (
+              {displayed.map((s) => (
                 <div key={s.id} className="flex items-center gap-4 py-3">
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-background text-lg font-bold text-accent">
                     {getInitials(s.name)}
@@ -226,6 +246,11 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
                 </div>
               ))}
             </div>
+            {displayCount < filtered.length && (
+              <div ref={sentinelRef} className="h-10 flex items-center justify-center">
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+              </div>
+            )}
           </div>
         </div>
 
@@ -299,6 +324,7 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
           </div>
         </div>
       </main>
+      </div>
 
       {/* Student popup */}
       {selectedStudent && !showDeleteConfirm && (
@@ -508,8 +534,8 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
 
       {/* Add student modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 md:px-5">
-          <div className="w-full max-w-md rounded-t-2xl md:rounded-2xl bg-surface p-6 pb-10 md:pb-6">
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 md:px-5" onClick={() => setShowAddModal(false)}>
+          <div className="w-full max-w-md rounded-t-2xl md:rounded-2xl bg-surface p-6 pb-24 md:pb-6" onClick={(e) => e.stopPropagation()}>
             <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted md:hidden" />
             <h3 className="font-heading text-2xl font-bold text-foreground mb-6">Adicionar aluno</h3>
 
@@ -576,19 +602,21 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
                       </svg>
                     </div>
                   </div>
-                  <div className="flex-1">
-                    <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
-                      Aulas restantes <span className="text-text-muted">(opcional)</span>
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={addRemainingLessons}
-                      onChange={(e) => setAddRemainingLessons(e.target.value)}
-                      placeholder="Ex: 10"
-                      className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
-                    />
-                  </div>
+                  {addPackId && (
+                    <div className="flex-1">
+                      <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+                        Aulas restantes
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={addRemainingLessons}
+                        onChange={(e) => setAddRemainingLessons(e.target.value)}
+                        placeholder="Ex: 10"
+                        className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 

@@ -136,10 +136,10 @@ export function DashboardView({ fullName, todaySessions, metricas, alertas, scho
         </Link>
 
         {/* Metrics + Alerts side by side on desktop */}
-        <div className="md:flex md:flex-row md:gap-6 md:items-stretch">
+        <div className="space-y-8 2xl:space-y-0 2xl:flex 2xl:flex-row 2xl:gap-6 2xl:items-stretch">
           {/* Metrics */}
           {metricas && (
-            <section className="space-y-4 md:flex-1 md:flex md:flex-col">
+            <section className="space-y-4 2xl:flex-1 2xl:flex 2xl:flex-col">
               <div className="flex items-center gap-3">
                 <h3 className="font-heading text-2xl text-foreground">Esta semana</h3>
                 <Link
@@ -150,52 +150,52 @@ export function DashboardView({ fullName, todaySessions, metricas, alertas, scho
                 </Link>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 md:flex md:flex-row md:items-stretch md:justify-start md:gap-4 md:flex-1">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-5 lg:gap-8 2xl:flex 2xl:flex-row 2xl:items-stretch 2xl:justify-start 2xl:gap-1 2xl:flex-1">
                 {/* Taxa de Ocupação */}
-                <div className="flex flex-col items-center rounded-xl border border-accent/10 bg-surface p-6 md:p-5 text-center shadow-md md:w-52 md:h-full">
-                  <div className="flex w-full flex-1 flex-col items-center justify-between gap-3 py-2">
-                    <span className="font-body text-base md:text-sm font-semibold uppercase text-text-secondary">
+                <div className="min-h-36 2xl:h-auto flex flex-col items-center rounded-xl border border-accent/10 bg-surface p-6 max-md:px-5 max-md:py-3 lg:p-7 md:p-5 2xl:p-5 text-center shadow-md md:flex-1 md:min-w-40 2xl:flex-none">
+                  <div className="flex w-full flex-1 flex-col items-center justify-between gap-3 max-md:gap-1 py-2 max-md:py-1">
+                    <span className="font-body text-base max-md:text-[10px] md:text-sm font-semibold uppercase text-text-secondary">
                       Ocupação
                     </span>
-                    <span className="font-heading text-5xl md:text-3xl text-foreground">
+                    <span className="font-heading text-5xl max-md:text-2xl md:text-3xl text-foreground">
                       {Math.round(metricas.ocupacao.taxa_media)}%
                     </span>
-                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-background">
+                    <div className="h-1.5 max-md:h-1 w-full overflow-hidden rounded-full bg-background">
                       <div className="h-full rounded-full bg-accent" style={{ width: `${Math.min(metricas.ocupacao.taxa_media, 100)}%` }} />
                     </div>
-                    <span className={`font-body text-base md:text-sm ${metricas.ocupacao.comparativo >= 0 ? "text-accent" : "text-error"}`}>
+                    <span className={`font-body text-base max-md:text-[10px] md:text-sm ${metricas.ocupacao.comparativo >= 0 ? "text-accent" : "text-error"}`}>
                       {metricas.ocupacao.comparativo >= 0 ? "↑" : "↓"} {Math.abs(metricas.ocupacao.comparativo)}% face semana passada
                     </span>
                   </div>
                 </div>
 
                 {/* Receita */}
-                <div className="flex flex-col items-center rounded-xl border border-accent/10 bg-surface p-6 md:p-5 text-center shadow-md md:w-52 md:h-full">
-                  <div className="flex w-full flex-1 flex-col items-center justify-between gap-3 py-2">
-                    <span className="font-body text-base md:text-sm font-semibold uppercase text-text-secondary">
+                <div className="min-h-36 2xl:h-auto flex flex-col items-center rounded-xl border border-accent/10 bg-surface p-6 max-md:px-5 max-md:py-3 lg:p-7 md:p-5 2xl:p-5 text-center shadow-md md:flex-1 md:min-w-40 2xl:flex-none">
+                  <div className="flex w-full flex-1 flex-col items-center justify-between gap-3 max-md:gap-1 py-2 max-md:py-1">
+                    <span className="font-body text-base max-md:text-[10px] md:text-sm font-semibold uppercase text-text-secondary">
                       Receita
                     </span>
-                    <span className="font-heading text-5xl md:text-3xl text-foreground">
+                    <span className="font-heading text-5xl max-md:text-2xl md:text-3xl text-foreground">
                       {metricas.receita.total}€
                     </span>
-                    <div className="h-1.5 w-full" />
-                    <span className={`font-body text-base md:text-sm ${metricas.receita.comparativo >= 0 ? "text-accent" : "text-error"}`}>
+                    <div className="h-1.5 max-md:h-1 w-full" />
+                    <span className={`font-body text-base max-md:text-[10px] md:text-sm ${metricas.receita.comparativo >= 0 ? "text-accent" : "text-error"}`}>
                       {metricas.receita.comparativo >= 0 ? "↑" : "↓"} {Math.abs(metricas.receita.comparativo)}€ face semana passada
                     </span>
                   </div>
                 </div>
 
                 {/* No-show */}
-                <div className="flex flex-col items-center rounded-xl border border-accent/10 bg-surface p-6 md:p-5 text-center shadow-md md:w-52 md:h-full">
-                  <div className="flex w-full flex-1 flex-col items-center justify-between gap-3 py-2">
-                    <span className="font-body text-base md:text-sm font-semibold uppercase text-text-secondary">
+                <div className="max-sm:hidden sm:min-h-36 2xl:h-auto flex flex-col items-center rounded-xl border border-accent/10 bg-surface p-6 max-md:px-5 max-md:py-3 lg:p-7 md:p-5 2xl:p-5 text-center shadow-md md:flex-1 md:min-w-40 2xl:flex-none">
+                  <div className="flex w-full flex-1 flex-col items-center justify-between gap-3 max-md:gap-1 py-2 max-md:py-1">
+                    <span className="font-body text-base max-md:text-[10px] md:text-sm font-semibold uppercase text-text-secondary">
                       No-show
                     </span>
-                    <span className="font-heading text-5xl md:text-3xl text-foreground">
+                    <span className="font-heading text-5xl max-md:text-2xl md:text-3xl text-foreground">
                       {metricas.noshow.taxa}%
                     </span>
                     <div className="h-1.5 w-full" />
-                    <span className={`font-body text-base md:text-sm ${metricas.noshow.comparativo <= 0 ? "text-accent" : "text-error"}`}>
+                    <span className={`font-body text-base max-md:text-[10px] md:text-sm ${metricas.noshow.comparativo <= 0 ? "text-accent" : "text-error"}`}>
                       {metricas.noshow.comparativo <= 0 ? "↓" : "↑"} {Math.abs(metricas.noshow.comparativo)}% face semana passada
                     </span>
                   </div>
@@ -206,7 +206,7 @@ export function DashboardView({ fullName, todaySessions, metricas, alertas, scho
 
           {/* Alerts */}
           {alertas.length > 0 && (
-            <section className="space-y-4 md:flex-1">
+            <section className="space-y-4 2xl:flex-1">
               <div className="flex items-center gap-3">
                 <h3 className="font-heading text-2xl text-foreground">Alertas</h3>
                 {alertas.length > 3 && (
@@ -222,7 +222,7 @@ export function DashboardView({ fullName, todaySessions, metricas, alertas, scho
 
               <div className="space-y-3">
                 {displayedAlertas.map((a) => (
-                <div key={a.id} className="flex items-center justify-between rounded-xl border border-accent/10 bg-surface px-5 py-4 shadow-md">
+                <div key={a.id} className="flex items-center justify-between rounded-xl border border-accent/10 bg-surface px-5 py-4 lg:px-7 lg:py-5 shadow-md">
                   <p className="flex-1 pr-4 font-body text-sm text-foreground">
                     {a.mensagem}
                   </p>

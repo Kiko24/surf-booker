@@ -80,7 +80,8 @@ export function ServicosView({ sessions, schoolId }: Props) {
 
   return (
     <>
-      <main className="px-5 pt-4">
+      <div className="relative max-w-[800px] lg:max-w-[1100px] xl:mx-auto">
+        <main className="px-5 pt-4">
         <section className="mt-6 mb-8 flex items-end justify-between">
           <h1 className="font-heading text-3xl font-bold text-foreground">
             Serviços
@@ -126,6 +127,16 @@ export function ServicosView({ sessions, schoolId }: Props) {
                   <h3 className="font-body text-base font-bold text-foreground"><span className="inline-block w-2 h-2 rounded-full bg-accent mr-2 mb-0.5" />{s.nome}</h3>
                   <p className="text-xs text-text-secondary">{s.modalidade} &middot; {s.duracao}min</p>
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedSession(s)}
+                  className="shrink-0 p-1 text-text-secondary hover:text-foreground transition-colors"
+                  aria-label="Opções do serviço"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                    <path d="M5 12h.01M12 12h.01M19 12h.01" />
+                  </svg>
+                </button>
               </div>
             ))}
           </div>
@@ -155,9 +166,9 @@ export function ServicosView({ sessions, schoolId }: Props) {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right align-middle">
-                    <button onClick={() => setSelectedSession(s)} className="p-2 text-on-surface-variant hover:text-primary-fixed-dim">
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                        <path d="M5 12h14M12 5v14"/>
+                    <button onClick={() => setSelectedSession(s)} className="p-2 text-text-secondary hover:text-foreground transition-colors" aria-label="Opções do serviço">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                        <path d="M5 12h.01M12 12h.01M19 12h.01" />
                       </svg>
                     </button>
                   </td>
@@ -167,6 +178,7 @@ export function ServicosView({ sessions, schoolId }: Props) {
           </table>
         </div>
       </main>
+      </div>
 
       {/* Service popup */}
       {selectedSession && (
@@ -261,8 +273,8 @@ export function ServicosView({ sessions, schoolId }: Props) {
 
       {/* Add / Edit Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center bg-black/50 md:px-5">
-          <div className="w-full max-w-md rounded-t-2xl md:rounded-2xl bg-surface p-6 pb-10 md:pb-6 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center bg-black/50 md:px-5" onClick={() => setShowModal(false)}>
+          <div className="w-full max-w-md rounded-t-2xl md:rounded-2xl bg-surface p-6 pb-10 md:pb-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted md:hidden" />
 
             <h3 className="font-heading text-2xl font-bold text-foreground mb-6">

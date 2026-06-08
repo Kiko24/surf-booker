@@ -182,7 +182,7 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
         {/* Grid layout */}
         <div className="md:grid md:grid-cols-12 md:gap-6 md:items-start">
           {/* Left column — setting cards */}
-          <div className="md:col-span-3">
+          <div className="md:col-span-3 min-h-[50vh] flex flex-col justify-center md:min-h-[65vh] 2xl:min-h-0 2xl:block">
             <div className="flex flex-col gap-3 w-full">
               <button
                 type="button"
@@ -304,7 +304,7 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
           </div>
 
           {/* Right column — desktop panel content */}
-          <div className="md:col-span-9 md:h-[calc(100vh-10rem)]">
+          <div className="max-md:hidden md:col-span-9 md:h-[calc(100vh-10rem)]">
             {!selectedSection && (
               <div className="h-full flex flex-col items-center justify-center text-center">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="h-12 w-12 text-text-muted mb-4">
