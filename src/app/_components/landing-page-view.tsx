@@ -85,6 +85,7 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
 
   const [showCalendar, setShowCalendar] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const faqs = [
     { q: "Preciso de conhecimentos técnicos para usar a Alaia?", a: "Não. A Alaia foi desenhada para donos de escolas de surf que não querem perder tempo com tecnologia. Em poucos minutos tens tudo configurado." },
@@ -104,8 +105,9 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
     <div className="bg-[#F7FAFC]">
       {/* Navbar — absolute sobre a hero */}
       <header className="absolute left-0 right-0 top-0 z-10 px-5 py-4 sm:px-8">
-        <div className="mx-auto flex max-w-4xl items-center justify-between rounded-full border border-gray-200 bg-white/90 px-4 py-2 shadow-sm backdrop-blur-sm">
-          <nav className="flex items-center gap-1">
+        <div className="mx-auto flex max-w-4xl items-center justify-between md:rounded-full md:border md:border-gray-200 md:bg-white/90 md:px-4 md:py-2 md:shadow-sm md:backdrop-blur-sm">
+          {/* Desktop nav */}
+          <nav className="hidden md:flex items-center gap-1">
             <button
               onClick={() => document.getElementById("como-funciona")?.scrollIntoView({ behavior: "smooth" })}
               className="font-body rounded-full px-3 py-1.5 text-sm font-semibold text-gray-900 transition-all hover:bg-accent/10 focus-visible:outline-2 focus-visible:outline-accent-light"
@@ -120,14 +122,15 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
             </button>
           </nav>
 
-          <a href="/" className="font-heading text-xl font-bold text-accent-light">
+          <a href="/" className="font-heading text-xl font-bold text-white md:text-accent-light">
             Alaia
           </a>
 
-          <div className="flex items-center gap-2">
+          {/* Desktop auth */}
+          <div className="hidden md:flex items-center gap-2">
             {user ? (
               <>
-                <span className="hidden text-sm text-gray-500 sm:block">
+                <span className="hidden text-sm text-gray-500 md:block">
                   {user.name}
                 </span>
                 <button
@@ -142,7 +145,7 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
               <>
                 <a
                   href="/onboarding"
-                  className="font-body hidden rounded-full px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100 sm:block"
+                  className="font-body rounded-full px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100"
                 >
                   Entrar
                 </a>
@@ -155,29 +158,71 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
               </>
             )}
           </div>
-        </div>
-      </header>
 
-      {/* Mobile nav links */}
-      <div className="absolute left-0 right-0 top-16 z-10 flex justify-center gap-1 px-5 py-3 sm:hidden">
-        <button
-          onClick={() => document.getElementById("como-funciona")?.scrollIntoView({ behavior: "smooth" })}
-          className="font-body rounded-full px-3 py-1.5 text-sm font-semibold text-gray-900 transition-all hover:bg-accent/10 focus-visible:outline-2 focus-visible:outline-accent-light"
-        >
-          Como funciona?
-        </button>
-        <button
-          onClick={() => document.getElementById("contacto")?.scrollIntoView({ behavior: "smooth" })}
-          className="font-body rounded-full px-3 py-1.5 text-sm font-semibold text-gray-900 transition-all hover:bg-accent/10 focus-visible:outline-2 focus-visible:outline-accent-light"
-        >
-          Contacto
-        </button>
-        {!user && (
-          <a href="/onboarding" className="font-body rounded-full px-3 py-1.5 text-sm font-semibold text-accent transition-all hover:bg-accent/10">
-            Entrar
-          </a>
-        )}
-      </div>
+          {/* Mobile hamburger */}
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="flex md:hidden items-center justify-center h-9 w-9 rounded-full text-white hover:bg-white/20 transition-colors"
+            aria-label="Menu"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              {mobileMenuOpen ? (
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+              )}
+            </svg>
+          </button>
+        </div>
+
+        {/* Mobile dropdown */}
+        <div className={`mt-2 mx-auto max-w-4xl rounded-2xl border border-gray-200 bg-white/95 px-5 py-5 shadow-lg backdrop-blur-md md:hidden transition-all duration-300 ease-out ${
+          mobileMenuOpen ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2 pointer-events-none"
+        }`}>
+          <nav className="flex flex-col gap-3">
+              <button
+                onClick={() => { setMobileMenuOpen(false); document.getElementById("como-funciona")?.scrollIntoView({ behavior: "smooth" }); }}
+                className="w-full text-left font-body rounded-xl px-4 py-3 text-sm font-semibold text-gray-900 transition-colors hover:bg-gray-100"
+              >
+                Como funciona?
+              </button>
+              <button
+                onClick={() => { setMobileMenuOpen(false); document.getElementById("contacto")?.scrollIntoView({ behavior: "smooth" }); }}
+                className="w-full text-left font-body rounded-xl px-4 py-3 text-sm font-semibold text-gray-900 transition-colors hover:bg-gray-100"
+              >
+                Contacto
+              </button>
+              <hr className="border-gray-200" />
+              {user ? (
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  className="w-full text-left font-body rounded-xl bg-gray-100 px-4 py-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200"
+                >
+                  Sair
+                </button>
+              ) : (
+                <>
+                  <a
+                    href="/onboarding"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block w-full text-center font-body rounded-xl border border-accent-light bg-white px-4 py-3 text-sm font-semibold text-accent-light transition-colors hover:bg-accent-light hover:text-white"
+                  >
+                    Entrar
+                  </a>
+                  <a
+                    href="/signup-owner"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block w-full text-center font-body rounded-xl border border-accent-light bg-white px-4 py-3 text-sm font-semibold text-accent-light transition-colors hover:bg-accent-light hover:text-white"
+                  >
+                    Registar o seu negócio
+                  </a>
+                </>
+              )}
+            </nav>
+          </div>
+      </header>
 
       <section className="relative z-0 flex min-h-dvh items-center justify-center overflow-hidden">
         {/* Imagem de fundo */}
@@ -217,18 +262,18 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
           <p className="text-[clamp(1rem,1.3vw,1.125rem)] text-gray-700 text-center max-w-2xl mx-auto leading-relaxed">
             Whatsapp, papéis, chamadas perdidas. Agora tudo no mesmo lugar.<br/>Com a Alaia gere as tuas aulas, as tuas reservas e os teus pagamentos. O resto é mar.
           </p>
-          <div className="mt-24 w-full">
-            <div className="flex flex-col md:flex-row gap-80">
+          <div className="mt-12 md:mt-24 w-full">
+            <div className="flex flex-col md:flex-row gap-16 md:gap-24 lg:gap-80">
               <div className="flex-1 flex justify-center">
                 <div className="w-fit flex-shrink-0 bg-white">
-                  <Image src={mockupImg} alt="Mockup da plataforma Alaia" width={555} height={1115} className="w-auto max-w-[240px] h-auto transition-transform duration-300 ease-out hover:scale-[1.02]" />
+                  <Image src={mockupImg} alt="Mockup da plataforma Alaia" width={555} height={1115} className="w-auto max-w-[180px] sm:max-w-[240px] h-auto transition-transform duration-300 ease-out hover:scale-[1.02]" />
                 </div>
               </div>
-              <div className="flex-1 flex justify-start -ml-24">
-                <div className="min-h-40 w-fit flex flex-col items-start">
+              <div className="flex-1 flex justify-center md:justify-start md:-ml-24">
+                <div className="min-h-40 w-fit flex flex-col items-center text-center md:items-start md:text-left">
                   <h3 className="font-heading text-[clamp(1.25rem,2.5vw,2rem)] font-bold text-gray-900 whitespace-nowrap">Tudo na ponta dos teus dedos</h3>
                   <p className="mt-1 text-[clamp(1rem,1.3vw,1.125rem)] text-gray-600">Menos tempo a organizar, mais tempo no mar.</p>
-                  <div className="relative mt-14 pl-8">
+                  <div className="relative mt-14 pl-8 self-start text-left">
                     <div className="absolute top-[12px] bottom-[12px] left-[11px] w-px bg-gradient-to-b from-accent-light via-accent-light/40 to-transparent z-0 pointer-events-none" />
                     <div className="space-y-10">
                       {[
@@ -239,7 +284,7 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
                         <div key={i} className="relative pl-4 group">
                           <div className="absolute left-[-20px] top-1.5 h-3 w-3 -translate-x-1/2 rounded-full border-2 border-white bg-accent-light/40 transition-all z-10 group-hover:scale-125 group-hover:bg-accent-light group-hover:shadow-[0_0_8px_rgba(30,111,168,0.5)]" />
                           <h3 className="font-heading text-[clamp(1rem,1.3vw,1.125rem)] font-semibold text-gray-900">{item.title}</h3>
-                          <p className="mt-0.5 text-[clamp(0.75rem,1vw,0.875rem)] leading-snug text-gray-700">{item.desc}</p>
+                          <p className="mt-0.5 text-[clamp(0.8125rem,1vw,0.875rem)] leading-snug text-gray-700">{item.desc}</p>
                         </div>
                       ))}
                     </div>
@@ -291,8 +336,8 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
           <div className="mx-auto max-w-4xl">
           <h2 className="font-heading text-[clamp(1.25rem,2.5vw,2rem)] font-bold text-gray-900 text-center">Menos tempo perdido. Mais organização.</h2>
           <p className="mt-1 text-[clamp(1rem,1.3vw,1.125rem)] text-gray-600 text-center">Ferramentas para pores a escola a funcionar sozinha</p>
-          <div className="mt-24 w-full">
-            <div className="flex flex-col md:flex-row gap-80">
+          <div className="mt-12 md:mt-24 w-full">
+            <div className="flex flex-col md:flex-row gap-16 md:gap-24 lg:gap-80">
               <div className="flex-1 flex justify-center">
                 <div className="w-full max-w-[240px] overflow-visible -ml-2">
                   <h3 className="font-heading text-[clamp(1.25rem,2.5vw,2rem)] font-bold text-gray-900 text-left whitespace-nowrap">O que a Alaia faz por ti.</h3>
@@ -304,7 +349,7 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
                       </svg>
                       <div>
                         <strong className="font-heading text-[clamp(1rem,1.3vw,1.125rem)] font-semibold text-gray-900">Reservas e pagamentos.</strong>
-                        <p className="text-[clamp(0.75rem,1vw,0.875rem)] text-gray-700 mt-0.5">Os alunos marcam online. Tu geres sem perder o controlo.</p>
+                        <p className="text-[clamp(0.8125rem,1vw,0.875rem)] text-gray-700 mt-0.5">Os alunos marcam online. Tu geres sem perder o controlo.</p>
                       </div>
                     </li>
                     <li className="group relative flex items-start gap-3 -mx-3 px-3 py-2 rounded-lg transition-all duration-300 ease-out hover:bg-gray-50 hover:translate-x-2 hover:scale-[1.02]">
@@ -313,7 +358,7 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
                       </svg>
                       <div>
                         <strong className="font-heading text-[clamp(1rem,1.3vw,1.125rem)] font-semibold text-gray-900">Waivers digitais.</strong>
-                        <p className="text-[clamp(0.75rem,1vw,0.875rem)] text-gray-700 mt-0.5">Os teus alunos assinam a responsabilidade antes de chegar à praia.</p>
+                        <p className="text-[clamp(0.8125rem,1vw,0.875rem)] text-gray-700 mt-0.5">Os teus alunos assinam a responsabilidade antes de chegar à praia.</p>
                       </div>
                     </li>
                     <li className="group relative flex items-start gap-3 -mx-3 px-3 py-2 rounded-lg transition-all duration-300 ease-out hover:bg-gray-50 hover:translate-x-2 hover:scale-[1.02]">
@@ -322,14 +367,14 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
                       </svg>
                       <div>
                         <strong className="font-heading text-[clamp(1rem,1.3vw,1.125rem)] font-semibold text-gray-900">Alunos e packs de aulas.</strong>
-                        <p className="text-[clamp(0.75rem,1vw,0.875rem)] text-gray-700 mt-0.5">Perfil completo e vendas adiantadas. Fidelizas e garantes receita.</p>
+                        <p className="text-[clamp(0.8125rem,1vw,0.875rem)] text-gray-700 mt-0.5">Perfil completo e vendas adiantadas. Fidelizas e garantes receita.</p>
                       </div>
                     </li>
                   </ul>
                 </div>
               </div>
-              <div className="flex-1 flex justify-start -ml-24">
-                <div className="w-full min-h-full relative overflow-hidden rounded-[3rem]">
+              <div className="flex-1 flex justify-start md:-ml-24">
+                <div className="w-full h-[300px] md:h-auto relative overflow-hidden rounded-[3rem]">
                   <Image src={featuresImg} alt="" fill className="object-cover" />
                 </div>
               </div>
