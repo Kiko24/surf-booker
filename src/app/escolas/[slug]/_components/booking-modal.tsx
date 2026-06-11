@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { criarReservaPublica } from "../actions";
+import { useState, useEffect } from "react";
+import { criarReservaPublica, buscarPackAtivo } from "../actions";
 
 type Props = {
   sessionId: string;
@@ -17,15 +17,30 @@ export function BookingModal({ sessionId, schoolId, onClose }: Props) {
   const [success, setSuccess] = useState(false);
   const [pending, setPending] = useState(false);
 
+  const [activePack, setActivePack] = useState<{ packPurchaseId: string; remaining: number; name: string } | null>(null);
+  const [packLoading, setPackLoading] = useState(false);
+
+  useEffect(() => {
+    if (!email.includes("@")) { setActivePack(null); return; }
+    const timer = setTimeout(async () => {
+      setPackLoading(true);
+      const pack = await buscarPackAtivo(schoolId, email);
+      setActivePack(pack);
+      setPackLoading(false);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [email, schoolId]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setPending(true);
-    const result = await criarReservaPublica(schoolId, sessionId, {
-      name,
-      email,
-      phone,
-    });
+    const result = await criarReservaPublica(
+      schoolId,
+      sessionId,
+      { name, email, phone },
+      activePack?.packPurchaseId ?? undefined
+    );
     setPending(false);
     if (!result.ok) {
       setError(result.error);
@@ -92,6 +107,13 @@ export function BookingModal({ sessionId, schoolId, onClose }: Props) {
             <h3 className="font-heading text-lg font-bold text-gray-900 mb-4">
               Reservar aula
             </h3>
+
+            {activePack && (
+              <div className="mb-4 rounded-xl bg-blue-50 border border-blue-200 px-4 py-3 text-sm text-blue-800">
+                Tens <strong>{activePack.remaining} aulas</strong> restantes do pack <strong>{activePack.name}</strong> — vamos usar 1 crédito.
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-800 mb-1">
@@ -116,6 +138,9 @@ export function BookingModal({ sessionId, schoolId, onClose }: Props) {
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm text-gray-900 focus:border-accent-light focus:outline-none focus:ring-1 focus:ring-accent-light"
                 />
+                {packLoading && (
+                  <p className="mt-1 text-xs text-gray-400">A verificar packs...</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-800 mb-1">

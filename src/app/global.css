@@ -12,9 +12,9 @@
   --color-text-muted: rgba(255, 255, 255, 0.4);
 
   /* Accent / Borders */
-  --color-accent: #81CAFA;
-  --color-accent-light: #1E6FA8;
-  --color-border: #81CAFA;
+  --color-accent: #1E6FA8;
+  --color-accent-light: #81CAFA;
+  --color-border: #1E6FA8;
 
   /* Botões */
   --color-primary: #F5F5F5;

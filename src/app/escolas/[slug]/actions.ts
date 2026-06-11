@@ -250,36 +250,167 @@ export async function getPublicSessionsForMonth(
   return byDay;
 }
 
-export async function criarReservaPublica(
+async function findOrCreateStudent(
+  admin: ReturnType<typeof createAdminClient>,
   schoolId: string,
-  sessionId: string,
   data: { name: string; email: string; phone: string }
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  const admin = createAdminClient();
+): Promise<{ id: string } | null> {
+  const email = data.email.trim().toLowerCase();
+
+  const { data: existing } = await admin
+    .from("students")
+    .select("id")
+    .eq("email", email)
+    .maybeSingle();
+
+  if (existing) {
+    const { data: ss } = await admin
+      .from("school_students")
+      .select("student_id")
+      .eq("school_id", schoolId)
+      .eq("student_id", existing.id)
+      .maybeSingle();
+
+    if (ss) return { id: existing.id };
+  }
 
   const { data: student, error: studentErr } = await admin
     .from("students")
     .insert({
       full_name: data.name.trim(),
-      email: data.email.trim().toLowerCase(),
+      email,
       phone: data.phone.trim(),
       is_guest: true,
     })
     .select("id")
     .single();
 
-  if (studentErr || !student) {
-    return { ok: false, error: "Erro ao criar aluno." };
-  }
+  if (studentErr || !student) return null;
 
   const { error: ssErr } = await admin.from("school_students").insert({
     school_id: schoolId,
     student_id: student.id,
   });
 
-  if (ssErr) {
-    return { ok: false, error: "Erro ao associar aluno à escola." };
+  if (ssErr) return null;
+
+  return { id: student.id };
+}
+
+export async function comprarPackPublico(
+  schoolId: string,
+  classTypeId: string,
+  quantity: number,
+  data: { name: string; email: string; phone: string }
+): Promise<{ ok: true; packPurchaseId: string } | { ok: false; error: string }> {
+  const admin = createAdminClient();
+
+  if (data.name.trim().length < 2) return { ok: false, error: "Nome deve ter pelo menos 2 caracteres." };
+  if (!data.email.includes("@") || !data.email.includes(".")) return { ok: false, error: "Email inválido." };
+  if (data.phone.replace(/\D/g, "").length < 6) return { ok: false, error: "Telemóvel deve ter pelo menos 6 dígitos." };
+  if (quantity < 1 || quantity > 99) return { ok: false, error: "Quantidade inválida." };
+
+  const student = await findOrCreateStudent(admin, schoolId, data);
+  if (!student) return { ok: false, error: "Erro ao criar aluno." };
+
+  const { data: classType } = await admin
+    .from("class_types")
+    .select("name, price_cents")
+    .eq("id", classTypeId)
+    .eq("school_id", schoolId)
+    .single();
+
+  if (!classType) return { ok: false, error: "Serviço não encontrado." };
+
+  const { data: existingPack } = await admin
+    .from("packs")
+    .select("id")
+    .eq("class_type_id", classTypeId)
+    .eq("school_id", schoolId)
+    .maybeSingle();
+
+  let packId: string;
+  if (existingPack) {
+    packId = existingPack.id;
+  } else {
+    const { data: newPack, error: packErr } = await admin
+      .from("packs")
+      .insert({
+        school_id: schoolId,
+        class_type_id: classTypeId,
+        name: classType.name,
+        total_lessons: quantity,
+        price_cents: classType.price_cents * quantity,
+        is_active: true,
+      })
+      .select("id")
+      .single();
+
+    if (packErr || !newPack) return { ok: false, error: "Erro ao criar pack." };
+    packId = newPack.id;
   }
+
+  const { data: purchase, error: ppErr } = await admin
+    .from("pack_purchases")
+    .insert({
+      school_id: schoolId,
+      pack_id: packId,
+      student_id: student.id,
+      lessons_remaining: quantity,
+      status: "active",
+    })
+    .select("id")
+    .single();
+
+  if (ppErr || !purchase) return { ok: false, error: "Erro ao registar compra." };
+
+  return { ok: true, packPurchaseId: purchase.id };
+}
+
+export async function buscarPackAtivo(
+  schoolId: string,
+  email: string
+): Promise<{ packPurchaseId: string; remaining: number; name: string } | null> {
+  const admin = createAdminClient();
+
+  const { data: student } = await admin
+    .from("students")
+    .select("id")
+    .eq("email", email.trim().toLowerCase())
+    .maybeSingle();
+
+  if (!student) return null;
+
+  const { data: pp } = await admin
+    .from("pack_purchases")
+    .select("id, lessons_remaining, packs(name)")
+    .eq("school_id", schoolId)
+    .eq("student_id", student.id)
+    .eq("status", "active")
+    .gt("lessons_remaining", 0)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (!pp) return null;
+
+  return {
+    packPurchaseId: pp.id,
+    remaining: pp.lessons_remaining,
+    name: (pp.packs as unknown as { name: string })?.name ?? "Pack",
+  };
+}
+
+export async function criarReservaPublica(
+  schoolId: string,
+  sessionId: string,
+  data: { name: string; email: string; phone: string },
+  packPurchaseId?: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const admin = createAdminClient();
+
+  const student = await findOrCreateStudent(admin, schoolId, data);
+  if (!student) return { ok: false, error: "Erro ao criar aluno." };
 
   const { data: sessionData } = await admin
     .from("sessions")
@@ -289,6 +420,21 @@ export async function criarReservaPublica(
     .single();
 
   const priceCents = sessionData?.price_cents ?? 0;
+
+  if (packPurchaseId) {
+    const { data: pp } = await admin
+      .from("pack_purchases")
+      .select("lessons_remaining")
+      .eq("id", packPurchaseId)
+      .eq("student_id", student.id)
+      .eq("school_id", schoolId)
+      .eq("status", "active")
+      .single();
+
+    if (!pp || pp.lessons_remaining < 1) {
+      return { ok: false, error: "Pack sem créditos disponíveis." };
+    }
+  }
 
   const { data: bookingGroup, error: bgErr } = await admin
     .from("booking_groups")
@@ -304,21 +450,35 @@ export async function criarReservaPublica(
     .select("id")
     .single();
 
-  if (bgErr || !bookingGroup) {
-    return { ok: false, error: "Erro ao criar reserva." };
-  }
+  if (bgErr || !bookingGroup) return { ok: false, error: "Erro ao criar reserva." };
+
+  const isPack = !!packPurchaseId;
 
   const { error: bErr } = await admin.from("bookings").insert({
     booking_group_id: bookingGroup.id,
     session_id: sessionId,
     student_id: student.id,
-    payment_method: "single",
-    payment_status: "unpaid",
-    price_cents: priceCents,
+    payment_method: isPack ? "pack" : "single",
+    payment_status: isPack ? "paid_offline" : "unpaid",
+    price_cents: isPack ? 0 : priceCents,
+    ...(isPack ? { pack_purchase_id: packPurchaseId } : {}),
   });
 
-  if (bErr) {
-    return { ok: false, error: "Erro ao confirmar reserva." };
+  if (bErr) return { ok: false, error: "Erro ao confirmar reserva." };
+
+  if (isPack && packPurchaseId) {
+    const { data: pp } = await admin
+      .from("pack_purchases")
+      .select("lessons_remaining")
+      .eq("id", packPurchaseId)
+      .single();
+
+    if (pp) {
+      const newRemaining = pp.lessons_remaining - 1;
+      const update: Record<string, unknown> = { lessons_remaining: newRemaining };
+      if (newRemaining <= 0) update.status = "exhausted";
+      await admin.from("pack_purchases").update(update).eq("id", packPurchaseId);
+    }
   }
 
   return { ok: true };

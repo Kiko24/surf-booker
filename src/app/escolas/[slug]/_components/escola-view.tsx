@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import type { PublicSchoolData } from "../actions";
-import { toggleFavorite } from "../actions";
+import { toggleFavorite, comprarPackPublico } from "../actions";
 import { Lightbox } from "./lightbox";
 import { BookingModal } from "./booking-modal";
 import { PublicCalendar } from "./public-calendar";
@@ -36,6 +36,7 @@ export function EscolaView({ data }: Props) {
   const [showBookingForm, setShowBookingForm] = useState(false);
   const [displayCount, setDisplayCount] = useState(10);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const [galleryIndex, setGalleryIndex] = useState(0);
   const [favorited, setFavorited] = useState(false);
   const [favoriteLoading, setFavoriteLoading] = useState(false);
   const [favoriteError, setFavoriteError] = useState<string | null>(null);
@@ -46,11 +47,14 @@ export function EscolaView({ data }: Props) {
   const [packPhone, setPackPhone] = useState("");
   const [packFormError, setPackFormError] = useState<string | null>(null);
   const [packQuantity, setPackQuantity] = useState(1);
+  const [showPackSuccess, setShowPackSuccess] = useState(false);
+  const [packLoading, setPackLoading] = useState(false);
 
   useEffect(() => {
     if (!showServicePicker) return;
     setPackQuantity(1);
     setPackFormError(null);
+    setShowPackSuccess(false);
   }, [showServicePicker]);
 
   useEffect(() => {
@@ -169,13 +173,71 @@ export function EscolaView({ data }: Props) {
       {/* Galeria + Serviços */}
       <section className="px-5 pt-8 pb-8 sm:px-8 sm:pb-12">
         <div className="mx-auto max-w-5xl">
+
+          {/* Mobile gallery carousel */}
+          <div className="md:hidden relative mb-6">
+            {images.length > 0 ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setLightboxIndex(galleryIndex)}
+                  className="w-full rounded-xl overflow-hidden"
+                >
+                  <img
+                    src={images[galleryIndex].public_url}
+                    alt=""
+                    className="w-full h-[300px] object-cover"
+                  />
+                </button>
+                {images.length > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setGalleryIndex((i) => (i > 0 ? i - 1 : images.length - 1))}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 z-10 h-9 w-9 rounded-full bg-black/40 text-white shadow flex items-center justify-center hover:bg-black/60 backdrop-blur-sm transition-colors"
+                      aria-label="Anterior"
+                    >
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setGalleryIndex((i) => (i < images.length - 1 ? i + 1 : 0))}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 z-10 h-9 w-9 rounded-full bg-black/40 text-white shadow flex items-center justify-center hover:bg-black/60 backdrop-blur-sm transition-colors"
+                      aria-label="Seguinte"
+                    >
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex gap-1.5">
+                      {images.map((_, i) => (
+                        <div
+                          key={i}
+                          className={`h-1.5 w-1.5 rounded-full transition-colors shadow-sm ${i === galleryIndex ? "bg-white" : "bg-white/50"}`}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </>
+            ) : (
+              <div className="flex items-center justify-center rounded-xl bg-gray-100 h-[280px]">
+                <svg className="h-12 w-12 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z" />
+                </svg>
+              </div>
+            )}
+          </div>
+
           <div className="flex flex-col gap-3 md:flex-row md:items-start">
             {/* Coluna esquerda: foto grande + serviços */}
             <div className="flex flex-col gap-8 md:w-[65%]">
               <button
                 type="button"
                 onClick={images[0] ? () => setLightboxIndex(0) : undefined}
-                className="overflow-hidden rounded-xl md:h-[420px]"
+                className="hidden md:block overflow-hidden rounded-xl md:h-[420px]"
               >
                 {images[0] ? (
                   <img
@@ -300,8 +362,8 @@ export function EscolaView({ data }: Props) {
             </div>
 
             {/* Coluna direita: 2 fotos + info card */}
-            <div className="flex flex-col gap-6 md:w-[35%]">
-              <div className="flex flex-col gap-3 md:h-[420px]">
+            <div className="flex flex-col md:w-[35%]">
+              <div className="hidden md:flex flex-col gap-3 md:h-[420px]">
                 {images[1] ? (
                   <button
                     type="button"
@@ -353,7 +415,7 @@ export function EscolaView({ data }: Props) {
                   </div>
                 )}
               </div>
-              <div className="rounded-xl bg-white p-5 shadow-sm md:mt-14">
+              <div className="rounded-xl bg-white p-5 shadow-sm mt-4 md:mt-[88px]">
                 <h3 className="font-heading font-semibold text-gray-900 text-[32px]">
                   {school.name}
                 </h3>
@@ -634,6 +696,23 @@ export function EscolaView({ data }: Props) {
                     );
                   }
                   if (rightSvc.category === "pack" || rightSvc.category === "aluguer") {
+                    if (showPackSuccess) {
+                      return (
+                        <div className="text-center py-8">
+                          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
+                            <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                          <h3 className="font-heading text-lg font-bold text-gray-900">
+                            Pedido confirmado!
+                          </h3>
+                          <p className="mt-2 text-sm text-gray-600">
+                            O seu pedido foi confirmado, entraremos em contacto.
+                          </p>
+                        </div>
+                      );
+                    }
                     return (
                       <div className="space-y-3">
                         <div>
@@ -723,7 +802,7 @@ export function EscolaView({ data }: Props) {
                 : null;
               const canContinue = isAula ? !!selectedSession : (packName.trim().length >= 2 && packEmail.trim().includes("@") && packPhone.trim().length >= 6);
 
-              const handleContinue = () => {
+              const handleContinue = async () => {
                 if (isAula && selectedSession) {
                   setShowBookingForm(true);
                 } else if (isPack) {
@@ -734,7 +813,16 @@ export function EscolaView({ data }: Props) {
                   if (!email.includes("@") || !email.includes(".")) { setPackFormError("Email inválido."); return; }
                   if (phone.length < 6) { setPackFormError("Telemóvel deve ter pelo menos 6 dígitos."); return; }
                   setPackFormError(null);
-                  setShowBookingForm(true);
+                  setPackLoading(true);
+                  const result = await comprarPackPublico(
+                    school.id,
+                    selSvc.id,
+                    packQuantity,
+                    { name, email: email.toLowerCase(), phone }
+                  );
+                  setPackLoading(false);
+                  if (!result.ok) { setPackFormError(result.error); return; }
+                  setShowPackSuccess(true);
                 }
               };
 
@@ -747,18 +835,28 @@ export function EscolaView({ data }: Props) {
                     {sessionTime && <span className="mx-1.5">·</span>}
                     {sessionTime && <span>{sessionTime}</span>}
                   </p>
-                  <button
-                    type="button"
-                    disabled={!canContinue}
-                    onClick={handleContinue}
-                    className={`rounded-full border-2 px-6 py-2 text-sm transition-all ${
-                      canContinue
-                        ? "border-accent text-black hover:scale-105 hover:bg-accent hover:text-white"
-                        : "border-gray-200 text-gray-300"
-                    }`}
-                  >
-                    Continuar
-                  </button>
+                  {showPackSuccess ? (
+                    <button
+                      type="button"
+                      onClick={() => { setShowServicePicker(false); setShowPackSuccess(false); }}
+                      className="rounded-full border-2 border-accent px-6 py-2 text-sm font-semibold text-black transition-all hover:scale-105 hover:bg-accent hover:text-white"
+                    >
+                      Fechar
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={!canContinue || packLoading}
+                      onClick={handleContinue}
+                      className={`rounded-full border-2 px-6 py-2 text-sm transition-all ${
+                        canContinue && !packLoading
+                          ? "border-accent text-black hover:scale-105 hover:bg-accent hover:text-white"
+                          : "border-gray-200 text-gray-300"
+                      }`}
+                    >
+                      {packLoading ? "A processar..." : "Continuar"}
+                    </button>
+                  )}
                 </div>
               );
             })()}

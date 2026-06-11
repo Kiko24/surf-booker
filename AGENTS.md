@@ -22,7 +22,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - `text-foreground` — texto principal (branco)
 - `text-text-secondary` — texto secundário (cinza claro)
 - `text-text-muted` — texto muted
-- `text-accent` — cor de ação/accento (laranja #FF6B35) + `bg-accent` + `text-primary-foreground`
+- `text-accent` — cor de ação/accento (azul #1E6FA8) + `bg-accent` + `text-primary-foreground`
 - `text-error` / `bg-error` — vermelho para ações destrutivas
 - `text-success` / `bg-success` — verde para estados positivos
 - `font-heading` — tight font para títulos
@@ -289,8 +289,6 @@ src/
 │       │   ├── actions.ts               # Server actions: getStudents, deleteStudent, createStudent, toggleWaiver
 │       │   └── _components/
 │       │       └── alunos-view.tsx      # Students list UI, search, filter, student popup, add student modal
-│       ├── equipamento/                 # (not implemented yet)
-│       │   └── page.tsx
 │       └── mais/
 │           ├── page.tsx                 # Server component, fetches school info
 │           ├── actions.ts               # saveSchoolInfo(), saveInstructor(), addSchoolImage() + magic bytes validation
@@ -483,7 +481,7 @@ SELECT id, full_name FROM students WHERE id IN (...);
 - Instructor file input `onChange` errors (format/size) displayed via `setInstrutorError()` with `bg-error/10` and warning icon
 - Storage buckets: `school-logos`, `school-images`, `instructor-avatars` — all public for read (CDN), RLS policies for INSERT/DELETE (owner only, migration 0018)
 - Migration 0019: `description` column on `class_types` (max 1000 chars, applied)
-- `getSchoolInfo()` in dashboard/actions.ts — needs phone in query
+- `getSchoolInfo()` in dashboard/actions.ts — selects name, logo_url, location, description, phone, cancellation_window_hours
 
 ### Public School Page (`/escolas/[slug]`)
 - `getPublicSchoolData()`: server action using `createAdminClient()` (bypass RLS), fetches real data: school info, class_types with categories/modalities, instructors with avatar URLs, school_images with public storage URLs — no placeholders
@@ -505,6 +503,9 @@ SELECT id, full_name FROM students WHERE id IN (...);
 - Pack/aluguer form: name/email/phone inputs with sanitization (name: letters/accented max 80; email: lowercase max 120; phone: digits/+ max 20)
 - Form validation: name ≥ 2 chars, email must include @ and ., phone ≥ 6 digits; error message below inputs
 - Logged-in user auto-fill from `students` table or auth metadata
+- **Pack purchase flow**: `comprarPackPublico()` server action — find/create student by email, create `packs` row on-the-fly if needed, create `pack_purchases` with `lessons_remaining = quantity`
+- **Pack credit consumption**: `criarReservaPublica()` accepts `packPurchaseId` — creates booking with `payment_method = 'pack'`, decrements `lessons_remaining`, auto-exhausts at 0
+- **Pack detection in BookingModal**: 400ms debounce on email input queries `buscarPackAtivo()` — shows blue banner with remaining credits, auto-uses oldest active pack on submit
 
 ### Public Navbar
 - Minimal: "Pesquisar escolas" (opens search dropdown) | Alaia (center) | Entrar + Registar (right)
@@ -517,25 +518,23 @@ SELECT id, full_name FROM students WHERE id IN (...);
 - `class_types`: category (`aula`/`pack`/`aluguer`), modality, total_lessons, description
 - `instructors`: table with name, level, avatar_url (created in migration 0015)
 - `school_images`: table with file_path (created in migration 0017)
+- `packs`: table with total_lessons, price_cents, class_type_id (created in 0001, modified 0007)
+- `pack_purchases`: table with student_id, pack_id, lessons_remaining, status (created in 0001)
+- `bookings`: includes `pack_purchase_id` FK + constraint `bookings_pack_consistency_check`
 - 3 storage buckets with RLS policies (migration 0018)
 - Seed SQL: test sessions for June 4-5 2026 (BSS school)
 
 ### Known Issues
-- `/escolas` directory page 404s if visited directly
-- Pack/aluguer "Continuar" action not fully wired — currently calls `setShowBookingForm(true)` but `BookingModal` expects `sessionId`
 - No full end-to-end validation with all features working
 - BSS school has 4 class_types with categories; Oporto school has 0 class_types, 0 instructors, 0 images
 
 ### Not Started / Pending
-- Equipment page (`/dashboard/equipamento`)
 - Check-in / attendance marking
 - Email/notification system
 - Student profile page with full history
-- Wire pack/aluguer "Continuar" action — decide what happens on form submit
-- Wire `booking-modal.tsx` to `criarReservaPublica()` for aula sessions
 - Create test school via onboarding to validate end-to-end
 - SEO: meta tags, Open Graph, JSON-LD for school page
-- `getSchoolInfo()` needs phone field in query
+- View pack purchases on dashboard (alunos page — remaining credits per student)
 
 ## Key Decisions
 1. **Admin client with server-side validation** for operations on tables that can't enforce ownership via RLS (e.g. `students` has no `school_id` column). The server action always verifies `auth.getUser()` + `schools.owner_user_id` before using admin client.
@@ -561,6 +560,19 @@ SELECT id, full_name FROM students WHERE id IN (...);
 21. **Instructor file validation** runs both client-side (`onChange`) and server-side (`saveInstructor`): file type, size (1MB), magic bytes
 22. **Error color**: `--color-error: #EF4444`; `text-error` works in Tailwind v4 via `@theme` custom color
 23. **Category filter buttons always visible** regardless of data; modality dropdown only if modalities exist
+24. **Unified accent color (`#1E6FA8`) in both themes** — eliminates inconsistent blues between public/dashboard pages. `--color-accent-light` (`#81CAFA`) used where lighter contrast needed on dark backgrounds.
+25. **Pack purchase on public page creates `packs` row on-the-fly** if no `packs` row exists for the `class_type_id` (necessary because `pack_purchases` FK references `packs(id)`, not `class_types`)
+26. **Student identified by email** across pack purchase and booking — both `comprarPackPublico()` and `criarReservaPublica()` call `findOrCreateStudent()` which reuses existing students by email + school
+27. **Theme initialisation via in-body sync script** (no blocking `<head>` script) — runs during HTML parsing before paint, applies `.light` for public pages; `ThemeInit` useEffect restores localStorage preference for dashboard pages
+28. **Inline scripts stripped from `<head>` by Next.js** — plain `<script>` tags with `dangerouslySetInnerHTML` in `<body>` render and execute correctly
+
+### Landing Page — Responsive Layout
+- Breakpoints: `sm: 640px`, `md: 768px`, `lg: 1024px`, `xl: 1280px`, `2xl: 1440px` (custom)
+- Navbar: < 768px → transparent header, logo branco, hamburger icon; ≥ 768px → pill com nav links + auth
+- Hamburger: `text-white` sobre hero escuro, `hover:bg-white/20`
+- Dropdown mobile: animação fade + slide (300ms, `opacity-100 translate-y-0` ↔ `opacity-0 -translate-y-2`)
+- "Como funciona" secção: mobile `flex-col` texto centrado; md `flex-row` texto left-aligned; gap `16/24/80` conforme breakpoint
+- Bullet descriptions: `clamp(0.8125rem,1vw,0.875rem)` (min 13px em tablet)
 
 ## Before Making Changes
 1. Read this file first

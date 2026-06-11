@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Oswald, Lato } from 'next/font/google';
-import { headers } from 'next/headers';
+import { ThemeInit } from "./_components/theme-init";
 import './global.css';
 
 const oswald = Oswald({
@@ -31,17 +31,15 @@ export const viewport: Viewport = {
   themeColor: '#1E1E1E',
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const pathname = (await headers()).get("next-url") ?? "";
-  const isDashboard = pathname.startsWith("/dashboard");
-
   return (
-    <html lang="pt-PT" suppressHydrationWarning className={`${oswald.variable} ${lato.variable}${isDashboard ? " dashboard-scale" : ""}`}>
+    <html lang="pt-PT" suppressHydrationWarning className={`${oswald.variable} ${lato.variable}`}>
       <body className="bg-background text-foreground antialiased">
+        <ThemeInit />
         {children}
       </body>
     </html>

@@ -12,6 +12,7 @@ export function PublicNavbar() {
   const [results, setResults] = useState<SchoolSearchResult[]>([]);
   const [displayCount, setDisplayCount] = useState(5);
   const [totalCount, setTotalCount] = useState(0);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -47,13 +48,13 @@ export function PublicNavbar() {
   }, [query]);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen && !mobileMenuOpen) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setIsOpen(false);
+      if (e.key === "Escape") { setIsOpen(false); setMobileMenuOpen(false); }
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [isOpen]);
+  }, [isOpen, mobileMenuOpen]);
 
   const visibleResults = results.slice(0, displayCount);
 
@@ -63,13 +64,14 @@ export function PublicNavbar() {
   }
 
   return (
-    <header className="absolute left-0 right-0 top-0 z-10 px-3 py-2 sm:px-5 sm:py-3">
-      <div className="mx-auto flex max-w-5xl items-center justify-between rounded-full border border-gray-200 bg-white/90 px-3 py-1.5 shadow-sm backdrop-blur-sm sm:px-5 sm:py-2">
+    <header className="absolute left-0 right-0 top-0 z-10 px-5 py-4">
+      {/* Desktop — pill */}
+      <div className="hidden md:flex mx-auto max-w-5xl items-center justify-between rounded-full border border-gray-200 bg-white/90 px-4 py-2 shadow-sm backdrop-blur-sm">
         <div className="relative">
           <button
             type="button"
             onClick={() => setIsOpen(!isOpen)}
-            className="rounded-full px-2 py-1 text-xs font-semibold text-gray-600 transition-colors hover:bg-gray-100 sm:text-sm"
+            className="rounded-full px-4 py-1.5 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-100"
           >
             Pesquisar escolas
           </button>
@@ -77,7 +79,7 @@ export function PublicNavbar() {
           {isOpen && (
             <div
               ref={dropdownRef}
-              className="absolute left-0 top-full mt-2 w-[320px] sm:w-[400px] rounded-xl border border-gray-200 bg-white shadow-lg"
+              className="absolute left-0 top-full mt-2 w-[400px] rounded-xl border border-gray-200 bg-white shadow-lg"
             >
               <div className="flex items-center gap-2 border-b border-gray-100 px-4 py-3">
                 <svg className="h-4 w-4 shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -129,7 +131,7 @@ export function PublicNavbar() {
                   <button
                     type="button"
                     onClick={() => setDisplayCount((prev) => prev + 5)}
-                    className="w-full px-4 py-3 text-center text-sm font-semibold text-accent-light transition-colors hover:bg-gray-50 border-t border-gray-100"
+                    className="w-full px-4 py-3 text-center text-sm font-semibold text-accent transition-colors hover:bg-gray-50 border-t border-gray-100"
                   >
                     Ver mais (+{totalCount - displayCount})
                   </button>
@@ -139,30 +141,123 @@ export function PublicNavbar() {
           )}
         </div>
 
-        <a href="/" className="font-heading text-base font-bold text-accent-light sm:text-lg">
+        <a href="/" className="font-heading text-lg font-bold text-accent">
           Alaia
         </a>
 
-        <div className="flex items-center gap-1.5 sm:gap-2">
+        <div className="flex items-center gap-2">
           <a
             href="/login"
-            className="rounded-full px-2 py-1 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-100 sm:text-sm sm:px-3"
+            className="rounded-full px-4 py-1.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100"
           >
             Entrar
           </a>
           <a
             href="/signup-owner"
-            className="rounded-full border border-accent-light bg-white px-2 py-1 text-xs font-semibold text-accent-light transition-colors hover:bg-accent-light hover:text-white sm:text-sm sm:px-3"
+            className="rounded-full border border-accent bg-white px-4 py-1.5 text-sm font-semibold text-accent transition-colors hover:bg-accent hover:text-white"
           >
             Registar
           </a>
         </div>
       </div>
 
+      {/* Mobile — transparent header (igual landing page) */}
+      <div className="flex md:hidden items-center justify-between">
+        <a href="/" className="font-heading text-xl font-bold text-accent">
+          Alaia
+        </a>
+        <button
+          type="button"
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          className="flex items-center justify-center h-9 w-9 rounded-full text-gray-700 hover:bg-gray-100 transition-colors"
+          aria-label="Menu"
+        >
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            {mobileMenuOpen ? (
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            ) : (
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+            )}
+          </svg>
+        </button>
+      </div>
+
+      {/* Mobile dropdown */}
+      <div className={`mt-2 mx-auto max-w-4xl rounded-2xl border border-gray-200 bg-white px-5 py-5 shadow-lg backdrop-blur-md md:hidden transition-all duration-300 ease-out ${
+        mobileMenuOpen ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2 pointer-events-none"
+      }`}>
+        <nav className="flex flex-col gap-3">
+          {/* Search within mobile dropdown */}
+          <div className="flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2.5">
+            <svg className="h-4 w-4 shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
+            </svg>
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Pesquisar escolas..."
+              className="flex-1 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
+            />
+          </div>
+
+          {visibleResults.length > 0 && (
+            <div className="max-h-[240px] overflow-y-auto -mx-1">
+              {visibleResults.map((school) => (
+                <button
+                  key={school.slug}
+                  type="button"
+                  onClick={() => { handleSelect(school.slug); setMobileMenuOpen(false); }}
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-gray-50"
+                >
+                  <span className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-gray-100">
+                    <img
+                      src={school.logo_url || "https://placehold.co/64x64/1E6FA8/FFFFFF?text=Escola"}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-gray-900 truncate">{school.name}</p>
+                    {school.location && <p className="text-xs text-gray-500 truncate">{school.location}</p>}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          <hr className="border-gray-200" />
+
+          <a
+            href="/login"
+            onClick={() => setMobileMenuOpen(false)}
+            className="block w-full text-center rounded-xl border border-accent bg-white px-4 py-3 text-sm font-semibold text-accent transition-colors hover:bg-accent hover:text-white"
+          >
+            Entrar
+          </a>
+          <a
+            href="/signup-owner"
+            onClick={() => setMobileMenuOpen(false)}
+            className="block w-full text-center rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent/90"
+          >
+            Registar o seu negócio
+          </a>
+        </nav>
+      </div>
+
+      {/* Backdrop for desktop search */}
       {isOpen && (
         <div
           className="fixed inset-0 z-[-1]"
           onClick={() => setIsOpen(false)}
+        />
+      )}
+
+      {/* Backdrop for mobile menu */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 z-[-1]"
+          onClick={() => setMobileMenuOpen(false)}
         />
       )}
     </header>

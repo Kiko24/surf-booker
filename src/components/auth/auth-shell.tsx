@@ -4,6 +4,7 @@ import Image, { type StaticImageData } from "next/image";
 import Link from "next/link";
 import defaultImage from "@/components/images/transferir.webp";
 import { AuthFooter } from "./auth-footer";
+import { ThemeToggle } from "@/app/_components/theme-toggle";
 import { cn } from "@/lib/utils/cn";
 
 type AuthShellProps = {
@@ -112,6 +113,11 @@ export function AuthShell({
               </div>
             )}
 
+            {/* Theme toggle absolute SÓ em desktop */}
+            <div className="hidden lg:block lg:absolute lg:top-6 lg:right-6 lg:z-10">
+              <ThemeToggle />
+            </div>
+
             <div className="w-full max-w-md lg:max-w-md lg:h-full lg:flex lg:flex-col">
               <div
                 className="
@@ -150,6 +156,8 @@ export function AuthShell({
                     ) : (
                       <span aria-hidden />
                     )}
+
+                    <ThemeToggle />
 
                     {showLogo && (
                       <Link
