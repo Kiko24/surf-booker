@@ -25,6 +25,7 @@ export default async function HomePage() {
           id: user.id,
           email: user.email ?? "",
           name: profile?.full_name ?? "",
+          role: profile?.role ?? "student",
         }}
       />
     );

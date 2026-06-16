@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type RedirectDestination = "/onboarding" | "/dashboard" | "/";
+export type RedirectDestination = "/onboarding" | "/dashboard" | "/perfil" | "/";
 
 export async function getRedirectByRole(
   supabase: SupabaseClient,
@@ -26,6 +26,10 @@ export async function getRedirectByRole(
 
   if (profile.role === "staff") {
     return "/dashboard";
+  }
+
+  if (profile.role === "client") {
+    return "/perfil";
   }
 
   return "/";

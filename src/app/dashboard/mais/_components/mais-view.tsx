@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useCallback, useRef, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { addSchoolImage, deleteImage, getImages, saveInstructor, deleteInstructor, getInstructors, getSchoolSettings, saveSchoolSettings, saveSchoolInfo, saveProfile, saveSchoolLogo, type SchoolImage, type Instructor, type SchoolSettings } from "../actions";
+import { addSchoolImage, deleteImage, getImages, saveInstructor, deleteInstructor, getInstructors, getSchoolSettings, saveSchoolSettings, saveSchoolInfo, saveProfile, saveSchoolLogo, getWaiverVersions, getWaiverAcceptances, saveWaiverVersion, type SchoolImage, type Instructor, type SchoolSettings, type WaiverVersion, type WaiverAcceptanceRow } from "../actions";
 
 type Props = {
   fullName: string;
@@ -78,6 +78,15 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
   });
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsError, setSettingsError] = useState("");
+  const [showWaivers, setShowWaivers] = useState(false);
+  const [waiverVersions, setWaiverVersions] = useState<WaiverVersion[]>([]);
+  const [waiverTitle, setWaiverTitle] = useState("");
+  const [waiverBody, setWaiverBody] = useState("");
+  const [waiverSaving, setWaiverSaving] = useState(false);
+  const [waiverError, setWaiverError] = useState("");
+  const [waiverAcceptances, setWaiverAcceptances] = useState<WaiverAcceptanceRow[]>([]);
+  const [showWaiverAcceptances, setShowWaiverAcceptances] = useState<string | null>(null);
+
   const [companySaving, setCompanySaving] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileError, setProfileError] = useState("");
@@ -91,6 +100,56 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
       });
     }
   }, [showSettings, schoolId]);
+
+  const loadWaivers = useCallback(async () => {
+    if (!schoolId) return;
+    const versions = await getWaiverVersions(schoolId);
+    setWaiverVersions(versions);
+    const active = versions.find((v) => v.is_active);
+    if (active) {
+      setWaiverTitle(active.title);
+      setWaiverBody(active.body);
+    } else {
+      setWaiverTitle("");
+      setWaiverBody("");
+    }
+  }, [schoolId]);
+
+  useEffect(() => {
+    if ((showWaivers || selectedSection === "waivers") && schoolId) {
+      loadWaivers();
+    }
+  }, [showWaivers, selectedSection, schoolId, loadWaivers]);
+
+  const tabSections = ["profile", "company", "instructors", "waivers", "settings"];
+
+  const handleTabKeyDown = (e: React.KeyboardEvent, section: string) => {
+    const idx = tabSections.indexOf(section);
+    let newIdx: number | null = null;
+    switch (e.key) {
+      case "ArrowDown":
+      case "ArrowRight":
+        newIdx = (idx + 1) % tabSections.length;
+        break;
+      case "ArrowUp":
+      case "ArrowLeft":
+        newIdx = (idx - 1 + tabSections.length) % tabSections.length;
+        break;
+      case "Home":
+        newIdx = 0;
+        break;
+      case "End":
+        newIdx = tabSections.length - 1;
+        break;
+      default:
+        return;
+    }
+    e.preventDefault();
+    const next = tabSections[newIdx];
+    setSelectedSection(next);
+    const btn = document.querySelector<HTMLButtonElement>(`[role="tab"][data-section="${next}"]`);
+    btn?.focus();
+  };
 
   const openProfile = useCallback(() => {
     setProfileName(fullName);
@@ -183,10 +242,21 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
         <div className="md:grid md:grid-cols-12 md:gap-6 md:items-start">
           {/* Left column — setting cards */}
           <div className="md:col-span-3 min-h-[50vh] flex flex-col justify-center md:min-h-[65vh] 2xl:min-h-0 2xl:block">
-            <div className="flex flex-col gap-3 w-full">
+            <div
+              role="tablist"
+              aria-label="Definições"
+              className="flex flex-col gap-3 w-full"
+            >
               <button
+                role="tab"
+                data-section="profile"
                 type="button"
+                aria-selected={selectedSection === "profile"}
+                aria-controls="panel-profile"
+                id="tab-profile"
                 onClick={openProfile}
+                onKeyDown={(e) => handleTabKeyDown(e, "profile")}
+                tabIndex={selectedSection === "profile" ? 0 : -1}
                 className={`flex items-center justify-between rounded-xl bg-surface p-4 text-left transition-colors hover:bg-[#2A2A2A] active:scale-[0.99] ${selectedSection === "profile" ? "border-l-4 border-accent" : ""}`}
               >
                 <div className="flex items-center gap-3 min-w-0">
@@ -204,8 +274,15 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                 </svg>
               </button>
               <button
+                role="tab"
+                data-section="company"
                 type="button"
+                aria-selected={selectedSection === "company"}
+                aria-controls="panel-company"
+                id="tab-company"
                 onClick={() => { setShowCompany(true); setSelectedSection("company"); }}
+                onKeyDown={(e) => handleTabKeyDown(e, "company")}
+                tabIndex={selectedSection === "company" ? 0 : -1}
                 className={`flex items-center justify-between rounded-xl bg-surface p-4 text-left transition-colors hover:bg-[#2A2A2A] active:scale-[0.99] ${selectedSection === "company" ? "border-l-4 border-accent" : ""}`}
               >
                 <div className="flex items-center gap-3 min-w-0">
@@ -223,8 +300,15 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                 </svg>
               </button>
               <button
+                role="tab"
+                data-section="instructors"
                 type="button"
+                aria-selected={selectedSection === "instructors"}
+                aria-controls="panel-instructors"
+                id="tab-instructors"
                 onClick={() => { setShowInstructors(true); setSelectedSection("instructors"); }}
+                onKeyDown={(e) => handleTabKeyDown(e, "instructors")}
+                tabIndex={selectedSection === "instructors" ? 0 : -1}
                 className={`flex items-center justify-between rounded-xl bg-surface p-4 text-left transition-colors hover:bg-[#2A2A2A] active:scale-[0.99] ${selectedSection === "instructors" ? "border-l-4 border-accent" : ""}`}
               >
                 <div className="flex items-center gap-3 min-w-0">
@@ -237,6 +321,34 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                   <div>
                     <p className="font-body text-sm font-semibold text-foreground">Instrutores</p>
                     <p className="font-body text-[11px] text-text-secondary leading-tight">Gerir equipa e horários</p>
+                  </div>
+                </div>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 shrink-0 text-text-muted">
+                  <path d="m9 18 6-6-6-6" />
+                </svg>
+              </button>
+              <button
+                role="tab"
+                data-section="waivers"
+                type="button"
+                aria-selected={selectedSection === "waivers"}
+                aria-controls="panel-waivers"
+                id="tab-waivers"
+                onClick={() => { setShowWaivers(true); setSelectedSection("waivers"); }}
+                onKeyDown={(e) => handleTabKeyDown(e, "waivers")}
+                tabIndex={selectedSection === "waivers" ? 0 : -1}
+                className={`flex items-center justify-between rounded-xl bg-surface p-4 text-left transition-colors hover:bg-[#2A2A2A] active:scale-[0.99] ${selectedSection === "waivers" ? "border-l-4 border-accent" : ""}`}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`h-5 w-5 shrink-0 ${selectedSection === "waivers" ? "text-accent" : "text-text-muted"}`}>
+                    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" x2="8" y1="13" y2="13" />
+                    <line x1="16" x2="8" y1="17" y2="17" />
+                  </svg>
+                  <div>
+                    <p className="font-body text-sm font-semibold text-foreground">Waivers</p>
+                    <p className="font-body text-[11px] text-text-secondary leading-tight">Gerir termos e aceitações</p>
                   </div>
                 </div>
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 shrink-0 text-text-muted">
@@ -263,8 +375,15 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                 </svg>
               </Link>
               <button
+                role="tab"
+                data-section="settings"
                 type="button"
+                aria-selected={selectedSection === "settings"}
+                aria-controls="panel-settings"
+                id="tab-settings"
                 onClick={() => { setShowSettings(true); setSelectedSection("settings"); }}
+                onKeyDown={(e) => handleTabKeyDown(e, "settings")}
+                tabIndex={selectedSection === "settings" ? 0 : -1}
                 className={`flex items-center justify-between rounded-xl bg-surface p-4 text-left transition-colors hover:bg-[#2A2A2A] active:scale-[0.99] ${selectedSection === "settings" ? "border-l-4 border-accent" : ""}`}
               >
                 <div className="flex items-center gap-3 min-w-0">
@@ -317,7 +436,13 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
             )}
 
             {selectedSection === "profile" && (
-              <div className="rounded-xl bg-surface px-6 pt-6 pb-2 flex flex-col h-full">
+              <div
+                role="tabpanel"
+                id="panel-profile"
+                aria-labelledby="tab-profile"
+                tabIndex={0}
+                className="rounded-xl bg-surface px-6 pt-6 pb-2 flex flex-col h-full"
+              >
                 <div className="flex items-center gap-4 mb-6 shrink-0 pl-3">
                   <div>
                     <h3 className="font-heading text-xl font-bold text-foreground">Perfil</h3>
@@ -370,7 +495,13 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
             )}
 
             {selectedSection === "company" && (
-              <div className="rounded-xl bg-surface px-6 pt-6 pb-4 flex flex-col h-full">
+              <div
+                role="tabpanel"
+                id="panel-company"
+                aria-labelledby="tab-company"
+                tabIndex={0}
+                className="rounded-xl bg-surface px-6 pt-6 pb-4 flex flex-col h-full"
+              >
                 <div className="flex items-center gap-4 mb-6 shrink-0 pl-3">
                   <div>
                     <h3 className="font-heading text-xl font-bold text-foreground">Negócio</h3>
@@ -453,7 +584,13 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
             )}
 
             {selectedSection === "instructors" && (
-              <div className="rounded-xl bg-surface px-6 pt-6 pb-2 flex flex-col h-full">
+              <div
+                role="tabpanel"
+                id="panel-instructors"
+                aria-labelledby="tab-instructors"
+                tabIndex={0}
+                className="rounded-xl bg-surface px-6 pt-6 pb-2 flex flex-col h-full"
+              >
                 <h3 className="font-heading text-xl font-bold text-foreground mb-6 shrink-0 pl-3">{editingInstrutorId !== null ? "Editar Instrutor" : "Instrutores"}</h3>
                 <div className="overflow-y-auto flex-1 min-h-0 pl-3 pr-3">
                 <div className="mb-8 flex justify-center">
@@ -466,7 +603,8 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                       </svg>
                     )}
                   </button>
-                  <input ref={instrutorFileRef} type="file" accept="image/png,image/webp,image/jpeg" className="hidden" onChange={(e) => {
+                  <label htmlFor="instrutor-foto" className="sr-only">Foto do instrutor</label>
+                  <input ref={instrutorFileRef} id="instrutor-foto" type="file" accept="image/png,image/webp,image/jpeg" className="hidden" onChange={(e) => {
                     setInstrutorError("");
                     const file = e.target.files?.[0];
                     if (!file) return;
@@ -545,7 +683,13 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
             )}
 
             {selectedSection === "settings" && (
-              <div className="rounded-xl bg-surface px-6 pt-6 pb-4 flex flex-col h-full">
+              <div
+                role="tabpanel"
+                id="panel-settings"
+                aria-labelledby="tab-settings"
+                tabIndex={0}
+                className="rounded-xl bg-surface px-6 pt-6 pb-4 flex flex-col h-full"
+              >
                 <h3 className="font-heading text-xl font-bold text-foreground mb-6 shrink-0 pl-3">Definições</h3>
                 {settingsError && <p className="font-body text-sm text-error mb-4 shrink-0 pl-3">{settingsError}</p>}
                 <div className="space-y-8 overflow-y-auto flex-1 min-h-0 pl-3 pr-3">
@@ -605,6 +749,95 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                 </div>
               </div>
             )}
+
+            {selectedSection === "waivers" && (
+              <div
+                role="tabpanel"
+                id="panel-waivers"
+                aria-labelledby="tab-waivers"
+                tabIndex={0}
+                className="rounded-xl bg-surface px-6 pt-6 pb-4 flex flex-col h-full"
+              >
+                <h3 className="font-heading text-xl font-bold text-foreground mb-6 shrink-0 pl-3">Waivers</h3>
+                <div className="space-y-6 overflow-y-auto flex-1 min-h-0 pl-3 pr-3">
+                  <div>
+                    <p className="font-body text-sm font-semibold text-text-secondary mb-1">Título do waiver</p>
+                    <input
+                      type="text"
+                      value={waiverTitle}
+                      onChange={(e) => setWaiverTitle(e.target.value)}
+                      placeholder="Ex: Termos de responsabilidade"
+                      maxLength={150}
+                      className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+                    />
+                  </div>
+                  <div>
+                    <p className="font-body text-sm font-semibold text-text-secondary mb-1">Texto do waiver</p>
+                    <textarea
+                      value={waiverBody}
+                      onChange={(e) => setWaiverBody(e.target.value)}
+                      placeholder="Escreve aqui os termos que os alunos devem aceitar..."
+                      rows={8}
+                      maxLength={20000}
+                      className="w-full resize-none rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+                    />
+                  </div>
+                  {waiverError && <p className="font-body text-sm text-error">{waiverError}</p>}
+                  <div className="flex gap-4 pt-2">
+                    <button type="button" onClick={() => { setSelectedSection(null); setWaiverError(""); }} className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground">Fechar</button>
+                    <button type="button" disabled={waiverSaving} onClick={async () => {
+                      if (!schoolId) return;
+                      setWaiverError("");
+                      if (!waiverTitle.trim()) { setWaiverError("O título é obrigatório"); return; }
+                      if (!waiverBody.trim()) { setWaiverError("O texto é obrigatório"); return; }
+                      setWaiverSaving(true);
+                      const res = await saveWaiverVersion(schoolId, { title: waiverTitle.trim(), body: waiverBody.trim() });
+                      setWaiverSaving(false);
+                      if (!res.ok) { setWaiverError(res.error ?? "Erro ao guardar"); return; }
+                      setSelectedSection(null);
+                    }} className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95 disabled:opacity-50">
+                      {waiverSaving ? "A guardar..." : "Publicar nova versão"}
+                    </button>
+                  </div>
+
+                  {/* Versions history */}
+                  {waiverVersions.length > 0 && (
+                    <div className="pt-6 border-t border-foreground/10">
+                      <p className="font-heading text-base font-bold text-foreground mb-4">Histórico de versões</p>
+                      <div className="space-y-2">
+                        {waiverVersions.map((v) => (
+                          <div key={v.id} className="flex items-center justify-between rounded-xl bg-[#2A2A2A] px-4 py-3">
+                            <div className="min-w-0 flex-1">
+                              <p className="font-body text-sm font-semibold text-foreground truncate">
+                                {v.title}
+                                {v.is_active && <span className="ml-2 text-xs font-normal text-success">Ativo</span>}
+                              </p>
+                              <p className="font-body text-xs text-text-secondary">
+                                v{v.version} · {new Date(v.created_at).toLocaleDateString("pt-PT")} · {v.acceptance_count} aceitação(ões)
+                              </p>
+                            </div>
+                            {v.acceptance_count > 0 && (
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (!schoolId) return;
+                                  const rows = await getWaiverAcceptances(schoolId, v.id);
+                                  setWaiverAcceptances(rows);
+                                  setShowWaiverAcceptances(v.id);
+                                }}
+                                className="shrink-0 rounded-lg bg-accent/20 px-3 py-1.5 font-body text-xs font-semibold text-accent transition-colors hover:bg-accent/30"
+                              >
+                                Ver aceitações
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -622,7 +855,7 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
               await logoutOwner();
               window.location.href = "/";
             }}
-            className="w-full rounded-xl bg-error/20 py-3 font-body text-sm font-semibold text-error transition-colors hover:bg-error/30"
+            className="w-full rounded-xl bg-error-bg py-3 font-body text-sm font-semibold text-error transition-colors hover:bg-error/30"
           >
             Terminar sessão
           </button>
@@ -1218,6 +1451,135 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
                 className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95 disabled:opacity-50"
               >
                 {instrutorSaving ? "A guardar..." : editingInstrutorId !== null ? "Guardar" : "Adicionar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Waiver Modal */}
+      {showWaivers && (
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 md:hidden" onClick={() => setShowWaivers(false)}>
+          <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-24 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted" />
+
+            <h3 className="font-heading text-2xl font-bold text-foreground mb-6">Waivers</h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">Título do waiver</label>
+                <input
+                  type="text"
+                  value={waiverTitle}
+                  onChange={(e) => setWaiverTitle(e.target.value)}
+                  placeholder="Ex: Termos de responsabilidade"
+                  maxLength={150}
+                  className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+                />
+              </div>
+              <div>
+                <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">Texto do waiver</label>
+                <textarea
+                  value={waiverBody}
+                  onChange={(e) => setWaiverBody(e.target.value)}
+                  placeholder="Escreve aqui os termos que os alunos devem aceitar..."
+                  rows={6}
+                  maxLength={20000}
+                  className="w-full resize-none rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+                />
+              </div>
+
+              {waiverError && <p className="font-body text-sm text-error">{waiverError}</p>}
+
+              {/* Versions list on mobile */}
+              {waiverVersions.length > 0 && (
+                <div className="pt-4 border-t border-foreground/10">
+                  <p className="font-heading text-base font-bold text-foreground mb-3">Histórico</p>
+                  <div className="space-y-2">
+                    {waiverVersions.map((v) => (
+                      <div key={v.id} className="flex items-center justify-between rounded-xl bg-[#2A2A2A] px-4 py-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-body text-sm font-semibold text-foreground truncate">
+                            v{v.version} {v.is_active && <span className="text-xs text-success">(Ativo)</span>}
+                          </p>
+                          <p className="font-body text-xs text-text-secondary">{v.acceptance_count} aceitação(ões)</p>
+                        </div>
+                        {v.acceptance_count > 0 && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (!schoolId) return;
+                              const rows = await getWaiverAcceptances(schoolId, v.id);
+                              setWaiverAcceptances(rows);
+                              setShowWaiverAcceptances(v.id);
+                            }}
+                            className="shrink-0 rounded-lg bg-accent/20 px-3 py-1.5 font-body text-xs font-semibold text-accent"
+                          >
+                            Ver
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => { setShowWaivers(false); setWaiverError(""); }}
+                  className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={waiverSaving}
+                  onClick={async () => {
+                    if (!schoolId) return;
+                    setWaiverError("");
+                    if (!waiverTitle.trim()) { setWaiverError("O título é obrigatório"); return; }
+                    if (!waiverBody.trim()) { setWaiverError("O texto é obrigatório"); return; }
+                    setWaiverSaving(true);
+                    const res = await saveWaiverVersion(schoolId, { title: waiverTitle.trim(), body: waiverBody.trim() });
+                    setWaiverSaving(false);
+                    if (!res.ok) { setWaiverError(res.error ?? "Erro ao guardar"); return; }
+                    setShowWaivers(false);
+                  }}
+                  className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95 disabled:opacity-50"
+                >
+                  {waiverSaving ? "A guardar..." : "Publicar nova versão"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Waiver Acceptances Dialog */}
+      {showWaiverAcceptances && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 px-5" onClick={() => setShowWaiverAcceptances(null)}>
+          <div className="w-full max-w-sm rounded-2xl bg-surface p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-heading text-lg font-bold text-foreground mb-4">Aceitações</h3>
+            {waiverAcceptances.length === 0 ? (
+              <p className="font-body text-sm text-text-secondary py-4 text-center">Nenhuma aceitação ainda</p>
+            ) : (
+              <div className="max-h-60 overflow-y-auto space-y-2">
+                {waiverAcceptances.map((a) => (
+                  <div key={a.id} className="flex items-center justify-between rounded-xl bg-[#2A2A2A] px-4 py-3">
+                    <p className="font-body text-sm text-foreground">{a.student_name}</p>
+                    <p className="font-body text-xs text-text-secondary">{new Date(a.accepted_at).toLocaleDateString("pt-PT")}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex justify-end pt-4">
+              <button
+                type="button"
+                onClick={() => setShowWaiverAcceptances(null)}
+                className="rounded-xl bg-[#2A2A2A] px-6 py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
+              >
+                Fechar
               </button>
             </div>
           </div>

@@ -34,6 +34,22 @@ export type PublicSession = {
   booked: number;
 };
 
+type SessionRow = {
+  id: string;
+  starts_at: string;
+  duration_minutes: number;
+  price_cents: number;
+  capacity: number | null;
+  class_type_id: string | null;
+  class_types: { name: string }[] | null;
+};
+
+type PackPurchaseRow = {
+  id: string;
+  lessons_remaining: number;
+  packs: { name: string } | null;
+};
+
 export type PublicSchoolData = {
   school: {
     id: string;
@@ -141,12 +157,12 @@ export async function getPublicSchoolData(
         : null,
     }));
 
-    const { data: sessionsData } = sessionsRes;
+    const sessionsData = sessionsRes.data as SessionRow[] | null;
     const realSessions: PublicSession[] = (sessionsData ?? []).map((s) => ({
       id: s.id,
       starts_at: s.starts_at,
       duration_minutes: s.duration_minutes,
-      class_type_name: (s.class_types as unknown as { name: string } | null)?.name ?? "",
+      class_type_name: s.class_types?.[0]?.name ?? "",
       price_cents: s.price_cents,
       capacity: s.capacity ?? 0,
       booked: 0,
@@ -202,7 +218,7 @@ export async function getPublicSessionsForMonth(
   const startDate = new Date(year, month - 1, 1).toISOString().split("T")[0];
   const endDate = new Date(year, month, 0).toISOString().split("T")[0];
 
-  const { data: sessions, error } = await admin
+    const { data: rawSessions, error } = await admin
     .from("sessions")
     .select("id, starts_at, duration_minutes, price_cents, capacity, class_type_id, class_types(name)")
     .eq("school_id", schoolId)
@@ -211,10 +227,12 @@ export async function getPublicSessionsForMonth(
     .lte("starts_at", `${endDate}T23:59:59`)
     .order("starts_at", { ascending: true });
 
-  if (error || !sessions) {
+  if (error || !rawSessions) {
     console.error("[getPublicSessionsForMonth] error:", error);
     return {};
   }
+
+  const sessions = rawSessions as SessionRow[];
 
   const sessionIds = sessions.map((s) => s.id);
   const countMap: Record<string, number> = {};
@@ -243,7 +261,7 @@ export async function getPublicSessionsForMonth(
       price_cents: s.price_cents,
       capacity: s.capacity ?? 0,
       booked: countMap[s.id] ?? 0,
-      class_type_name: (s.class_types as unknown as { name: string } | null)?.name ?? "",
+      class_type_name: s.class_types?.[0]?.name ?? "",
     });
   }
 
@@ -381,7 +399,7 @@ export async function buscarPackAtivo(
 
   if (!student) return null;
 
-  const { data: pp } = await admin
+  const { data: rawPp } = await admin
     .from("pack_purchases")
     .select("id, lessons_remaining, packs(name)")
     .eq("school_id", schoolId)
@@ -392,12 +410,13 @@ export async function buscarPackAtivo(
     .limit(1)
     .maybeSingle();
 
+  const pp = rawPp as PackPurchaseRow | null;
   if (!pp) return null;
 
   return {
     packPurchaseId: pp.id,
     remaining: pp.lessons_remaining,
-    name: (pp.packs as unknown as { name: string })?.name ?? "Pack",
+    name: pp.packs?.name ?? "Pack",
   };
 }
 
@@ -467,17 +486,12 @@ export async function criarReservaPublica(
   if (bErr) return { ok: false, error: "Erro ao confirmar reserva." };
 
   if (isPack && packPurchaseId) {
-    const { data: pp } = await admin
-      .from("pack_purchases")
-      .select("lessons_remaining")
-      .eq("id", packPurchaseId)
-      .single();
+    const { data: decremented } = await admin.rpc("decrement_pack_credit", {
+      p_purchase_id: packPurchaseId,
+    });
 
-    if (pp) {
-      const newRemaining = pp.lessons_remaining - 1;
-      const update: Record<string, unknown> = { lessons_remaining: newRemaining };
-      if (newRemaining <= 0) update.status = "exhausted";
-      await admin.from("pack_purchases").update(update).eq("id", packPurchaseId);
+    if (!decremented) {
+      return { ok: false, error: "Falha ao debitar pack. Tente novamente." };
     }
   }
 

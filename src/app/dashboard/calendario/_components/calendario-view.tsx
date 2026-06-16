@@ -129,7 +129,43 @@ export function CalendarioView({ schoolId }: Props) {
   const [groupError, setGroupError] = useState("");
 
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
   const [fabRight, setFabRight] = useState(0);
+
+  const handleDayKeyDown = (e: React.KeyboardEvent, day: number) => {
+    let newDay: number | null = null;
+    switch (e.key) {
+      case "ArrowLeft":
+        newDay = day - 1;
+        break;
+      case "ArrowRight":
+        newDay = day + 1;
+        break;
+      case "ArrowUp":
+        newDay = day - 7;
+        break;
+      case "ArrowDown":
+        newDay = day + 7;
+        break;
+      case "Home":
+        newDay = 1;
+        break;
+      case "End":
+        newDay = daysInMonth;
+        break;
+      default:
+        return;
+    }
+    e.preventDefault();
+    if (newDay !== null && newDay >= 1 && newDay <= daysInMonth) {
+      setSelectedDay(newDay);
+      setExpandedSession(null);
+      setTimeout(() => {
+        const btn = gridRef.current?.querySelector<HTMLButtonElement>(`[data-day="${newDay}"]`);
+        btn?.focus();
+      }, 0);
+    }
+  };
 
   useEffect(() => {
     function updateFabPosition() {
@@ -221,10 +257,12 @@ export function CalendarioView({ schoolId }: Props) {
             <div className="flex flex-col flex-1 overflow-hidden min-h-0 relative">
               <div className="rounded-xl bg-surface border border-white/5 flex flex-col overflow-hidden flex-1 min-h-0">
                 {/* Weekday headers */}
-                <div className="grid grid-cols-7 border-b border-white/5 bg-[#2A2A2A] shrink-0">
+                <div role="row" className="grid grid-cols-7 border-b border-white/5 bg-[#2A2A2A] shrink-0">
                   {WEEKDAYS.map((d, i) => (
                     <div
                       key={i}
+                      role="columnheader"
+                      aria-label={d}
                       className="py-1.5 text-center font-body text-[10px] font-semibold uppercase tracking-wider text-text-secondary border-r border-white/5 last:border-r-0"
                     >
                       {d}
@@ -233,7 +271,12 @@ export function CalendarioView({ schoolId }: Props) {
                 </div>
 
                 {/* Days grid */}
-                <div className="grid grid-cols-7 max-md:overflow-visible md:flex-1 md:overflow-y-auto [&::-webkit-scrollbar]:hidden">
+                <div
+                  ref={gridRef}
+                  role="grid"
+                  aria-label={`Calendário de ${MONTHS[month]} de ${year}`}
+                  className="grid grid-cols-7 max-md:overflow-visible md:flex-1 md:overflow-y-auto [&::-webkit-scrollbar]:hidden"
+                >
                   {Array.from({ length: firstDayOfWeek }, (_, i) => (
                     <div
                       key={`empty-${i}`}
@@ -262,9 +305,14 @@ export function CalendarioView({ schoolId }: Props) {
                         ? Math.round((totalAlunos / totalCap) * 100)
                         : 0;
 
+                    const dayAriaLabel = `Dia ${day} de ${MONTHS[month]} de ${year}${isToday ? ", hoje" : ""}${daySessionsForCell.length > 0 ? `, ${daySessionsForCell.length} ${daySessionsForCell.length === 1 ? "sessão" : "sessões"}` : ""}`;
+
                     return (
                       <button
                         key={day}
+                        role="gridcell"
+                        data-day={day}
+                        aria-label={dayAriaLabel}
                         type="button"
                         onClick={() => {
                           if (selectedDay === day) {
@@ -274,6 +322,7 @@ export function CalendarioView({ schoolId }: Props) {
                           }
                           setExpandedSession(null);
                         }}
+                        onKeyDown={(e) => handleDayKeyDown(e, day)}
                         className={`flex flex-col items-center gap-px p-1 border-b border-r border-white/5 transition-colors hover:bg-accent/5 min-h-[48px] max-md:min-h-[56px] xl:min-h-[56px] ${
                           isSelected
                             ? "bg-accent/10 ring-1 ring-inset ring-accent"
@@ -422,7 +471,7 @@ className="inline-flex items-center gap-1 rounded-full bg-accent/10 px-2.5 py-1 
                                           <button
                                             type="button"
                                             onClick={(e) => { e.stopPropagation(); setDeletingSession(si); setShowDeleteConfirm(true) }}
-                                            className="flex-1 rounded-lg bg-error/20 py-2 lg:py-2.5 font-body text-xs lg:text-sm font-semibold text-error transition-colors hover:bg-error/30"
+                                            className="flex-1 rounded-lg bg-error-bg py-2 lg:py-2.5 font-body text-xs lg:text-sm font-semibold text-error transition-colors hover:bg-error/30"
                                           >
                                             Cancelada
                                           </button>
@@ -469,7 +518,7 @@ className="flex-1 rounded-lg bg-[#2A2A2A] py-2 lg:py-2.5 font-body text-xs lg:te
                                         <button
                                           type="button"
                                           onClick={(e) => { e.stopPropagation(); setDeletingSession(si); setShowDeleteConfirm(true) }}
-className="flex-1 rounded-lg bg-error/10 py-2 lg:py-2.5 font-body text-xs lg:text-sm font-semibold text-error transition-colors hover:bg-error/20"
+className="flex-1 rounded-lg bg-error-bg py-2 lg:py-2.5 font-body text-xs lg:text-sm font-semibold text-error transition-colors hover:brightness-110"
                                         >
                                           Cancelar
                                         </button>
@@ -596,7 +645,7 @@ className="flex-1 rounded-lg bg-error/10 py-2 lg:py-2.5 font-body text-xs lg:tex
                                       <button
                                         type="button"
                                         onClick={(e) => { e.stopPropagation(); setDeletingSession(si); setShowDeleteConfirm(true) }}
-                                        className="flex-1 rounded-lg bg-error/20 py-2 font-body text-xs font-semibold text-error transition-colors hover:bg-error/30"
+                                        className="flex-1 rounded-lg bg-error-bg py-2 font-body text-xs font-semibold text-error transition-colors hover:bg-error/30"
                                       >
                                         Cancelada
                                       </button>
@@ -643,7 +692,7 @@ className="flex-1 rounded-lg bg-error/10 py-2 lg:py-2.5 font-body text-xs lg:tex
                                     <button
                                       type="button"
                                       onClick={(e) => { e.stopPropagation(); setDeletingSession(si); setShowDeleteConfirm(true) }}
-                                      className="flex-1 rounded-lg bg-error/10 py-2 font-body text-xs font-semibold text-error transition-colors hover:bg-error/20"
+                                      className="flex-1 rounded-lg bg-error-bg py-2 font-body text-xs font-semibold text-error transition-colors hover:brightness-110"
                                     >
                                       Cancelar
                                     </button>

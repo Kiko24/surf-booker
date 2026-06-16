@@ -2,8 +2,17 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
 import { searchSchools } from "@/app/escolas/actions";
 import type { SchoolSearchResult } from "@/app/escolas/actions";
+
+const PROFILE_LINKS = [
+  { href: "/perfil", label: "Geral" },
+  { href: "/perfil/historico", label: "Histórico de aulas" },
+  { href: "/perfil/packs", label: "Lista de packs" },
+  { href: "/perfil/definicoes", label: "Definições" },
+];
 
 export function PublicNavbar() {
   const router = useRouter();
@@ -13,8 +22,35 @@ export function PublicNavbar() {
   const [displayCount, setDisplayCount] = useState(5);
   const [totalCount, setTotalCount] = useState(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [clientLink, setClientLink] = useState(false);
+  const [userName, setUserName] = useState("");
+  const [profileOpen, setProfileOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const profileRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    const checkSession = async () => {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return;
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("user_id", session.user.id)
+        .single();
+      if (profile?.role === "client") {
+        setClientLink(true);
+        const { data: student } = await supabase
+          .from("students")
+          .select("full_name")
+          .eq("auth_user_id", session.user.id)
+          .maybeSingle();
+        setUserName(student?.full_name ?? session.user.email?.split("@")[0] ?? "Utilizador");
+      }
+    };
+    checkSession();
+  }, []);
 
   useEffect(() => {
     if (!isOpen) {
@@ -48,13 +84,13 @@ export function PublicNavbar() {
   }, [query]);
 
   useEffect(() => {
-    if (!isOpen && !mobileMenuOpen) return;
+    if (!isOpen && !mobileMenuOpen && !profileOpen) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { setIsOpen(false); setMobileMenuOpen(false); }
+      if (e.key === "Escape") { setIsOpen(false); setMobileMenuOpen(false); setProfileOpen(false); }
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [isOpen, mobileMenuOpen]);
+  }, [isOpen, mobileMenuOpen, profileOpen]);
 
   const visibleResults = results.slice(0, displayCount);
 
@@ -70,7 +106,7 @@ export function PublicNavbar() {
         <div className="relative">
           <button
             type="button"
-            onClick={() => setIsOpen(!isOpen)}
+            onClick={() => { setIsOpen(!isOpen); setProfileOpen(false); }}
             className="rounded-full px-4 py-1.5 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-100"
           >
             Pesquisar escolas
@@ -146,18 +182,65 @@ export function PublicNavbar() {
         </a>
 
         <div className="flex items-center gap-2">
-          <a
-            href="/login"
-            className="rounded-full px-4 py-1.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100"
-          >
-            Entrar
-          </a>
-          <a
-            href="/signup-owner"
-            className="rounded-full border border-accent bg-white px-4 py-1.5 text-sm font-semibold text-accent transition-colors hover:bg-accent hover:text-white"
-          >
-            Registar
-          </a>
+          {clientLink ? (
+            <div className="relative flex items-center gap-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  const supabase = createClient();
+                  await supabase.auth.signOut();
+                  window.location.href = "/";
+                }}
+                className="rounded-full px-4 py-1.5 text-sm font-semibold text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+              >
+                Sair
+              </button>
+              <div ref={profileRef} className="relative">
+                <button
+                  type="button"
+                  onClick={() => setProfileOpen(!profileOpen)}
+                  className="flex items-center gap-1.5 rounded-full border border-accent bg-accent px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90"
+                >
+                  {userName.charAt(0).toUpperCase() + userName.slice(1)}
+                  <svg className={`h-3.5 w-3.5 transition-transform ${profileOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </button>
+                {profileOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setProfileOpen(false)} />
+                    <div className="absolute right-0 top-full z-50 mt-2 w-52 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
+                      {PROFILE_LINKS.map((link) => (
+                        <Link
+                          key={link.href}
+                          href={link.href}
+                          onClick={() => setProfileOpen(false)}
+                          className="block px-4 py-2.5 text-sm text-gray-700 transition-all hover:text-accent hover:shadow-sm"
+                        >
+                          {link.label}
+                        </Link>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          ) : (
+            <>
+              <a
+                href="/login"
+                className="rounded-full px-4 py-1.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100"
+              >
+                Entrar
+              </a>
+              <a
+                href="/signup-owner"
+                className="rounded-full border border-accent bg-white px-4 py-1.5 text-sm font-semibold text-accent transition-colors hover:bg-accent hover:text-white"
+              >
+                Registar
+              </a>
+            </>
+          )}
         </div>
       </div>
 
@@ -228,20 +311,50 @@ export function PublicNavbar() {
 
           <hr className="border-gray-200" />
 
-          <a
-            href="/login"
-            onClick={() => setMobileMenuOpen(false)}
-            className="block w-full text-center rounded-xl border border-accent bg-white px-4 py-3 text-sm font-semibold text-accent transition-colors hover:bg-accent hover:text-white"
-          >
-            Entrar
-          </a>
-          <a
-            href="/signup-owner"
-            onClick={() => setMobileMenuOpen(false)}
-            className="block w-full text-center rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent/90"
-          >
-            Registar o seu negócio
-          </a>
+          {clientLink ? (
+            <div className="flex flex-col gap-2">
+              <div className="divide-y divide-gray-100 rounded-xl border border-gray-200 bg-white">
+                {PROFILE_LINKS.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block px-4 py-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 first:rounded-t-xl last:rounded-b-xl"
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  const supabase = createClient();
+                  await supabase.auth.signOut();
+                  window.location.href = "/";
+                }}
+                className="block w-full text-center rounded-xl border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-500 transition-colors hover:bg-gray-100"
+              >
+                Sair
+              </button>
+            </div>
+          ) : (
+            <>
+              <a
+                href="/login"
+                onClick={() => setMobileMenuOpen(false)}
+                className="block w-full text-center rounded-xl border border-accent bg-white px-4 py-3 text-sm font-semibold text-accent transition-colors hover:bg-accent hover:text-white"
+              >
+                Entrar
+              </a>
+              <a
+                href="/signup-owner"
+                onClick={() => setMobileMenuOpen(false)}
+                className="block w-full text-center rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent/90"
+              >
+                Registar o seu negócio
+              </a>
+            </>
+          )}
         </nav>
       </div>
 

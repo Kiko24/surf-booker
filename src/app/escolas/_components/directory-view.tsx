@@ -80,6 +80,7 @@ export function DirectoryView({ showcased }: Props) {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Procura a tua escola"
+              aria-label="Pesquisar escolas"
               className="flex-1 bg-white text-base text-gray-900 outline-none placeholder:text-gray-700"
             />
             {query && (
@@ -110,12 +111,18 @@ export function DirectoryView({ showcased }: Props) {
                     onClick={() => handleSelect(school.slug)}
                     className="flex w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-gray-50"
                   >
-                    <span className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-gray-100">
-                      <img
-                        src={school.logo_url || "https://placehold.co/56x56/1E6FA8/FFFFFF?text=Escola"}
-                        alt=""
-                        className="h-full w-full object-cover"
-                      />
+                    <span className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-accent">
+                      {school.logo_url ? (
+                        <img
+                          src={school.logo_url}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <span className="flex h-full w-full items-center justify-center text-lg font-bold text-white">
+                          {school.name.charAt(0).toUpperCase()}
+                        </span>
+                      )}
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="text-base font-semibold text-gray-900 truncate">
@@ -180,12 +187,21 @@ export function DirectoryView({ showcased }: Props) {
                   onKeyDown={(e) => { if (e.key === 'Enter') router.push(`/escolas/${school.slug}`); }}
                   className="snap-start shrink-0 w-[310px] rounded-2xl border border-gray-200 bg-white text-left transition-all hover:shadow-md hover:scale-[1.02] overflow-hidden flex flex-col"
                 >
-                  <div className="h-52 shrink-0 overflow-hidden bg-gray-100">
-                    <img
-                      src={school.photo_url || "https://placehold.co/620x352/1E6FA8/FFFFFF?text=Alaia"}
-                      alt={school.name}
-                      className="h-full w-full object-cover block"
-                    />
+                  <div className="h-52 shrink-0 overflow-hidden bg-accent">
+                    {school.photo_url ? (
+                      <img
+                        src={school.photo_url}
+                        alt={school.name}
+                        className="h-full w-full object-cover block"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-4">
+                        <svg className="h-12 w-12 text-white/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.41a2.25 2.25 0 013.182 0l2.909 2.91m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+                        </svg>
+                        <span className="text-xs text-white/60 font-medium">Sem fotos</span>
+                      </div>
+                    )}
                   </div>
                   <div className="flex flex-col flex-1 px-6 pt-4 pb-6 min-h-[180px]">
                     <h3 className="font-heading text-xl font-bold text-gray-900 truncate">
@@ -199,16 +215,18 @@ export function DirectoryView({ showcased }: Props) {
                         {school.location}
                       </p>
                     )}
-                    <div className="mt-auto flex flex-col gap-1.5">
-                      <div className="flex items-center gap-0.5">
-                        {Array.from({ length: 5 }).map((_, i) => (
-                          <StarOutline key={i} className="h-5 w-5 text-gray-300" />
-                        ))}
+                    {school.rating_count > 0 && (
+                      <div className="mt-auto flex flex-col gap-1.5">
+                        <div className="flex items-center gap-0.5">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <StarOutline key={i} className="h-5 w-5 text-gray-300" />
+                          ))}
+                        </div>
+                        <p className="text-xs text-gray-400">
+                          ({school.rating_count} avaliações)
+                        </p>
                       </div>
-                      <p className="text-xs text-gray-400">
-                        ({school.rating_count} avaliações)
-                      </p>
-                    </div>
+                    )}
                   </div>
                 </div>
               ))}

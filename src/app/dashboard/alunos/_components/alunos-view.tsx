@@ -118,8 +118,10 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
           {searchOpen ? (
               <div className="flex w-full items-center gap-4">
               <div className="relative flex-1">
+                <label htmlFor="search-alunos" className="sr-only">Procurar aluno</label>
                 <input
                   ref={searchRef}
+                  id="search-alunos"
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -212,6 +214,7 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
               key={f}
               type="button"
               onClick={() => setActiveFilter(f)}
+              aria-pressed={f === activeFilter}
               className={
                 f === activeFilter
                    ? "whitespace-nowrap rounded-full bg-accent px-4 py-1.5 font-body text-sm font-semibold text-primary-foreground"
@@ -238,11 +241,22 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
                       {s.classLabel && s.classDate ? `${s.classLabel}: ${s.classDate}` : "Sem aulas"}
                     </div>
                   </div>
-                  <button type="button" onClick={() => setSelectedStudent(s)} className="flex h-8 w-8 items-center justify-center rounded-full text-text-secondary hover:text-foreground transition-colors">
+                  <div className="flex items-center gap-2">
+                    {s.waiverSigned ? (
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 text-success shrink-0">
+                        <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.814a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.75-5.25Z" clipRule="evenodd" />
+                      </svg>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4 text-text-muted shrink-0">
+                        <circle cx="12" cy="12" r="9" />
+                      </svg>
+                    )}
+                    <button type="button" onClick={() => setSelectedStudent(s)} className="flex h-8 w-8 items-center justify-center rounded-full text-text-secondary hover:text-foreground transition-colors">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
                       <path d="m9 18 6-6-6-6" />
                     </svg>
                   </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -263,6 +277,7 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
                 <th className="px-5 py-3 font-body text-[10px] text-text-secondary uppercase tracking-widest text-center">Status do Pack</th>
                 <th className="px-5 py-3 font-body text-[10px] text-text-secondary uppercase tracking-widest text-center">Última Aula</th>
                 <th className="px-5 py-3 font-body text-[10px] text-text-secondary uppercase tracking-widest text-center">Estado</th>
+                <th className="px-5 py-3 font-body text-[10px] text-text-secondary uppercase tracking-widest text-center">Waiver</th>
                 <th className="px-5 py-3"></th>
               </tr>
             </thead>
@@ -288,10 +303,24 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
                       {s.isGuest ? "Convidado" : "Registado"}
                     </span>
                   </td>
+                  <td className="px-5 py-3 align-middle text-center">
+                    <div className="flex items-center justify-center">
+                      {s.waiverSigned ? (
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5 text-success">
+                          <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.814a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.75-5.25Z" clipRule="evenodd" />
+                        </svg>
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-5 w-5 text-text-muted">
+                          <circle cx="12" cy="12" r="9" />
+                        </svg>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-5 py-3 text-right align-middle">
                     <button
                       type="button"
                       onClick={() => setSelectedStudent(s)}
+                      aria-label={`Detalhes de ${s.name}`}
                       className="text-text-secondary hover:text-foreground"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
@@ -382,9 +411,12 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
                       ))}
                     </div>
                   )}
-                  <button
-                    type="button"
-                    onClick={async () => {
+                          <button
+                            type="button"
+                            role="checkbox"
+                            aria-checked={selectedStudent.waiverSigned}
+                            aria-label="Termo de responsabilidade"
+                            onClick={async () => {
                       const packs = await getAvailablePacks(schoolId);
                       setAvailablePacks(packs);
                       setShowBuyPack(true);
@@ -430,7 +462,7 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
               <button
                 type="button"
                 onClick={() => setShowDeleteConfirm(true)}
-                className="mt-5 w-full rounded-xl bg-error/20 py-3 font-body text-sm font-semibold text-error transition-colors hover:bg-error/30"
+                className="mt-5 w-full rounded-xl bg-error-bg py-3 font-body text-sm font-semibold text-error transition-colors hover:bg-error/30"
               >
                 Eliminar aluno
               </button>

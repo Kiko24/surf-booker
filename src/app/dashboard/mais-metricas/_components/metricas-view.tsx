@@ -95,14 +95,16 @@ export function MetricasView() {
         </div>
 
         {/* Filter row */}
-        <div className="mb-4 flex gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden">
+        <div className="mb-4 flex gap-2 overflow-x-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-text-muted/30">
           {FILTERS.map((f) => (
             <button key={f.key} type="button" onClick={() => setActiveFilter(f.key)}
+              aria-pressed={activeFilter === f.key}
               className={activeFilter === f.key ? "whitespace-nowrap rounded-full bg-accent px-4 py-1.5 font-body text-sm font-semibold text-primary-foreground" : "whitespace-nowrap rounded-full bg-surface px-4 py-1.5 font-body text-sm font-semibold text-text-secondary"}
             >{f.label}</button>
           ))}
           {savedFilters.map((sf, i) => (
             <button key={`c-${i}`} type="button" onClick={() => setActiveFilter("personalizado")}
+              aria-pressed={activeFilter === "personalizado"}
               className={activeFilter === "personalizado" ? "whitespace-nowrap rounded-full bg-accent px-4 py-1.5 font-body text-sm font-semibold text-primary-foreground" : "whitespace-nowrap rounded-full bg-surface px-4 py-1.5 font-body text-sm font-semibold text-text-secondary"}
             >{sf.label}</button>
           ))}
@@ -116,7 +118,7 @@ export function MetricasView() {
 
         {loading ? (
           <div className="flex flex-1 items-center justify-center">
-            <p className="font-body text-sm text-text-muted">A carregar métricas...</p>
+            <p className="font-body text-sm text-text-muted" role="status">A carregar métricas...</p>
           </div>
         ) : !d ? (
           <div className="flex flex-1 items-center justify-center">
@@ -129,7 +131,7 @@ export function MetricasView() {
             <section className="rounded-xl border border-accent/10 bg-surface p-5 md:p-6">
               <h2 className="font-heading text-lg font-bold text-foreground mb-1">Receita</h2>
               <div className="mb-3 flex items-baseline gap-3">
-                <span className="font-heading text-3xl text-foreground">{formatCents(d.receita.total)}</span>
+                <span className="font-heading text-3xl text-foreground" aria-label={`Receita total ${formatCents(d.receita.total)}`}>{formatCents(d.receita.total)}</span>
                 <Seta valor={d.receita.comparativo} />
               </div>
               <div className="space-y-2">
@@ -158,7 +160,7 @@ export function MetricasView() {
             <section className="rounded-xl border border-accent/10 bg-surface p-5 md:p-6">
               <h2 className="font-heading text-lg font-bold text-foreground mb-1">Ocupação</h2>
               <div className="mb-3">
-                <span className="font-heading text-3xl text-foreground">{d.ocupacao.taxa_media}%</span>
+                <span className="font-heading text-3xl text-foreground" aria-label={`Taxa de ocupação média ${d.ocupacao.taxa_media}%`}>{d.ocupacao.taxa_media}%</span>
                 <span className="ml-2 font-body text-sm text-text-secondary">taxa de ocupação média</span>
               </div>
               <div className="grid grid-cols-2 gap-3 mb-3">
@@ -191,19 +193,19 @@ export function MetricasView() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-lg bg-[#2A2A2A] p-3 text-center">
                   <p className="font-body text-xs text-text-secondary">Total únicos</p>
-                  <p className="font-heading text-xl text-foreground">{d.alunos.total_unicos}</p>
+                  <p className="font-heading text-xl text-foreground" aria-label={`${d.alunos.total_unicos} alunos únicos`}>{d.alunos.total_unicos}</p>
                 </div>
                 <div className="rounded-lg bg-[#2A2A2A] p-3 text-center">
                   <p className="font-body text-xs text-text-secondary">Novos</p>
-                  <p className="font-heading text-xl text-success">{d.alunos.novos}</p>
+                  <p className="font-heading text-xl text-success" aria-label={`${d.alunos.novos} novos alunos`}>{d.alunos.novos}</p>
                 </div>
                 <div className="rounded-lg bg-[#2A2A2A] p-3 text-center">
                   <p className="font-body text-xs text-text-secondary">Com pack</p>
-                  <p className="font-heading text-xl text-foreground">{d.alunos.com_pack}</p>
+                  <p className="font-heading text-xl text-foreground" aria-label={`${d.alunos.com_pack} alunos com pack`}>{d.alunos.com_pack}</p>
                 </div>
                 <div className="rounded-lg bg-[#2A2A2A] p-3 text-center">
                   <p className="font-body text-xs text-text-secondary">Inativos</p>
-                  <p className="font-heading text-xl text-error">{d.alunos.inativos}</p>
+                  <p className="font-heading text-xl text-error" aria-label={`${d.alunos.inativos} alunos inativos`}>{d.alunos.inativos}</p>
                 </div>
               </div>
             </section>
@@ -212,7 +214,7 @@ export function MetricasView() {
             <section className="rounded-xl border border-accent/10 bg-surface p-5 md:p-6">
               <h2 className="font-heading text-lg font-bold text-foreground mb-1">No-Shows</h2>
               <div className="mb-3 flex items-baseline gap-3">
-                <span className="font-heading text-3xl text-foreground">{d.noshow.taxa}%</span>
+                <span className="font-heading text-3xl text-foreground" aria-label={`Taxa de no-show ${d.noshow.taxa}%`}>{d.noshow.taxa}%</span>
                 <Seta valor={d.noshow.comparativo} />
               </div>
               {d.noshow.recorrentes.length > 0 && (

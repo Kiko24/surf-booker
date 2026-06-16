@@ -42,7 +42,14 @@ export function DashboardLayout({ children }: Props) {
   }, []);
 
   return (
-    <div className="h-svh overflow-hidden bg-background text-foreground font-body md:flex">
+    <>
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:rounded-xl focus:bg-accent focus:px-4 focus:py-3 focus:text-primary-foreground focus:outline-none"
+      >
+        Saltar para o conteúdo principal
+      </a>
+      <div className="h-svh overflow-hidden bg-background text-foreground font-body md:flex">
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex md:flex-col md:w-64 md:h-full md:shrink-0 md:bg-background md:border-r md:border-white/10 md:py-10 md:px-6 md:z-50">
         <div className="flex items-center gap-4">
@@ -68,9 +75,10 @@ export function DashboardLayout({ children }: Props) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-4 text-sm font-semibold transition-all duration-300 ${
+                aria-current={isActive ? "page" : undefined}
+                className={`flex items-center gap-4 text-sm font-semibold transition-all duration-300 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none ${
                   isActive
-                    ? "text-accent relative before:absolute before:-left-6 before:top-1/2 before:-translate-y-1/2 before:h-4 before:w-[3px] before:rounded-r before:bg-accent before:shadow-[0_0_10px_rgba(255,107,53,0.5)]"
+                    ? "text-accent relative before:absolute before:-left-6 before:top-1/2 before:-translate-y-1/2 before:h-4 before:w-[3px] before:rounded-r before:bg-accent before:shadow-[0_0_10px_rgba(129,202,250,0.5)]"
                     : "text-text-secondary hover:text-accent"
                 }`}
               >
@@ -89,7 +97,7 @@ export function DashboardLayout({ children }: Props) {
               await logoutOwner();
               window.location.href = "/";
             }}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-text-secondary transition-colors hover:text-error"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-text-secondary transition-colors hover:text-error focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
             aria-label="Terminar sessão"
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
@@ -101,8 +109,9 @@ export function DashboardLayout({ children }: Props) {
           <button
             type="button"
             onClick={toggleTheme}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-text-secondary transition-colors hover:text-foreground"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-text-secondary transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
             aria-label={dark ? "Modo claro" : "Modo escuro"}
+            aria-pressed={!dark}
           >
             {dark ? (
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
@@ -119,7 +128,7 @@ export function DashboardLayout({ children }: Props) {
       </aside>
 
       {/* Main Content */}
-      <div className="flex-1 h-full overflow-y-auto md:overflow-y-auto pb-24 md:pb-0 [&::-webkit-scrollbar]:hidden">
+      <div id="main-content" className="flex-1 h-full overflow-y-auto md:overflow-y-auto pb-24 md:pb-0 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-text-muted/30">
         {children}
       </div>
 
@@ -137,10 +146,11 @@ export function DashboardLayout({ children }: Props) {
             <Link
               key={item.href}
               href={item.href}
+              aria-label={item.label}
               className={
                 isActive
-                  ? "flex h-12 w-12 scale-90 items-center justify-center rounded-full bg-accent text-primary-foreground transition-all duration-200"
-                  : "flex h-12 w-12 items-center justify-center rounded-full text-text-secondary transition-all hover:bg-accent/10"
+                  ? "flex h-12 w-12 scale-90 items-center justify-center rounded-full bg-accent text-primary-foreground transition-all duration-200 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+                  : "flex h-12 w-12 items-center justify-center rounded-full text-text-secondary transition-all hover:bg-accent/10 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
               }
             >
               <Icon className="h-5 w-5" />
@@ -149,5 +159,6 @@ export function DashboardLayout({ children }: Props) {
         })}
       </nav>
     </div>
+    </>
   );
 }

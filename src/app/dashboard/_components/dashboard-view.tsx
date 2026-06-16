@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useState, useRef, useEffect } from "react";
 import { HomeIcon, CalendarIcon, GroupIcon, SurfingIcon, DotsIcon, PlusIcon, ArrowRightIcon } from "./icons";
 import type { TodaySession, Alerta, ActivityItem } from "../actions";
 import type { MetricasData } from "../mais-metricas/actions";
@@ -42,6 +42,45 @@ export function DashboardView({ fullName, todaySessions, metricas, alertas, scho
   const displayedAlertas = alertas.slice(0, 3);
   const [showSessionsModal, setShowSessionsModal] = useState(false);
   const [showAlertasModal, setShowAlertasModal] = useState(false);
+  const sessionsTriggerRef = useRef<HTMLButtonElement>(null);
+  const alertasTriggerRef = useRef<HTMLButtonElement>(null);
+  const sessionsModalRef = useRef<HTMLDivElement>(null);
+  const alertasModalRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (showSessionsModal) {
+      sessionsModalRef.current?.querySelector<HTMLElement>("button, a, input, [tabindex]:not([tabindex='-1'])")?.focus();
+    }
+    if (showAlertasModal) {
+      alertasModalRef.current?.querySelector<HTMLElement>("button, a, input, [tabindex]:not([tabindex='-1'])")?.focus();
+    }
+    if (!showSessionsModal && !showAlertasModal) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setShowSessionsModal(false);
+        setShowAlertasModal(false);
+        setTimeout(() => sessionsTriggerRef.current?.focus(), 0);
+        setTimeout(() => alertasTriggerRef.current?.focus(), 0);
+      }
+      if (e.key === "Tab") {
+        const activeModal = showSessionsModal ? sessionsModalRef.current : alertasModalRef.current;
+        if (!activeModal) return;
+        const focusable = activeModal.querySelectorAll<HTMLElement>("button, a, input, [tabindex]:not([tabindex='-1'])");
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [showSessionsModal, showAlertasModal]);
 
   const handleDismiss = useCallback(async (tipo: string, entityId: string | null) => {
     await dismissAlert(schoolId, tipo, entityId);
@@ -65,9 +104,9 @@ export function DashboardView({ fullName, todaySessions, metricas, alertas, scho
       <main className="space-y-8 px-5 pb-32 md:pb-8 pt-8 md:pt-12">
         {/* Greeting */}
         <section>
-          <h2 className="font-heading text-3xl text-foreground">
+          <h1 className="font-heading text-3xl text-foreground">
             Bom dia, {firstName}
-          </h2>
+          </h1>
           <p className="mt-1 text-sm text-text-secondary">
             {todayLabel()} &nbsp;&middot; {todaySessions.length} {todaySessions.length === 1 ? "sessão" : "sessões"} hoje
           </p>
@@ -81,8 +120,11 @@ export function DashboardView({ fullName, todaySessions, metricas, alertas, scho
               <h3 className="font-heading text-2xl text-foreground">Sessões de hoje</h3>
               {todaySessions.length > 2 && (
                 <button
+                  ref={sessionsTriggerRef}
                   type="button"
                   onClick={() => setShowSessionsModal(true)}
+                  aria-expanded={showSessionsModal}
+                  aria-controls="sessions-modal"
                   className="rounded-full border border-accent/20 px-3 py-1 text-xs font-semibold text-accent transition-colors hover:bg-accent/10 mt-1.5"
                 >
                   Ver todas!
@@ -95,7 +137,7 @@ export function DashboardView({ fullName, todaySessions, metricas, alertas, scho
                 const pct = s.capacidade > 0 ? (s.inscritos / s.capacidade) * 100 : 0;
                 let tag: { label: string; className: string } | null = null;
                 if (s.capacidade > 0 && s.inscritos >= s.capacidade) {
-                  tag = { label: "Lotada", className: "rounded-full bg-error/20 px-2 py-0.5 font-body text-sm font-semibold text-error" };
+                  tag = { label: "Lotada", className: "rounded-full bg-error-bg px-2 py-0.5 font-body text-sm font-semibold text-error" };
                 } else if (s.capacidade > 0 && pct <= 50) {
                   tag = { label: "Pouca ocupação", className: "rounded-full bg-success/20 px-2 py-0.5 font-body text-sm font-semibold text-success" };
                 }
@@ -210,13 +252,16 @@ export function DashboardView({ fullName, todaySessions, metricas, alertas, scho
               <div className="flex items-center gap-3">
                 <h3 className="font-heading text-2xl text-foreground">Alertas</h3>
                 {alertas.length > 3 && (
-                  <button
-                    type="button"
-                    onClick={() => setShowAlertasModal(true)}
-                    className="rounded-full border border-accent/20 px-3 py-1 text-xs font-semibold text-accent transition-colors hover:bg-accent/10 mt-1.5"
-                  >
-                    Ver todas!
-                  </button>
+                <button
+                  ref={alertasTriggerRef}
+                  type="button"
+                  onClick={() => setShowAlertasModal(true)}
+                  aria-expanded={showAlertasModal}
+                  aria-controls="alertas-modal"
+                  className="rounded-full border border-accent/20 px-3 py-1 text-xs font-semibold text-accent transition-colors hover:bg-accent/10 mt-1.5"
+                >
+                  Ver todas!
+                </button>
                 )}
               </div>
 
@@ -252,7 +297,14 @@ export function DashboardView({ fullName, todaySessions, metricas, alertas, scho
 
       {/* Sessions Modal */}
       {showSessionsModal && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 md:px-5">
+        <div
+          ref={sessionsModalRef}
+          id="sessions-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Sessões de hoje"
+          className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 md:px-5"
+        >
           <div className="w-full max-w-md rounded-t-2xl md:rounded-2xl bg-surface pb-10 md:pb-4">
             <div className="flex items-center justify-between border-b border-accent/10 px-6 py-4">
               <h3 className="font-heading text-xl text-foreground">
@@ -271,7 +323,7 @@ export function DashboardView({ fullName, todaySessions, metricas, alertas, scho
                 const pct = s.capacidade > 0 ? (s.inscritos / s.capacidade) * 100 : 0;
                 let tag: { label: string; className: string } | null = null;
                 if (s.capacidade > 0 && s.inscritos >= s.capacidade) {
-                  tag = { label: "Lotada", className: "rounded-full bg-error/20 px-2 py-0.5 font-body text-sm font-semibold text-error" };
+                  tag = { label: "Lotada", className: "rounded-full bg-error-bg px-2 py-0.5 font-body text-sm font-semibold text-error" };
                 } else if (s.capacidade > 0 && pct <= 50) {
                   tag = { label: "Pouca ocupação", className: "rounded-full bg-success/20 px-2 py-0.5 font-body text-sm font-semibold text-success" };
                 }
@@ -301,7 +353,14 @@ export function DashboardView({ fullName, todaySessions, metricas, alertas, scho
 
       {/* Alertas Modal */}
       {showAlertasModal && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 md:px-5">
+        <div
+          ref={alertasModalRef}
+          id="alertas-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Alertas"
+          className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 md:px-5"
+        >
           <div className="w-full max-w-md rounded-t-2xl md:rounded-2xl bg-surface pb-10 md:pb-4">
             <div className="flex items-center justify-between border-b border-accent/10 px-6 py-4">
               <h3 className="font-heading text-xl text-foreground">

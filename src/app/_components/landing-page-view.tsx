@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import mockupImg from "@/components/images/mockup.png";
 import breakImg from "@/components/images/break.png";
@@ -11,10 +12,18 @@ import { useRef, useState, useEffect } from "react";
 import { useScrollReveal } from "./use-scroll-reveal";
 import { z } from "zod";
 
+const PROFILE_LINKS = [
+  { href: "/perfil", label: "Geral" },
+  { href: "/perfil/historico", label: "Histórico de aulas" },
+  { href: "/perfil/packs", label: "Lista de packs" },
+  { href: "/perfil/definicoes", label: "Definições" },
+];
+
 type UserInfo = {
   id: string;
   email: string;
   name: string;
+  role: string;
 };
 
 export function LandingPageView({ user }: { user: UserInfo | null }) {
@@ -24,6 +33,7 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
   const [isMobile, setIsMobile] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", message: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const contactSchema = z.object({
     name: z.string().trim().min(2, "Mínimo 2 caracteres").max(80, "Máximo 80 caracteres"),
@@ -87,6 +97,15 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  useEffect(() => {
+    if (!mobileMenuOpen && !profileOpen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { setMobileMenuOpen(false); setProfileOpen(false); }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [mobileMenuOpen, profileOpen]);
+
   const faqs = [
     { q: "Preciso de conhecimentos técnicos para usar a Alaia?", a: "Não. A Alaia foi desenhada para donos de escolas de surf que não querem perder tempo com tecnologia. Em poucos minutos tens tudo configurado." },
     { q: "Posso experimentar antes de pagar?", a: "Para além da demonstração gratuita, ainda podemos oferecer 14 dias grátis para experimentar a plataforma." },
@@ -110,13 +129,13 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
           <nav className="hidden md:flex items-center gap-1">
             <button
               onClick={() => document.getElementById("como-funciona")?.scrollIntoView({ behavior: "smooth" })}
-              className="font-body rounded-full px-3 py-1.5 text-sm font-semibold text-gray-900 transition-all hover:bg-accent/10 focus-visible:outline-2 focus-visible:outline-accent-light"
+              className="font-body rounded-full px-3 py-1.5 text-sm font-semibold text-gray-900 transition-all cursor-pointer hover:bg-accent/10 focus-visible:outline-2 focus-visible:outline-accent-light"
             >
               Como funciona?
             </button>
             <button
               onClick={() => document.getElementById("contacto")?.scrollIntoView({ behavior: "smooth" })}
-              className="font-body rounded-full px-3 py-1.5 text-sm font-semibold text-gray-900 transition-all hover:bg-accent/10 focus-visible:outline-2 focus-visible:outline-accent-light"
+              className="font-body rounded-full px-3 py-1.5 text-sm font-semibold text-gray-900 transition-all cursor-pointer hover:bg-accent/10 focus-visible:outline-2 focus-visible:outline-accent-light"
             >
               Contacto
             </button>
@@ -127,16 +146,42 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
           </a>
 
           {/* Desktop auth */}
-          <div className="hidden md:flex items-center gap-2">
+          <div className="hidden md:flex items-center gap-4">
             {user ? (
               <>
-                <span className="hidden text-sm text-gray-500 md:block">
-                  {user.name}
-                </span>
+                <div className="relative hidden md:block">
+                  <button
+                    type="button"
+                    onClick={() => setProfileOpen(!profileOpen)}
+                    className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold text-gray-900 transition-all hover:bg-accent/10 focus-visible:outline-2 focus-visible:outline-accent-light"
+                  >
+                    {user.name}
+                    <svg className={`h-3.5 w-3.5 transition-transform ${profileOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </button>
+                  {profileOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setProfileOpen(false)} />
+                      <div className="absolute right-0 top-full z-50 mt-2 w-52 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
+                        {PROFILE_LINKS.map((link) => (
+                          <Link
+                            key={link.href}
+                            href={link.href}
+                            onClick={() => setProfileOpen(false)}
+                            className="block px-4 py-2.5 text-sm text-gray-700 transition-all hover:text-accent hover:shadow-sm"
+                          >
+                            {link.label}
+                          </Link>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
                 <button
                   type="button"
                   onClick={handleSignOut}
-                  className="font-body rounded-full bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200"
+                  className="font-body hidden md:block rounded-full px-3 py-1.5 text-sm font-semibold text-gray-900 transition-all hover:bg-accent/10 focus-visible:outline-2 focus-visible:outline-accent-light"
                 >
                   Sair
                 </button>
@@ -151,13 +196,16 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
                 </a>
                 <a
                   href="/signup-owner"
-                  className="font-body rounded-full border border-accent-light bg-white px-4 py-2 text-sm font-semibold text-accent-light transition-colors hover:bg-accent-light hover:text-white"
+                  className="font-body rounded-full border border-accent bg-white px-4 py-2 text-sm font-semibold text-accent transition-colors hover:bg-accent hover:text-white"
                 >
                   Registar o seu negócio
                 </a>
               </>
             )}
           </div>
+
+          {/* Mobile — transparent header (igual landing page) */}
+          
 
           {/* Mobile hamburger */}
           <button
@@ -195,26 +243,40 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
               </button>
               <hr className="border-gray-200" />
               {user ? (
-                <button
-                  type="button"
-                  onClick={handleSignOut}
-                  className="w-full text-left font-body rounded-xl bg-gray-100 px-4 py-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200"
-                >
-                  Sair
-                </button>
+                <>
+                  <div className="divide-y divide-gray-100 rounded-xl border border-gray-200 bg-white">
+                    {PROFILE_LINKS.map((link) => (
+                      <Link
+                        key={link.href}
+                        href={link.href}
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="block px-4 py-3 text-sm font-semibold text-gray-700 transition-colors hover:text-accent first:rounded-t-xl last:rounded-b-xl"
+                      >
+                        {link.label}
+                      </Link>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleSignOut}
+                    className="w-full text-left font-body rounded-xl bg-gray-100 px-4 py-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200"
+                  >
+                    Sair
+                  </button>
+                </>
               ) : (
                 <>
                   <a
                     href="/onboarding"
                     onClick={() => setMobileMenuOpen(false)}
-                    className="block w-full text-center font-body rounded-xl border border-accent-light bg-white px-4 py-3 text-sm font-semibold text-accent-light transition-colors hover:bg-accent-light hover:text-white"
+                    className="block w-full text-center font-body rounded-xl border border-accent bg-white px-4 py-3 text-sm font-semibold text-accent transition-colors hover:bg-accent hover:text-white"
                   >
                     Entrar
                   </a>
                   <a
                     href="/signup-owner"
                     onClick={() => setMobileMenuOpen(false)}
-                    className="block w-full text-center font-body rounded-xl border border-accent-light bg-white px-4 py-3 text-sm font-semibold text-accent-light transition-colors hover:bg-accent-light hover:text-white"
+                    className="block w-full text-center font-body rounded-xl border border-accent bg-white px-4 py-3 text-sm font-semibold text-accent transition-colors hover:bg-accent hover:text-white"
                   >
                     Registar o seu negócio
                   </a>
@@ -228,7 +290,7 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
         {/* Imagem de fundo */}
         <div className="absolute inset-0 z-0">
           <Image src="/images/hero-section.png" alt="" fill className="object-cover" priority />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-black/20" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/70 to-black/40" />
         </div>
 
         {/* Conteúdo centrado */}
@@ -237,7 +299,7 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
             Feito para<br/>
             <span className="text-accent">quem vive o mar.</span>
           </h1>
-          <p className="mt-6 text-[clamp(1rem,1.528vw,1.375rem)] font-semibold text-white/90 max-w-2xl">
+          <p className="mt-6 text-[clamp(1rem,1.528vw,1.375rem)] font-semibold text-white max-w-2xl">
             A plataforma de gestão para escolas de surf e desportos aquáticos.<br/>
             Os alunos reservam online, tu geres tudo num só lugar.
           </p>
@@ -310,14 +372,14 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
       >
         <div ref={imageRef} className="absolute inset-0 z-0 will-change-transform" style={{ top: "-10%", height: "120%" }}>
           <Image src={breakImg} alt="" fill className="object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-black/20" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/70 to-black/40" />
         </div>
         <div
           ref={breakTextReveal.ref}
           className={`relative z-10 transition-all duration-700 ease-out ${breakTextReveal.isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
         >
           <div className="text-center px-5 sm:px-8">
-            <p className="text-[clamp(1rem,1.8vw,1.375rem)] font-semibold text-white/90">
+            <p className="text-[clamp(1rem,1.8vw,1.375rem)] font-semibold text-white">
               Deixa a gestão connosco.<br/>O surf é contigo.
             </p>
             <h2 className="mt-4 font-heading text-[clamp(1.5rem,3.5vw,3rem)] font-bold text-white whitespace-nowrap">

@@ -1,36 +1,75 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Alaia
 
-## Getting Started
+Plataforma de gestão para escolas de surf e desportos aquáticos. Os alunos reservam online, o dono da escola gere tudo num só lugar — calendário, alunos, serviços e pagamentos.
 
-First, run the development server:
+## Stack
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **Framework**: Next.js 16 (App Router, Turbopack)
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS v4
+- **Database**: Supabase (PostgreSQL, RLS, Storage)
+- **Auth**: Supabase Auth (magic link + password)
+- **Rate Limiting**: Upstash Redis
+
+## Funcionalidades
+
+### Página Pública
+- Diretório de escolas com pesquisa semântica
+- Página de cada escola com galeria, info, serviços e instrutores
+- Calendário público com reserva online (auth + guest)
+- Comprar packs com créditos consumidos automaticamente
+
+### Dashboard (dono da escola)
+- Visão geral com KPIs
+- Gestão de calendário: criar/editar/cancelar aulas (sessões)
+- Check-in de alunos em cada sessão
+- Gestão de alunos: lista, pesquisa, histórico, waivers
+- Configurações: info do negócio, instrutores, imagens, definições
+
+### Perfil do Cliente
+- Visão geral com histórico e estatísticas
+- Histórico de aulas
+- Lista de packs e créditos restantes
+- Definições da conta
+- Favoritos (escolas guardadas)
+- Waivers assinados
+
+### Segurança
+- Row Level Security (RLS) em todas as tabelas
+- Server actions validam auth + ownership
+- Admin client (service_role) usado apenas após verificação no servidor
+- Rate limiting em todas as ações críticas
+- Audit logging em operações destrutivas
+- Validação de uploads (tamanho, tipo, magic bytes)
+
+## Estrutura
+
+```
+src/
+├── app/
+│   ├── _components/        # Componentes partilhados
+│   ├── escolas/[slug]/     # Página pública da escola
+│   ├── dashboard/          # Dashboard do dono
+│   ├── perfil/             # Perfil do cliente
+│   └── onboarding/         # Setup inicial
+├── lib/
+│   ├── supabase/           # Clientes server, client, admin
+│   ├── rate-limit.ts       # Rate limiting (Upstash)
+│   └── audit.ts            # Audit logging
+└── supabase/migrations/    # Migrations SQL (0021)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Desenvolvimento
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm install
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Migrations
 
-## Learn More
+As migrations estão em `supabase/migrations/` e são aplicadas manualmente via `supabase migration up`. Cada migration tem um prefixo numérico (0001–0021).
 
-To learn more about Next.js, take a look at the following resources:
+## Licença
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Uso privado.

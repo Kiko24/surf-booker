@@ -9,20 +9,21 @@
   --color-foreground: #FFFFFF;
   --color-text-primary: #FFFFFF;
   --color-text-secondary: rgba(255, 255, 255, 0.6);
-  --color-text-muted: rgba(255, 255, 255, 0.4);
+  --color-text-muted: rgba(255, 255, 255, 0.55);
 
   /* Accent / Borders */
-  --color-accent: #1E6FA8;
+  --color-accent: #81CAFA;
   --color-accent-light: #81CAFA;
-  --color-border: #1E6FA8;
+  --color-border: #81CAFA;
 
   /* Botões */
   --color-primary: #F5F5F5;
   --color-primary-foreground: #1E1E1E;
 
   /* Estados */
-  --color-error: #EF4444;
+  --color-error: #F87171;
   --color-error-foreground: #FFFFFF;
+  --color-error-bg: #4D2222;
   --color-success: #10B981;
 
   /* Fontes */
@@ -43,15 +44,16 @@ html.light {
   --color-foreground: #111827;
   --color-text-primary: #111827;
   --color-text-secondary: #4B5563;
-  --color-text-muted: #9CA1A6;
+  --color-text-muted: #6B7280;
   --color-accent: #1E6FA8;
   --color-accent-light: #81CAFA;
   --color-border: #E5E7EB;
   --color-primary: #111827;
   --color-primary-foreground: #FFFFFF;
-  --color-error: #EF4444;
+  --color-error: #DC2626;
   --color-error-foreground: #FFFFFF;
-  --color-success: #16A34A;
+  --color-error-bg: #FFF5F5;
+  --color-success: #15803D;
 }
 
 html.light ::-webkit-scrollbar-thumb {
@@ -139,6 +141,13 @@ p {
 input::placeholder,
 textarea::placeholder {
   color: var(--color-text-muted);
+}
+
+/* Cursor pointer em todos os clickáveis */
+button:not(:disabled),
+a[href],
+[role="button"] {
+  cursor: pointer;
 }
 
 /* Focus visível */

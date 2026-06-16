@@ -132,6 +132,7 @@ export function ServicosView({ sessions, schoolId }: Props) {
                   onClick={() => setSelectedSession(s)}
                   className="shrink-0 p-1 text-text-secondary hover:text-foreground transition-colors"
                   aria-label="Opções do serviço"
+                  aria-haspopup="dialog"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
                     <path d="M5 12h.01M12 12h.01M19 12h.01" />
@@ -166,7 +167,7 @@ export function ServicosView({ sessions, schoolId }: Props) {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right align-middle">
-                    <button onClick={() => setSelectedSession(s)} className="p-2 text-text-secondary hover:text-foreground transition-colors" aria-label="Opções do serviço">
+                    <button onClick={() => setSelectedSession(s)} className="p-2 text-text-secondary hover:text-foreground transition-colors" aria-label="Opções do serviço" aria-haspopup="dialog">
                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
                         <path d="M5 12h.01M12 12h.01M19 12h.01" />
                       </svg>
@@ -181,8 +182,11 @@ export function ServicosView({ sessions, schoolId }: Props) {
       </div>
 
       {/* Service popup */}
-      {selectedSession && (
-        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50">
+        {selectedSession && (
+          <div
+            className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50"
+            onKeyDown={(e) => { if (e.key === "Escape") setSelectedSession(null); }}
+          >
           <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-10">
             <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted" />
 
@@ -292,9 +296,11 @@ export function ServicosView({ sessions, schoolId }: Props) {
                   value={nome}
                   onChange={(e) => { setNome(e.target.value); setFormErrors((prev) => ({ ...prev, nome: "" })); }}
                   placeholder="Ex: Aula Nível 1"
+                  aria-invalid={!!formErrors.nome}
+                  aria-describedby={formErrors.nome ? "error-nome" : undefined}
                   className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
                 />
-                {formErrors.nome && <p className="mt-1 font-body text-sm text-error">{formErrors.nome}</p>}
+                {formErrors.nome && <p id="error-nome" className="mt-1 font-body text-sm text-error">{formErrors.nome}</p>}
               </div>
 
               {/* Modalidade */}
@@ -353,9 +359,11 @@ export function ServicosView({ sessions, schoolId }: Props) {
                       value={preco}
                       onChange={(e) => { setPreco(e.target.value); setFormErrors((prev) => ({ ...prev, preco: "" })); }}
                       placeholder="150"
+                      aria-invalid={!!formErrors.preco}
+                      aria-describedby={formErrors.preco ? "error-preco-pack" : undefined}
                       className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
                     />
-                    {formErrors.preco && <p className="mt-1 font-body text-sm text-error">{formErrors.preco}</p>}
+                    {formErrors.preco && <p id="error-preco-pack" className="mt-1 font-body text-sm text-error">{formErrors.preco}</p>}
                   </div>
                   <div className="flex-1">
                     <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
@@ -368,9 +376,11 @@ export function ServicosView({ sessions, schoolId }: Props) {
                       value={totalLessons}
                       onChange={(e) => { setTotalLessons(e.target.value); setFormErrors((prev) => ({ ...prev, totalLessons: "" })); }}
                       placeholder="5"
+                      aria-invalid={!!formErrors.totalLessons}
+                      aria-describedby={formErrors.totalLessons ? "error-totalLessons" : undefined}
                       className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
                     />
-                    {formErrors.totalLessons && <p className="mt-1 font-body text-sm text-error">{formErrors.totalLessons}</p>}
+                    {formErrors.totalLessons && <p id="error-totalLessons" className="mt-1 font-body text-sm text-error">{formErrors.totalLessons}</p>}
                   </div>
                 </div>
               ) : categoria === "aluguer" ? (
@@ -385,9 +395,11 @@ export function ServicosView({ sessions, schoolId }: Props) {
                       value={preco}
                       onChange={(e) => { setPreco(e.target.value); setFormErrors((prev) => ({ ...prev, preco: "" })); }}
                       placeholder="35"
+                      aria-invalid={!!formErrors.preco}
+                      aria-describedby={formErrors.preco ? "error-preco-aluguer" : undefined}
                       className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
                     />
-                    {formErrors.preco && <p className="mt-1 font-body text-sm text-error">{formErrors.preco}</p>}
+                    {formErrors.preco && <p id="error-preco-aluguer" className="mt-1 font-body text-sm text-error">{formErrors.preco}</p>}
                   </div>
                   <div>
                     <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
@@ -399,9 +411,11 @@ export function ServicosView({ sessions, schoolId }: Props) {
                       value={duracaoAluguer}
                       onChange={(e) => { setDuracaoAluguer(e.target.value); setFormErrors((prev) => ({ ...prev, duracaoAluguer: "" })); }}
                       placeholder="2"
+                      aria-invalid={!!formErrors.duracaoAluguer}
+                      aria-describedby={formErrors.duracaoAluguer ? "error-duracaoAluguer" : undefined}
                       className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
                     />
-                    {formErrors.duracaoAluguer && <p className="mt-1 font-body text-sm text-error">{formErrors.duracaoAluguer}</p>}
+                    {formErrors.duracaoAluguer && <p id="error-duracaoAluguer" className="mt-1 font-body text-sm text-error">{formErrors.duracaoAluguer}</p>}
                   </div>
                   <div className="mt-6">
                     <select
@@ -425,9 +439,11 @@ export function ServicosView({ sessions, schoolId }: Props) {
                     value={preco}
                     onChange={(e) => { setPreco(e.target.value); setFormErrors((prev) => ({ ...prev, preco: "" })); }}
                     placeholder="Ex: 35"
+                    aria-invalid={!!formErrors.preco}
+                    aria-describedby={formErrors.preco ? "error-preco" : undefined}
                     className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
                   />
-                  {formErrors.preco && <p className="mt-1 font-body text-sm text-error">{formErrors.preco}</p>}
+                  {formErrors.preco && <p id="error-preco" className="mt-1 font-body text-sm text-error">{formErrors.preco}</p>}
                 </div>
               ) : null}
 
@@ -443,9 +459,11 @@ export function ServicosView({ sessions, schoolId }: Props) {
                   value={duracao}
                   onChange={(e) => { setDuracao(e.target.value); setFormErrors((prev) => ({ ...prev, duracao: "" })); }}
                   placeholder="Ex: 90"
+                  aria-invalid={!!formErrors.duracao}
+                  aria-describedby={formErrors.duracao ? "error-duracao" : undefined}
                   className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
                 />
-                {formErrors.duracao && <p className="mt-1 font-body text-sm text-error">{formErrors.duracao}</p>}
+                {formErrors.duracao && <p id="error-duracao" className="mt-1 font-body text-sm text-error">{formErrors.duracao}</p>}
               </div>
 
               {/* Sobre */}
