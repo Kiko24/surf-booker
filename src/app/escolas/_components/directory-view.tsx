@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { searchSchools } from "@/app/escolas/actions";
 import { PublicNavbar } from "@/app/_components/public-navbar";
@@ -26,18 +27,18 @@ export function DirectoryView({ showcased }: Props) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (!query.trim()) {
-      setResults([]);
-      setShowResults(false);
-      return;
-    }
-    const sanitized = query.trim().slice(0, 100).replace(/[^a-zA-Z0-9áéíóúâêîôûàèìòùãõçñÁÉÍÓÚÂÊÎÔÛÀÈÌÒÙÃÕÇÑ\s'-]/g, "");
-    if (!sanitized) {
-      setResults([]);
-      setShowResults(false);
-      return;
-    }
     const timer = setTimeout(async () => {
+      if (!query.trim()) {
+        setResults([]);
+        setShowResults(false);
+        return;
+      }
+      const sanitized = query.trim().slice(0, 100).replace(/[^a-zA-Z0-9áéíóúâêîôûàèìòùãõçñÁÉÓÍÚÂÊÎÔÛÀÈÌÒÙÃÕÇÑ\s'-]/g, "");
+      if (!sanitized) {
+        setResults([]);
+        setShowResults(false);
+        return;
+      }
       const data = await searchSchools(sanitized, 10);
       setResults(data);
       setShowResults(true);
@@ -240,9 +241,9 @@ export function DirectoryView({ showcased }: Props) {
         <div className="mx-auto max-w-4xl">
           <div className="flex flex-col md:flex-row justify-between gap-8">
             <div className="max-w-xs">
-              <a href="/" className="font-heading text-xl font-bold text-white">
+              <Link href="/" className="font-heading text-xl font-bold text-white">
                 Alaia
-              </a>
+              </Link>
               <p className="mt-2 text-sm text-gray-300 leading-relaxed">
                 Plataforma de gestão para escolas de surf e desportos aquáticos.
               </p>
@@ -251,12 +252,12 @@ export function DirectoryView({ showcased }: Props) {
               <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">
                 Produto
               </p>
-              <a
+              <Link
                 href="/"
                 className="text-sm text-gray-300 transition-colors hover:text-accent-light"
               >
                 Como funciona?
-              </a>
+              </Link>
               <a
                 href="/signup-owner"
                 className="text-sm text-gray-300 transition-colors hover:text-accent-light"

@@ -13,7 +13,9 @@ const WEEKDAY_HEADERS = ["D", "S", "T", "Q", "Q", "S", "S"];
 
 export function PublicCalendar({ schoolId, classTypeFilter, onSelectSession }: Props) {
   const onSelectSessionRef = useRef(onSelectSession);
-  onSelectSessionRef.current = onSelectSession;
+  useEffect(() => {
+    onSelectSessionRef.current = onSelectSession;
+  }, [onSelectSession]);
 
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
@@ -34,7 +36,8 @@ export function PublicCalendar({ schoolId, classTypeFilter, onSelectSession }: P
   }, [schoolId, year, month]);
 
   useEffect(() => {
-    fetchSessions();
+    const id = requestAnimationFrame(() => fetchSessions());
+    return () => cancelAnimationFrame(id);
   }, [fetchSessions]);
 
   const daysInMonth = new Date(year, month, 0).getDate();
@@ -89,9 +92,12 @@ export function PublicCalendar({ schoolId, classTypeFilter, onSelectSession }: P
   }, [sessionsByDay, classTypeFilter]);
 
   useEffect(() => {
-    setSelectedDay(null);
-    setSelectedSession(null);
-    onSelectSessionRef.current(null);
+    const id = requestAnimationFrame(() => {
+      setSelectedDay(null);
+      setSelectedSession(null);
+      onSelectSessionRef.current(null);
+    });
+    return () => cancelAnimationFrame(id);
   }, [classTypeFilter]);
 
   const selectedDaySessions = selectedDay ? filteredByDay[selectedDay] ?? [] : [];

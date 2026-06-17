@@ -401,8 +401,8 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
                     <p className="font-body text-sm text-text-muted">Não tem packs ativos</p>
                   ) : (
                     <div className="space-y-2">
-                      {selectedStudent.packs.map((p, i) => (
-                        <div key={i} className="flex items-center justify-between">
+                      {selectedStudent.packs.map((p) => (
+                        <div key={p.name} className="flex items-center justify-between">
                           <span className="font-body text-sm text-foreground">{p.name}</span>
                           <span className="font-body text-xs text-text-secondary">
                             {p.remaining === 1 ? "1 aula restante" : `${p.remaining} aulas restantes`}

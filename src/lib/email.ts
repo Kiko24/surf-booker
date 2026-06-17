@@ -1,7 +1,7 @@
 import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
-const FROM = "Surf Booker <onboarding@resend.dev>";
+const FROM = process.env.RESEND_FROM_EMAIL ?? "Surf Booker <onboarding@resend.dev>";
 
 type BookingNotification = {
   ownerEmail: string;

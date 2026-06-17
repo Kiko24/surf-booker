@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { type ReactNode, useState, useEffect, useCallback } from "react";
 import { NAV_ITEMS } from "./constants";
 import { getSchoolInfo } from "../actions";
@@ -14,7 +14,11 @@ export function DashboardLayout({ children }: Props) {
   const pathname = usePathname();
   const [schoolName, setSchoolName] = useState("Surf Booker");
   const [schoolLogo, setSchoolLogo] = useState<string | null>(null);
-  const [dark, setDark] = useState(true);
+  const [dark, setDark] = useState(() => {
+    if (typeof window === "undefined") return true;
+    const saved = localStorage.getItem("theme");
+    return saved ? saved === "dark" : true;
+  });
 
   useEffect(() => {
     getSchoolInfo().then((info) => {
@@ -26,10 +30,7 @@ export function DashboardLayout({ children }: Props) {
   }, []);
 
   useEffect(() => {
-    const saved = localStorage.getItem("theme");
-    const isDark = saved ? saved === "dark" : true;
-    setDark(isDark);
-    document.documentElement.classList.toggle("light", !isDark);
+    document.documentElement.classList.toggle("light", !dark);
   }, []);
 
   const toggleTheme = useCallback(() => {

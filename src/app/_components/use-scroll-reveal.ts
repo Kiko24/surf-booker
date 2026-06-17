@@ -1,24 +1,25 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 export function useScrollReveal(threshold = 0.2) {
-  const ref = useRef<HTMLDivElement>(null);
   const [isVisible, setIsVisible] = useState(false);
+  const observerRef = useRef<IntersectionObserver | null>(null);
 
-  useEffect(() => {
-    const el = ref.current;
+  const ref = useCallback((el: HTMLDivElement | null) => {
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+    }
     if (!el) return;
-    const observer = new IntersectionObserver(
+    observerRef.current = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
           setIsVisible(true);
-          observer.disconnect();
+          observerRef.current?.disconnect();
         }
       },
-      { threshold }
+      { threshold },
     );
-    observer.observe(el);
-    return () => observer.disconnect();
+    observerRef.current.observe(el);
   }, [threshold]);
 
   return { ref, isVisible };

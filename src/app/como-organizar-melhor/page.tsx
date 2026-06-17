@@ -111,7 +111,7 @@ export default function ComoOrganizarMelhorPage() {
                 <h2 className="font-heading text-xl font-bold text-gray-900">Packs de aulas</h2>
               </div>
               <p className="mt-4 font-body text-sm leading-relaxed text-gray-700">
-                <span className="font-semibold text-red-600">Antes:</span> O pagamento era aula a aula, "depois combina-se". No final do mês não sabias quanto ias receber e os alunos apareciam quando calhava.
+                <span className="font-semibold text-red-600">Antes:</span> O pagamento era aula a aula, &quot;depois combina-se&quot;. No final do mês não sabias quanto ias receber e os alunos apareciam quando calhava.
               </p>
               <p className="mt-3 font-body text-sm leading-relaxed text-gray-700">
                 <span className="font-semibold text-green-600">Depois:</span> Vendes packs de aulas adiantados, garantes receita previsível e os alunos comprometem-se. Menos aulas vagas, mais faturação estável.

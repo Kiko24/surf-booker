@@ -54,27 +54,29 @@ export function PublicNavbar() {
 
   useEffect(() => {
     if (!isOpen) {
-      setQuery("");
-      setResults([]);
-      setDisplayCount(5);
-      return;
+      const id = requestAnimationFrame(() => {
+        setQuery("");
+        setResults([]);
+        setDisplayCount(5);
+      });
+      return () => cancelAnimationFrame(id);
     }
     inputRef.current?.focus();
   }, [isOpen]);
 
   useEffect(() => {
-    if (!query.trim()) {
-      setResults([]);
-      setTotalCount(0);
-      return;
-    }
-    const sanitized = query.trim().slice(0, 100).replace(/[^a-zA-Z0-9áéíóúâêîôûàèìòùãõçñÁÉÍÓÚÂÊÎÔÛÀÈÌÒÙÃÕÇÑ\s'-]/g, "");
-    if (!sanitized) {
-      setResults([]);
-      setTotalCount(0);
-      return;
-    }
     const timer = setTimeout(async () => {
+      if (!query.trim()) {
+        setResults([]);
+        setTotalCount(0);
+        return;
+      }
+      const sanitized = query.trim().slice(0, 100).replace(/[^a-zA-Z0-9áéíóúâêîôûàèìòùãõçñÁÉÓÍÚÂÊÎÔÛÀÈÌÒÙÃÕÇÑ\s'-]/g, "");
+      if (!sanitized) {
+        setResults([]);
+        setTotalCount(0);
+        return;
+      }
       const data = await searchSchools(sanitized, 200);
       setResults(data);
       setTotalCount(data.length);
@@ -177,9 +179,9 @@ export function PublicNavbar() {
           )}
         </div>
 
-        <a href="/" className="font-heading text-lg font-bold text-accent">
+        <Link href="/" className="font-heading text-lg font-bold text-accent">
           Alaia
-        </a>
+        </Link>
 
         <div className="flex items-center gap-2">
           {clientLink ? (
@@ -246,9 +248,9 @@ export function PublicNavbar() {
 
       {/* Mobile — transparent header (igual landing page) */}
       <div className="flex md:hidden items-center justify-between">
-        <a href="/" className="font-heading text-xl font-bold text-accent">
+        <Link href="/" className="font-heading text-xl font-bold text-accent">
           Alaia
-        </a>
+        </Link>
         <button
           type="button"
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}

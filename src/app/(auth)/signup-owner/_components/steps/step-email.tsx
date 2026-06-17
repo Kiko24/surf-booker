@@ -19,8 +19,11 @@ export function StepEmail({ defaultEmail = "", onSubmit }: Props) {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const emailRef = useRef(email);
   const onSubmitRef = useRef(onSubmit);
-  emailRef.current = email;
-  onSubmitRef.current = onSubmit;
+
+  useEffect(() => {
+    emailRef.current = email;
+    onSubmitRef.current = onSubmit;
+  }, [email, onSubmit]);
 
   useEffect(() => {
     const btn = buttonRef.current;

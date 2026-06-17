@@ -1,6 +1,7 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { rateLimitPublic } from "@/lib/rate-limit";
 
 export type SchoolSearchResult = {
   name: string;
@@ -24,6 +25,9 @@ export async function searchSchools(
   query: string,
   limit: number
 ): Promise<SchoolSearchResult[]> {
+  const rl = await rateLimitPublic("searchSchools", 20, "60 s");
+  if (!rl.ok) return [];
+
   const admin = createAdminClient();
   const sanitized = query.trim().slice(0, 100);
   const { data, error } = await admin
@@ -51,6 +55,9 @@ export async function searchSchools(
 }
 
 export async function getShowcasedSchools(): Promise<ShowcasedSchool[]> {
+  const rl = await rateLimitPublic("getShowcasedSchools", 10, "60 s");
+  if (!rl.ok) return [];
+
   const admin = createAdminClient();
   const IMAGE_BUCKET = "school-images";
 

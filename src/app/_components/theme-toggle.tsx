@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 export function ThemeToggle({ className = "" }: { className?: string }) {
-  const [isLight, setIsLight] = useState(false);
-
-  useEffect(() => {
-    setIsLight(document.documentElement.classList.contains("light"));
-  }, []);
+  const [isLight, setIsLight] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return document.documentElement.classList.contains("light");
+  });
 
   function toggle() {
     const html = document.documentElement;

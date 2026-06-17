@@ -21,8 +21,8 @@ export function BookingModal({ sessionId, schoolId, onClose }: Props) {
   const [packLoading, setPackLoading] = useState(false);
 
   useEffect(() => {
-    if (!email.includes("@")) { setActivePack(null); return; }
     const timer = setTimeout(async () => {
+      if (!email.includes("@")) { setActivePack(null); setPackLoading(false); return; }
       setPackLoading(true);
       const pack = await buscarPackAtivo(schoolId, email);
       setActivePack(pack);

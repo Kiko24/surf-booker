@@ -12,6 +12,16 @@ export type StudentPack = {
   remaining: number;
 };
 
+type StudentId = { id: string };
+type StudentWithName = { id: string; full_name: string };
+type StudentDetails = { id: string; full_name: string; email: string | null; phone: string | null; is_guest: boolean };
+type PackInfo = { name: string; is_active: boolean };
+type StudentWithWaiver = { waiver_signed: boolean };
+type SchoolOwner = { owner_user_id: string };
+type NestedStudentName = { student: { full_name: string } };
+type SessionRow = { id: string; starts_at: string };
+type DeleteStudentRecord = { school_id: string; student: { full_name: string } | null };
+
 export type StudentRecord = {
   id: string;
   name: string;
@@ -43,7 +53,7 @@ export async function getStudents(schoolId: string): Promise<StudentRecord[]> {
   if (!rows) return [];
 
   const studentIds = rows
-    .map((r) => (r.student as unknown as { id: string } | null)?.id)
+    .map((r) => (r.student as unknown as StudentId | null)?.id)
     .filter(Boolean);
 
   if (studentIds.length === 0) return [];
@@ -63,7 +73,7 @@ export async function getStudents(schoolId: string): Promise<StudentRecord[]> {
     .in("id", sessionIds)
     .order("starts_at", { ascending: true });
 
-  const sessionStartsMap = new Map(sessions?.map(s => [(s as unknown as { id: string }).id, (s as unknown as { starts_at: string }).starts_at]) ?? []);
+  const sessionStartsMap = new Map(sessions?.map(s => { const row = s as SessionRow; return [row.id, row.starts_at]; }) ?? []);
 
   // group bookings by student
   const studentBookings = new Map<string, string[]>();
@@ -83,7 +93,7 @@ export async function getStudents(schoolId: string): Promise<StudentRecord[]> {
 
   const packsByStudent = new Map<string, StudentPack[]>();
   for (const sp of studentPacks ?? []) {
-    const p = sp.pack as unknown as { name: string; is_active: boolean } | null;
+    const p = sp.pack as unknown as PackInfo | null;
     if (!p || !p.is_active) continue;
     const list = packsByStudent.get(sp.student_id) ?? [];
     list.push({ name: p.name, remaining: sp.lessons_remaining });
@@ -94,13 +104,7 @@ export async function getStudents(schoolId: string): Promise<StudentRecord[]> {
   const result: StudentRecord[] = [];
 
   for (const r of rows) {
-    const s = r.student as unknown as {
-      id: string;
-      full_name: string;
-      email: string | null;
-      phone: string | null;
-      is_guest: boolean;
-    } | null;
+    const s = r.student as unknown as StudentDetails | null;
 
     if (!s) continue;
 
@@ -128,7 +132,7 @@ export async function getStudents(schoolId: string): Promise<StudentRecord[]> {
       email: s.email,
       phone: s.phone,
       isGuest: s.is_guest,
-      waiverSigned: (s as unknown as { waiver_signed: boolean }).waiver_signed ?? false,
+      waiverSigned: (s as unknown as StudentWithWaiver).waiver_signed ?? false,
       hasActivePack: (packsByStudent.get(s.id)?.length ?? 0) > 0,
       classLabel: label,
       classDate: targetDate
@@ -151,13 +155,16 @@ export async function toggleWaiver(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Não autenticado" };
 
+  const rl = await rateLimitByUser(user.id, "toggleWaiver");
+  if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
+
   const { data: school } = await supabase
     .from("school_students")
     .select("school:schools!inner(owner_user_id)")
     .eq("student_id", studentId)
     .maybeSingle();
   if (!school) return { ok: false, error: "Aluno não encontrado na escola" };
-  if ((school.school as unknown as { owner_user_id: string }).owner_user_id !== user.id) {
+  if ((school.school as unknown as SchoolOwner).owner_user_id !== user.id) {
     return { ok: false, error: "Sem permissão" };
   }
 
@@ -178,12 +185,14 @@ export async function deleteStudent(studentId: string): Promise<{ ok: boolean; e
   const rl = await rateLimitByUser(user.id, "deleteStudent");
   if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
 
-  // get student name + school_id before deleting
+  // verify ownership before deleting
   const { data: student } = await supabase
     .from("school_students")
-    .select("school_id, student:students(full_name)")
+    .select("school_id, student:students(full_name), school:schools!inner(owner_user_id)")
     .eq("student_id", studentId)
-    .single();
+    .eq("school.owner_user_id", user.id)
+    .maybeSingle();
+  if (!student) return { ok: false, error: "Aluno não encontrado" };
 
   const admin = createAdminClient();
 
@@ -201,13 +210,13 @@ export async function deleteStudent(studentId: string): Promise<{ ok: boolean; e
 
   if (student) {
     logAudit({
-      schoolId: (student as unknown as { school_id: string }).school_id,
+      schoolId: (student as unknown as DeleteStudentRecord).school_id,
       userId: user.id,
       action: "delete_student",
       entityType: "student",
       entityId: studentId,
       metadata: {
-        studentName: ((student as unknown as { student: { full_name: string } }).student?.full_name) ?? null,
+        studentName: ((student as unknown as DeleteStudentRecord).student?.full_name) ?? null,
       },
     });
   }

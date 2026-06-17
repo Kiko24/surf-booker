@@ -2,6 +2,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { rateLimitPublic } from "@/lib/rate-limit";
 
 export type PublicSchoolImage = {
   id: string;
@@ -70,6 +71,9 @@ export type PublicSchoolData = {
 export async function getPublicSchoolData(
   slug: string
 ): Promise<PublicSchoolData | null> {
+  const rl = await rateLimitPublic("getPublicSchoolData", 30, "60 s");
+  if (!rl.ok) return null;
+
   let admin;
   try {
     admin = createAdminClient();
@@ -213,6 +217,9 @@ export async function getPublicSessionsForMonth(
   year: number,
   month: number
 ): Promise<Record<number, PublicSession[]>> {
+  const rl = await rateLimitPublic("getPublicSessionsForMonth", 30, "60 s");
+  if (!rl.ok) return {};
+
   const admin = createAdminClient();
 
   const startDate = new Date(year, month - 1, 1).toISOString().split("T")[0];
@@ -290,6 +297,15 @@ async function findOrCreateStudent(
       .maybeSingle();
 
     if (ss) return { id: existing.id };
+
+    // Student existe com este email mas não está ligado a esta escola — criar link
+    const { error: linkErr } = await admin.from("school_students").insert({
+      school_id: schoolId,
+      student_id: existing.id,
+    });
+
+    if (linkErr) return null;
+    return { id: existing.id };
   }
 
   const { data: student, error: studentErr } = await admin
@@ -321,6 +337,9 @@ export async function comprarPackPublico(
   quantity: number,
   data: { name: string; email: string; phone: string }
 ): Promise<{ ok: true; packPurchaseId: string } | { ok: false; error: string }> {
+  const rl = await rateLimitPublic("comprarPackPublico", 5, "60 s");
+  if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
+
   const admin = createAdminClient();
 
   if (data.name.trim().length < 2) return { ok: false, error: "Nome deve ter pelo menos 2 caracteres." };
@@ -389,6 +408,9 @@ export async function buscarPackAtivo(
   schoolId: string,
   email: string
 ): Promise<{ packPurchaseId: string; remaining: number; name: string } | null> {
+  const rl = await rateLimitPublic("buscarPackAtivo", 10, "60 s");
+  if (!rl.ok) return null;
+
   const admin = createAdminClient();
 
   const { data: student } = await admin
@@ -426,6 +448,9 @@ export async function criarReservaPublica(
   data: { name: string; email: string; phone: string },
   packPurchaseId?: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  const rl = await rateLimitPublic("criarReservaPublica", 5, "60 s");
+  if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
+
   const admin = createAdminClient();
 
   const student = await findOrCreateStudent(admin, schoolId, data);

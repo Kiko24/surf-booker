@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import Link from "next/link";
 import type { PublicSchoolData } from "../actions";
 import { toggleFavorite, comprarPackPublico } from "../actions";
 import { Lightbox } from "./lightbox";
@@ -52,9 +53,12 @@ export function EscolaView({ data }: Props) {
 
   useEffect(() => {
     if (!showServicePicker) return;
-    setPackQuantity(1);
-    setPackFormError(null);
-    setShowPackSuccess(false);
+    const id = requestAnimationFrame(() => {
+      setPackQuantity(1);
+      setPackFormError(null);
+      setShowPackSuccess(false);
+    });
+    return () => cancelAnimationFrame(id);
   }, [showServicePicker]);
 
   useEffect(() => {
@@ -333,8 +337,8 @@ export function EscolaView({ data }: Props) {
                     Instrutores
                   </h2>
                   <div className="flex flex-wrap gap-6">
-                    {instructors.map((inst, i) => (
-                      <div key={i} className="flex flex-col items-center text-center w-[calc(50%-12px)] sm:w-[calc(25%-18px)]">
+                    {instructors.map((inst) => (
+                      <div key={inst.name} className="flex flex-col items-center text-center w-[calc(50%-12px)] sm:w-[calc(25%-18px)]">
                         <div className="h-16 w-16 overflow-hidden rounded-full bg-gray-200">
                           {inst.avatar_url ? (
                             <img
@@ -886,9 +890,9 @@ export function EscolaView({ data }: Props) {
           <div className="flex flex-col md:flex-row justify-between gap-8">
             {/* Brand */}
             <div className="max-w-xs">
-              <a href="/" className="font-heading text-xl font-bold text-white">
+              <Link href="/" className="font-heading text-xl font-bold text-white">
                 Alaia
-              </a>
+              </Link>
               <p className="mt-2 text-sm text-gray-300 leading-relaxed">
                 Plataforma de gestão para escolas de surf e desportos aquáticos.
               </p>

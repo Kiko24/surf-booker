@@ -1,7 +1,9 @@
 "use server";
 
+import { formatTimeAgo } from "@/lib/utils/format";
 import { createClient } from "@/lib/supabase/server";
 import { getSchoolId } from "@/lib/school";
+import { rateLimitByUser } from "@/lib/rate-limit";
 
 export type TodaySession = {
   id: string;
@@ -85,7 +87,7 @@ export async function getTodaySessions(schoolId: string): Promise<TodaySession[]
       id: s.id,
       time: `${hours}:${minutes}`,
       durationMinutes: s.duration_minutes,
-      title: (s.class_types as unknown as { name: string } | null)?.name ?? "Aula",
+      title: (s.class_types as unknown as ClassTypeName | null)?.name ?? "Aula",
       inscritos: bookingCount[s.id] ?? 0,
       capacidade: s.capacity ?? 10,
       alunosList: alunosIds.map(id => ({ name: studentNameMap.get(id) ?? "Aluno" })),
@@ -145,7 +147,7 @@ export async function getAlertas(schoolId: string): Promise<Alerta[]> {
       if (cap > 0 && inscritos / cap < 0.4) {
         const entityKey = `baixa_ocupacao:${s.id}`;
         if (dismissedKeys.has(entityKey)) continue;
-        const nome = (s.class_types as unknown as { name: string } | null)?.name ?? "Aula";
+        const nome = (s.class_types as unknown as ClassTypeName | null)?.name ?? "Aula";
         const d = new Date(s.starts_at);
         const hora = `${d.getHours().toString().padStart(2,"0")}:${d.getMinutes().toString().padStart(2,"0")}`;
         alertas.push({ id: `baixa-${++idCounter}`, tipo: "baixa_ocupacao", mensagem: `"${nome}" às ${hora} — ${inscritos}/${cap} inscritos`, link: "/dashboard/calendario", entityId: s.id });
@@ -163,8 +165,8 @@ export async function getAlertas(schoolId: string): Promise<Alerta[]> {
     .gt("lessons_remaining", 0);
 
   for (const pr of packRows ?? []) {
-    const pack = pr.pack as unknown as { name: string };
-    const student = pr.student as unknown as { full_name: string };
+    const pack = pr.pack as unknown as PackName;
+    const student = pr.student as unknown as StudentFullName;
     const { data: recentBookings } = await supabase
       .from("bookings")
       .select("id")
@@ -209,25 +211,34 @@ export async function getAlertas(schoolId: string): Promise<Alerta[]> {
   }
 
   // ─── 5. Pagamentos pendentes (sessões passadas) ─────────
-  const { data: unpaidBookings } = await supabase
-    .from("bookings")
-    .select("id, session_id, student_id, session:sessions!inner(starts_at, school_id, class_types(name)), student:students!inner(full_name)")
-    .eq("session_id.school_id", schoolId)
-    .eq("payment_status", "unpaid")
-    .in("status", ["confirmed", "attended"])
-    .lt("session_id.starts_at", now.toISOString())
-    .order("session_id.starts_at", { ascending: false })
-    .limit(10);
+  const { data: pastSessions } = await supabase
+    .from("sessions")
+    .select("id")
+    .eq("school_id", schoolId)
+    .lt("starts_at", now.toISOString());
 
-  for (const ub of unpaidBookings ?? []) {
-    const entityKey = `pagamento_pendente:${ub.id}`;
-    if (dismissedKeys.has(entityKey)) continue;
-    const session = ub.session as unknown as { starts_at: string; class_types: { name: string } | null };
-    const student = ub.student as unknown as { full_name: string };
-    const nomeAula = session.class_types?.name ?? "Aula";
-    const d = new Date(session.starts_at);
-    const dataStr = d.toLocaleDateString("pt-PT", { day: "numeric", month: "long" });
-    alertas.push({ id: `pagamento-${++idCounter}`, tipo: "pagamento_pendente", mensagem: `${student.full_name} — "${nomeAula}" (${dataStr}) por pagar`, link: "/dashboard/calendario", entityId: ub.id });
+  const pastSessionIds = pastSessions?.map(s => s.id) ?? [];
+
+  if (pastSessionIds.length > 0) {
+    const { data: unpaidBookings } = await supabase
+      .from("bookings")
+      .select("id, session_id, student_id, session:sessions!inner(starts_at, class_types(name)), student:students!inner(full_name)")
+      .in("session_id", pastSessionIds)
+      .eq("payment_status", "unpaid")
+      .in("status", ["confirmed", "attended"])
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    for (const ub of unpaidBookings ?? []) {
+      const entityKey = `pagamento_pendente:${ub.id}`;
+      if (dismissedKeys.has(entityKey)) continue;
+      const session = ub.session as unknown as SessionUnpaid;
+      const student = ub.student as unknown as StudentFullName;
+      const nomeAula = session.class_types?.name ?? "Aula";
+      const d = new Date(session.starts_at);
+      const dataStr = d.toLocaleDateString("pt-PT", { day: "numeric", month: "long" });
+      alertas.push({ id: `pagamento-${++idCounter}`, tipo: "pagamento_pendente", mensagem: `${student.full_name} — "${nomeAula}" (${dataStr}) por pagar`, link: "/dashboard/calendario", entityId: ub.id });
+    }
   }
 
   // ─── 6. Sessão completamente cheia (próximos 7 dias) ────
@@ -257,7 +268,7 @@ export async function getAlertas(schoolId: string): Promise<Alerta[]> {
       if (cap > 0 && inscritos >= cap) {
         const entityKey = `lotada:${s.id}`;
         if (dismissedKeys.has(entityKey)) continue;
-        const nome = (s.class_types as unknown as { name: string } | null)?.name ?? "Aula";
+        const nome = (s.class_types as unknown as ClassTypeName | null)?.name ?? "Aula";
         const d = new Date(s.starts_at);
         const dataStr = d.toLocaleDateString("pt-PT", { day: "numeric", month: "long" });
         const hora = `${d.getHours().toString().padStart(2,"0")}:${d.getMinutes().toString().padStart(2,"0")}`;
@@ -279,7 +290,7 @@ export async function getAlertas(schoolId: string): Promise<Alerta[]> {
   for (const s of noInstructor ?? []) {
     const entityKey = `sem_instrutor:${s.id}`;
     if (dismissedKeys.has(entityKey)) continue;
-    const nome = (s.class_types as unknown as { name: string } | null)?.name ?? "Aula";
+    const nome = (s.class_types as unknown as ClassTypeName | null)?.name ?? "Aula";
     const d = new Date(s.starts_at);
     const dataStr = d.toLocaleDateString("pt-PT", { day: "numeric", month: "long" });
     const hora = `${d.getHours().toString().padStart(2,"0")}:${d.getMinutes().toString().padStart(2,"0")}`;
@@ -311,21 +322,45 @@ export async function getAlertas(schoolId: string): Promise<Alerta[]> {
   return alertas;
 }
 
-export async function dismissAlert(schoolId: string, tipo: string, entityId: string | null): Promise<void> {
+export async function dismissAlert(schoolId: string, tipo: string, entityId: string | null): Promise<{ ok: boolean; error?: string }> {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Não autenticado" };
+
+  const rl = await rateLimitByUser(user.id, "dismissAlert");
+  if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
+
+  const { data: school } = await supabase
+    .from("schools")
+    .select("owner_user_id")
+    .eq("id", schoolId)
+    .single();
+
+  if (!school) return { ok: false, error: "Escola não encontrada" };
+  if (school.owner_user_id !== user.id) return { ok: false, error: "Sem permissão" };
+
   const { error } = await supabase
     .from("alert_dismissals")
     .insert({ school_id: schoolId, tipo, entity_id: entityId ?? null });
 
   if (error) {
     console.error("Failed to dismiss alert:", error);
+    return { ok: false, error: "Erro ao dispensar alerta" };
   }
+
+  return { ok: true };
 }
 
 export async function logoutOwner(): Promise<void> {
   const supabase = await createClient();
   await supabase.auth.signOut();
 }
+
+type ClassTypeName = { name: string };
+type PackName = { name: string };
+type StudentFullName = { full_name: string };
+type SessionUnpaid = { starts_at: string; class_types: ClassTypeName | null };
+type BookingWithStudent = { student_id: string; students: StudentFullName | null };
 
 export type ActivityItem = {
   id: string;
@@ -334,18 +369,6 @@ export type ActivityItem = {
   timeAgo: string;
   timestamp: string;
 };
-
-function formatTimeAgo(d: Date): string {
-  const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
-  const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return "agora";
-  if (mins < 60) return `há ${mins} min`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `há ${hours} ${hours === 1 ? "hora" : "horas"}`;
-  const days = Math.floor(hours / 24);
-  return `há ${days} ${days === 1 ? "dia" : "dias"}`;
-}
 
 export async function getRecentActivity(schoolId: string): Promise<ActivityItem[]> {
   const supabase = await createClient();
@@ -360,7 +383,7 @@ export async function getRecentActivity(schoolId: string): Promise<ActivityItem[
     .limit(5);
 
   for (const bg of recentBookings ?? []) {
-    const bks = bg.bookings as unknown as { student_id: string; students: { full_name: string } | null }[];
+    const bks = bg.bookings as unknown as BookingWithStudent[];
     const firstB = bks?.[0];
     const name = firstB?.students?.full_name ?? bg.contact_name;
     items.push({
@@ -381,8 +404,8 @@ export async function getRecentActivity(schoolId: string): Promise<ActivityItem[
     .limit(5);
 
   for (const pp of recentPacks ?? []) {
-    const s = pp.students as unknown as { full_name: string };
-    const p = pp.packs as unknown as { name: string };
+    const s = pp.students as unknown as StudentFullName;
+    const p = pp.packs as unknown as PackName;
     items.push({
       id: pp.id,
       type: "pack_purchase",
@@ -395,13 +418,13 @@ export async function getRecentActivity(schoolId: string): Promise<ActivityItem[
   // Buscar cancelamentos (bookings cancelados)
   const { data: cancelled } = await supabase
     .from("bookings")
-    .select("id, student_id, students( full_name )")
+    .select("id, student_id, students( full_name ), session:sessions!inner(school_id)")
     .in("status", ["cancelled_by_school", "cancelled_by_student"])
+    .eq("session.school_id", schoolId)
     .limit(5);
 
-  // For cancellations, get session info to find school_id context
   for (const cb of cancelled ?? []) {
-    const s = cb.students as unknown as { full_name: string };
+    const s = cb.students as unknown as StudentFullName;
     items.push({
       id: cb.id,
       type: "cancellation",

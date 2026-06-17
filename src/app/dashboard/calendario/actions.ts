@@ -7,6 +7,10 @@ import { logAudit } from "@/lib/audit";
 import { getSchoolId } from "@/lib/school";
 import { sendBookingNotification, sendCancellationNotification } from "@/lib/email";
 
+type ClassTypeName = { name: string };
+type InstructorName = { name: string };
+type StudentName = { id: string; full_name: string };
+
 export type SessionAluno = { id: string; name: string; paymentStatus: string };
 
 export type SessionData = {
@@ -86,10 +90,10 @@ export async function getSessionsForMonth(
 
     const bData = bookingMap[s.id] ?? { count: 0, alunos: [] as { id: string; name: string; paymentStatus: string }[] };
 
-    const instructor = s.instructors as unknown as { name: string } | null;
+    const instructor = s.instructors as unknown as InstructorName | null;
     result[day].push({
       id: s.id,
-      nome: (s.class_types as unknown as { name: string } | null)?.name ?? "Aula",
+      nome: (s.class_types as unknown as ClassTypeName | null)?.name ?? "Aula",
       time: `${hours}:${minutes}`,
       capacidade: s.capacity ?? 0,
       alunos: bData.count,
@@ -252,7 +256,9 @@ export async function cancelSession(sessionId: string): Promise<{ ok: boolean; e
         className,
         date,
         time,
-      }).catch(() => {});
+      }).catch((err) => {
+        console.error("Failed to send cancellation notification to", s.email, err);
+      });
     }
   }
 
@@ -295,42 +301,35 @@ export async function completeSession(sessionId: string): Promise<{ ok: boolean;
     .eq("session_id", sessionId)
     .in("status", ["confirmed"]);
 
+  const promises: PromiseLike<unknown>[] = [];
+
   for (const b of bookings ?? []) {
-    // Cobrar avulso se unpaid
     if (b.payment_method === "single" && b.payment_status === "unpaid") {
-      await supabase
-        .from("bookings")
-        .update({ payment_status: "paid_offline" })
-        .eq("id", b.id);
+      promises.push(
+        supabase
+          .from("bookings")
+          .update({ payment_status: "paid_offline" })
+          .eq("id", b.id)
+      );
     }
 
-    // Descontar crédito de pack
     if (b.payment_method === "pack" && b.pack_purchase_id) {
-      const { data: pp } = await supabase
-        .from("pack_purchases")
-        .select("id, lessons_remaining")
-        .eq("id", b.pack_purchase_id)
-        .eq("student_id", b.student_id)
-        .eq("status", "active")
-        .single();
-      if (pp && pp.lessons_remaining >= 1) {
-        const newRemaining = pp.lessons_remaining - 1;
-        await supabase
-          .from("pack_purchases")
-          .update({
-            lessons_remaining: newRemaining,
-            ...(newRemaining === 0 ? { status: "exhausted" } : {}),
-          })
-          .eq("id", pp.id);
-      }
+      promises.push(
+        supabase.rpc("decrement_pack_credit", {
+          p_purchase_id: b.pack_purchase_id,
+        })
+      );
     }
 
-    // Marcar booking como attended
-    await supabase
-      .from("bookings")
-      .update({ status: "attended" })
-      .eq("id", b.id);
+    promises.push(
+      supabase
+        .from("bookings")
+        .update({ status: "attended" })
+        .eq("id", b.id)
+    );
   }
+
+  await Promise.all(promises);
 
   const { error } = await supabase
     .from("sessions")
@@ -413,7 +412,7 @@ export async function getSchoolStudents(schoolId: string): Promise<{ id: string;
   if (!rows) return [];
 
   return rows
-    .map((r) => r.student as unknown as { id: string; full_name: string } | null)
+    .map((r) => r.student as unknown as StudentName | null)
     .filter(Boolean)
     .map((s) => ({ id: s!.id, name: s!.full_name }));
 }
@@ -437,7 +436,7 @@ async function notifyOwnerBooking(
     const d = new Date(session.starts_at);
     const date = d.toLocaleDateString("pt-PT", { day: "numeric", month: "long" });
     const time = `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
-    const className = (session.class_types as unknown as { name: string } | null)?.name ?? "Aula";
+    const className = (session.class_types as unknown as ClassTypeName | null)?.name ?? "Aula";
 
     await sendBookingNotification({
       ownerEmail,
@@ -447,8 +446,8 @@ async function notifyOwnerBooking(
       date,
       time,
     });
-  } catch {
-    // swallow — notification failure must never break the booking
+  } catch (err) {
+    console.error("Failed to send booking notification:", err);
   }
 }
 
@@ -473,22 +472,18 @@ export async function createBooking(
 
     const { data: pp } = await supabase
       .from("pack_purchases")
-      .select("id, lessons_remaining")
+      .select("id")
       .eq("id", packPurchaseId)
       .eq("student_id", studentId)
       .eq("status", "active")
-      .single();
-    if (!pp || pp.lessons_remaining < 1) return { ok: false, error: "Pack sem aulas restantes" };
+      .maybeSingle();
+    if (!pp) return { ok: false, error: "Pack sem aulas restantes" };
 
-    const newRemaining = pp.lessons_remaining - 1;
-    const { error: updErr } = await supabase
-      .from("pack_purchases")
-      .update({
-        lessons_remaining: newRemaining,
-        ...(newRemaining === 0 ? { status: "exhausted" } : {}),
-      })
-      .eq("id", pp.id);
-    if (updErr) return { ok: false, error: updErr.message };
+    const { data: ok, error: rpcErr } = await supabase.rpc("decrement_pack_credit", {
+      p_purchase_id: packPurchaseId,
+    });
+    if (rpcErr) return { ok: false, error: rpcErr.message };
+    if (!ok) return { ok: false, error: "Pack sem aulas restantes" };
   }
 
   const { data: student } = await supabase

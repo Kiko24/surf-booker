@@ -50,9 +50,9 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
         <div className="mx-auto max-w-4xl">
           <div className="flex flex-col md:flex-row justify-between gap-8">
             <div className="max-w-xs">
-              <a href="/" className="font-heading text-xl font-bold text-white">
+              <Link href="/" className="font-heading text-xl font-bold text-white">
                 Alaia
-              </a>
+              </Link>
               <p className="mt-2 text-sm text-gray-300 leading-relaxed">
                 Plataforma de gestão para escolas de surf e desportos aquáticos.
               </p>
@@ -61,12 +61,12 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
               <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">
                 Produto
               </p>
-              <a href="/" className="text-sm text-gray-300 transition-colors hover:text-accent-light">
+              <Link href="/" className="text-sm text-gray-300 transition-colors hover:text-accent-light">
                 Como funciona?
-              </a>
-              <a href="/" className="text-sm text-gray-300 transition-colors hover:text-accent-light">
+              </Link>
+              <Link href="/" className="text-sm text-gray-300 transition-colors hover:text-accent-light">
                 Contacto
-              </a>
+              </Link>
               <a
                 href="/signup-owner"
                 className="text-sm text-gray-300 transition-colors hover:text-accent-light"

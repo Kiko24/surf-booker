@@ -49,19 +49,19 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
     }
   }, [showInstructors, schoolId]);
 
+  const [images, setImages] = useState<SchoolImage[]>([]);
+
   useEffect(() => {
     if (showCompany && schoolId) {
       getImages(schoolId).then(setImages);
     }
   }, [showCompany, schoolId]);
-
   const loadInstructors = useCallback(() => {
     if (schoolId) getInstructors(schoolId).then(setInstrutores);
   }, [schoolId]);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const logoFileRef = useRef<HTMLInputElement>(null);
 
-  const [images, setImages] = useState<SchoolImage[]>([]);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const imageFileRef = useRef<HTMLInputElement>(null);
 
@@ -117,7 +117,8 @@ export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, sc
 
   useEffect(() => {
     if ((showWaivers || selectedSection === "waivers") && schoolId) {
-      loadWaivers();
+      const id = requestAnimationFrame(() => loadWaivers());
+      return () => cancelAnimationFrame(id);
     }
   }, [showWaivers, selectedSection, schoolId, loadWaivers]);
 

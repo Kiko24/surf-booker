@@ -20,18 +20,18 @@ export function StepTransition({
 
   useEffect(() => {
     if (stepKey === renderedKey) {
-      setRenderedChildren(children);
-      return;
+      const id = requestAnimationFrame(() => setRenderedChildren(children));
+      return () => cancelAnimationFrame(id);
     }
 
-    setPhase("out");
+    const outId = requestAnimationFrame(() => setPhase("out"));
     const t = setTimeout(() => {
       setRenderedKey(stepKey);
       setRenderedChildren(children);
       setPhase("in");
     }, 180);
 
-    return () => clearTimeout(t);
+    return () => { cancelAnimationFrame(outId); clearTimeout(t); };
   }, [stepKey, children, renderedKey]);
 
   const translateOut = direction === "forward" ? "-translate-x-4" : "translate-x-4";

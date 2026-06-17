@@ -20,7 +20,7 @@ export default async function DashboardPage() {
     .single();
 
   const schoolId = await getSchoolId();
-  let todaySessions = schoolId ? await getTodaySessions(schoolId) : [];
+  const todaySessions = schoolId ? await getTodaySessions(schoolId) : [];
   const metricas = schoolId ? await getMetricas("esta_semana") : null;
   const alertas = schoolId ? await getAlertas(schoolId) : [];
   const recentActivity = schoolId ? await getRecentActivity(schoolId) : [];

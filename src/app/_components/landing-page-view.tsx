@@ -8,8 +8,7 @@ import mockupImg from "@/components/images/mockup.png";
 import breakImg from "@/components/images/break.png";
 import featuresImg from "@/components/images/features.png";
 import demoImg from "@/components/images/demo.png";
-import { useRef, useState, useEffect } from "react";
-import { useScrollReveal } from "./use-scroll-reveal";
+import { useRef, useState, useEffect, useCallback } from "react";
 import { z } from "zod";
 
 const PROFILE_LINKS = [
@@ -88,10 +87,31 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
     };
   }, [isMobile]);
 
-  const comoFuncionaReveal = useScrollReveal(0.15);
-  const featuresReveal = useScrollReveal(0.2);
-  const contactReveal = useScrollReveal(0.15);
-  const breakTextReveal = useScrollReveal(0.2);
+  const [comoFuncionaVisible, setComoFuncionaVisible] = useState(false);
+  const [featuresVisible, setFeaturesVisible] = useState(false);
+  const [contactVisible, setContactVisible] = useState(false);
+  const [breakTextVisible, setBreakTextVisible] = useState(false);
+
+  const comoFuncionaRef = useCallback((el: HTMLDivElement | null) => {
+    if (!el) return;
+    const o = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setComoFuncionaVisible(true); o.disconnect(); } }, { threshold: 0.15 });
+    o.observe(el);
+  }, []);
+  const featuresRef = useCallback((el: HTMLDivElement | null) => {
+    if (!el) return;
+    const o = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setFeaturesVisible(true); o.disconnect(); } }, { threshold: 0.2 });
+    o.observe(el);
+  }, []);
+  const contactRef = useCallback((el: HTMLDivElement | null) => {
+    if (!el) return;
+    const o = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setContactVisible(true); o.disconnect(); } }, { threshold: 0.15 });
+    o.observe(el);
+  }, []);
+  const breakTextRef = useCallback((el: HTMLDivElement | null) => {
+    if (!el) return;
+    const o = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setBreakTextVisible(true); o.disconnect(); } }, { threshold: 0.2 });
+    o.observe(el);
+  }, []);
 
   const [showCalendar, setShowCalendar] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
@@ -141,9 +161,9 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
             </button>
           </nav>
 
-          <a href="/" className="font-heading text-xl font-bold text-white md:text-accent-light">
+          <Link href="/" className="font-heading text-xl font-bold text-white md:text-accent-light">
             Alaia
-          </a>
+          </Link>
 
           {/* Desktop auth */}
           <div className="hidden md:flex items-center gap-4">
@@ -314,8 +334,8 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
 
       <section id="como-funciona" className="bg-gray-50 px-5 py-16 sm:px-8 sm:py-24 relative">
         <div
-          ref={comoFuncionaReveal.ref}
-          className={`transition-all duration-700 ease-out ${comoFuncionaReveal.isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
+          ref={comoFuncionaRef}
+          className={`transition-all duration-700 ease-out ${comoFuncionaVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
         >
           <div className="mx-auto max-w-4xl">
           <h2 className="font-heading text-[clamp(1.5rem,3vw,2.5rem)] font-bold text-gray-900 text-center mb-2">
@@ -375,8 +395,8 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
           <div className="absolute inset-0 bg-gradient-to-r from-black/70 to-black/40" />
         </div>
         <div
-          ref={breakTextReveal.ref}
-          className={`relative z-10 transition-all duration-700 ease-out ${breakTextReveal.isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
+          ref={breakTextRef}
+          className={`relative z-10 transition-all duration-700 ease-out ${breakTextVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
         >
           <div className="text-center px-5 sm:px-8">
             <p className="text-[clamp(1rem,1.8vw,1.375rem)] font-semibold text-white">
@@ -392,8 +412,8 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
       {/* Organização section */}
       <section className="bg-white px-5 py-16 sm:px-8 sm:py-24 relative">
         <div
-          ref={featuresReveal.ref}
-          className={`transition-all duration-700 ease-out ${featuresReveal.isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
+          ref={featuresRef}
+          className={`transition-all duration-700 ease-out ${featuresVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
         >
           <div className="mx-auto max-w-4xl">
           <h2 className="font-heading text-[clamp(1.25rem,2.5vw,2rem)] font-bold text-gray-900 text-center">Menos tempo perdido. Mais organização.</h2>
@@ -501,8 +521,8 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
       {/* Contacto section */}
       <section id="contacto" className="relative overflow-hidden px-5 py-16 sm:px-8 sm:py-24 bg-gradient-to-b from-white to-gray-50">
         <div
-          ref={contactReveal.ref}
-          className={`transition-all duration-700 ease-out ${contactReveal.isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
+          ref={contactRef}
+          className={`transition-all duration-700 ease-out ${contactVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
         >
           <div className="mx-auto max-w-4xl relative z-10">
           <h2 className="font-heading text-[clamp(1.5rem,3vw,2.5rem)] font-bold text-gray-900 text-center">
@@ -580,9 +600,9 @@ export function LandingPageView({ user }: { user: UserInfo | null }) {
           <div className="flex flex-col md:flex-row justify-between gap-8">
             {/* Brand */}
             <div className="max-w-xs">
-              <a href="/" className="font-heading text-xl font-bold text-white">
+              <Link href="/" className="font-heading text-xl font-bold text-white">
                 Alaia
-              </a>
+              </Link>
               <p className="mt-2 text-sm text-gray-300 leading-relaxed">
                 Plataforma de gestão para escolas de surf e desportos aquáticos.
               </p>

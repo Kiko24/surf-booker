@@ -20,7 +20,7 @@ export async function logAudit(event: AuditEvent) {
       entity_id: event.entityId,
       metadata: event.metadata ?? {},
     });
-  } catch {
-    // audit nunca bloqueia a operação principal
+  } catch (err) {
+    console.error("Audit log failed:", err);
   }
 }

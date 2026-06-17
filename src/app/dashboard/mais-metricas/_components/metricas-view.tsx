@@ -46,15 +46,15 @@ export function MetricasView() {
   const [customLabel, setCustomLabel] = useState("");
   const [customAmount, setCustomAmount] = useState(30);
   const [customUnit, setCustomUnit] = useState<SavedFilter["unit"]>("days");
-  const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
+  const [savedFilters, setSavedFilters] = useState<SavedFilter[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const stored = localStorage.getItem("metricas_custom_filters");
+      return stored ? JSON.parse(stored) : [];
+    } catch { return []; }
+  });
   const [data, setData] = useState<MetricasData | null>(null);
   const [loading, setLoading] = useState(true);
-
-
-  useEffect(() => {
-    const stored = localStorage.getItem("metricas_custom_filters");
-    if (stored) { try { setSavedFilters(JSON.parse(stored)); } catch { /* */ } }
-  }, []);
 
   function saveFilters(list: typeof savedFilters) {
     setSavedFilters(list);
@@ -71,7 +71,7 @@ export function MetricasView() {
     setLoading(false);
   }, [activeFilter, savedFilters]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { const id = requestAnimationFrame(() => fetchData()); return () => cancelAnimationFrame(id); }, [fetchData]);
 
   const d = data;
 

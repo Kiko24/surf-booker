@@ -529,12 +529,10 @@ export async function saveSchoolLogo(
   const ext = validation.mime.split("/")[1].replace("jpeg", "jpg");
   const path = `${schoolId}/logo.${ext}`;
 
-  // Remove old logo if exists
-  if (school.logo_url) {
-    const oldPath = school.logo_url.split("/").pop();
-    if (oldPath) {
-      await admin.storage.from(LOGO_BUCKET).remove([`${schoolId}/${oldPath}`]);
-    }
+  // Remove old logo files for this school
+  const { data: oldFiles } = await admin.storage.from(LOGO_BUCKET).list(schoolId, { limit: 10 });
+  if (oldFiles && oldFiles.length > 0) {
+    await admin.storage.from(LOGO_BUCKET).remove(oldFiles.map(f => `${schoolId}/${f.name}`));
   }
 
   const { error: uploadError } = await admin.storage
@@ -587,17 +585,18 @@ export async function getWaiverVersions(schoolId: string): Promise<WaiverVersion
 
   if (!data) return [];
 
-  const versions = await Promise.all(
-    data.map(async (v) => {
-      const { count } = await supabase
-        .from("waiver_acceptances")
-        .select("id", { count: "exact", head: true })
-        .eq("waiver_version_id", v.id);
-      return { ...v, acceptance_count: count ?? 0 };
-    })
-  );
+  const versionIds = data.map(v => v.id);
+  const { data: acceptances } = await supabase
+    .from("waiver_acceptances")
+    .select("waiver_version_id")
+    .in("waiver_version_id", versionIds);
 
-  return versions;
+  const counts = new Map<string, number>();
+  for (const a of acceptances ?? []) {
+    counts.set(a.waiver_version_id, (counts.get(a.waiver_version_id) ?? 0) + 1);
+  }
+
+  return data.map(v => ({ ...v, acceptance_count: counts.get(v.id) ?? 0 }));
 }
 
 export type WaiverAcceptanceRow = {
@@ -618,21 +617,20 @@ export async function getWaiverAcceptances(schoolId: string, waiverVersionId: st
 
   if (!data) return [];
 
+  const studentIds = data.map(a => a.student_id);
   const admin = createAdminClient();
-  const rows: WaiverAcceptanceRow[] = [];
-  for (const a of data) {
-    const { data: student } = await admin
-      .from("students")
-      .select("full_name")
-      .eq("id", a.student_id)
-      .single();
-    rows.push({
-      id: a.id,
-      student_name: student?.full_name ?? "Desconhecido",
-      accepted_at: a.accepted_at,
-    });
-  }
-  return rows;
+  const { data: students } = await admin
+    .from("students")
+    .select("id, full_name")
+    .in("id", studentIds);
+
+  const studentMap = new Map(students?.map(s => [s.id, s.full_name]) ?? []);
+
+  return data.map(a => ({
+    id: a.id,
+    student_name: studentMap.get(a.student_id) ?? "Desconhecido",
+    accepted_at: a.accepted_at,
+  }));
 }
 
 export async function saveWaiverVersion(

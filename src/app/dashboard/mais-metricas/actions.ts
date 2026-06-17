@@ -3,6 +3,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { getSchoolId } from "@/lib/school";
 
+type SessionClassTypeId = { class_type_id: string | null };
+type SessionStartsAt = { starts_at: string };
+
 export type MetricasData = {
   receita: {
     total: number;
@@ -122,7 +125,7 @@ export async function getMetricas(
   const ctMap = new Map((classTypes ?? []).map(ct => [ct.id, ct.name]));
   const porServicoMap: Record<string, number> = {};
   for (const b of bookingsRevenue ?? []) {
-    const ctId = (b.session_id as unknown as { class_type_id: string | null }).class_type_id;
+    const ctId = (b.session_id as unknown as SessionClassTypeId).class_type_id;
     const nome = ctId ? (ctMap.get(ctId) ?? "Sem Serviço") : "Sem Serviço";
     porServicoMap[nome] = (porServicoMap[nome] ?? 0) + (b.price_cents ?? 0);
   }
@@ -238,7 +241,7 @@ export async function getMetricas(
       .limit(1)
       .maybeSingle();
     if (firstB) {
-      const d = new Date((firstB.session_id as unknown as { starts_at: string }).starts_at);
+      const d = new Date((firstB.session_id as unknown as SessionStartsAt).starts_at);
       if (d >= start && d <= end) novos++;
     }
   }
@@ -262,7 +265,7 @@ export async function getMetricas(
       .limit(1)
       .maybeSingle();
     if (lastB) {
-      const d = new Date((lastB.session_id as unknown as { starts_at: string }).starts_at);
+      const d = new Date((lastB.session_id as unknown as SessionStartsAt).starts_at);
       if (d < trintaDias) inativos++;
     }
   }
@@ -310,7 +313,7 @@ export async function getMetricas(
   const mesRevenue: Record<number, number> = {};
 
   for (const b of yearRevenue ?? []) {
-    const d = new Date((b.session_id as unknown as { starts_at: string }).starts_at);
+    const d = new Date((b.session_id as unknown as SessionStartsAt).starts_at);
     const mes = d.getMonth() + 1;
     mesRevenue[mes] = (mesRevenue[mes] ?? 0) + (b.price_cents ?? 0);
     if (mes >= 6 && mes <= 9) { receitaVerao += b.price_cents ?? 0; sessoesVerao++; }

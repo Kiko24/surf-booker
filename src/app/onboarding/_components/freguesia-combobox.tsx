@@ -24,10 +24,6 @@ export function FreguesiaCombobox({
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setQuery(value);
-  }, [value]);
-
-  useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (
         wrapperRef.current &&

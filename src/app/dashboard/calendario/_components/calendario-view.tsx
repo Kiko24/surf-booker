@@ -52,6 +52,31 @@ type DaySession = {
 
 const EMPTY_SESSIONS: Record<number, DaySession[]> = {};
 
+function updateSessionsAddStudent(
+  sessions: Record<number, DaySession[]>,
+  sessionId: string,
+  studentId: string,
+  studentName: string,
+): Record<number, DaySession[]> {
+  const next: Record<number, DaySession[]> = {};
+  for (const day of Object.keys(sessions)) {
+    const dayNum = Number(day);
+    next[dayNum] = sessions[dayNum].map((sess) =>
+      sess.id === sessionId
+        ? {
+            ...sess,
+            alunos: sess.alunos + 1,
+            alunosList: [
+              ...sess.alunosList,
+              { id: studentId, name: studentName, paymentStatus: "unpaid" },
+            ],
+          }
+        : sess,
+    );
+  }
+  return next;
+}
+
 export function CalendarioView({ schoolId }: Props) {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -83,11 +108,12 @@ export function CalendarioView({ schoolId }: Props) {
       setSessions(data);
       setLoadingSessions(false);
     },
-    [schoolId]
+    [schoolId, setSessions, setLoadingSessions]
   );
 
   useEffect(() => {
-    fetchSessions(year, month);
+    const id = requestAnimationFrame(() => fetchSessions(year, month));
+    return () => cancelAnimationFrame(id);
   }, [year, month, fetchSessions]);
 
   const fetchServicos = useCallback(async () => {
@@ -185,7 +211,8 @@ export function CalendarioView({ schoolId }: Props) {
 
   useEffect(() => {
     if (searchParams.get("nova") === "true") {
-      setShowModal(true);
+      const id = requestAnimationFrame(() => setShowModal(true));
+      return () => cancelAnimationFrame(id);
     }
   }, [searchParams]);
 
@@ -918,34 +945,13 @@ className="flex-1 rounded-lg bg-error-bg py-2 lg:py-2.5 font-body text-xs lg:tex
                     }
                     setShowGuestModal(false);
                     setStudentSearch(guestName);
-                    setSessions((prev) => {
-                      const next = { ...prev };
-                      for (const day of Object.keys(next)) {
-                        const dayNum = Number(day);
-                        next[dayNum] = next[dayNum].map((sess) =>
-                          sess.id === guestSessionId
-                            ? {
-                                ...sess,
-                                alunos: sess.alunos + 1,
-                                alunosList: [
-                                  ...sess.alunosList,
-                                  {
-                                    id: res.studentId!,
-                                    name: res.studentName!,
-                                    paymentStatus: "unpaid",
-                                  },
-                                ],
-                              }
-                            : sess
-                        );
-                      }
-                      return next;
-                    });
+                    setSessions((prev) =>
+                      updateSessionsAddStudent(prev, guestSessionId, res.studentId!, res.studentName!)
+                    );
                     if (schoolId) {
                       const list = await getSchoolStudents(schoolId);
                       setSchoolStudents(list);
                     }
-                    fetchSessions(year, month);
                   }}
                   className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95"
                 >
@@ -1370,9 +1376,9 @@ className="flex-1 rounded-lg bg-error-bg py-2 lg:py-2.5 font-body text-xs lg:tex
                           </p>
                         ) : (
                           <div className="space-y-2">
-                            {profileStudent.packs.map((p, i) => (
+                            {profileStudent.packs.map((p) => (
                               <div
-                                key={i}
+                                key={p.id}
                                 className="flex items-center justify-between"
                               >
                                 <span className="font-body text-sm text-foreground">
@@ -1422,33 +1428,12 @@ className="flex-1 rounded-lg bg-error-bg py-2 lg:py-2.5 font-body text-xs lg:tex
                 const { sessionId, studentId, studentName } =
                   pendingPackStudent;
                 await createBooking(sessionId, studentId, schoolId);
-                setSessions((prev) => {
-                  const next = { ...prev };
-                  for (const day of Object.keys(next)) {
-                    const dayNum = Number(day);
-                    next[dayNum] = next[dayNum].map((sess) =>
-                      sess.id === sessionId
-                        ? {
-                            ...sess,
-                            alunos: sess.alunos + 1,
-                            alunosList: [
-                              ...sess.alunosList,
-                              {
-                                id: studentId,
-                                name: studentName,
-                                paymentStatus: "unpaid",
-                              },
-                            ],
-                          }
-                        : sess
-                    );
-                  }
-                  return next;
-                });
+                setSessions((prev) =>
+                  updateSessionsAddStudent(prev, sessionId, studentId, studentName)
+                );
                 setPendingPackStudent(null);
                 setAddingToSession(null);
                 setStudentSearch("");
-                fetchSessions(year, month);
               }}
               className="w-full rounded-xl bg-surface py-3 font-body text-sm font-semibold text-foreground transition-colors hover:bg-[#2A2A2A] mb-2"
             >
@@ -1467,33 +1452,12 @@ className="flex-1 rounded-lg bg-error-bg py-2 lg:py-2.5 font-body text-xs lg:tex
                     paymentMethod: "pack",
                     packPurchaseId: p.id,
                   });
-                  setSessions((prev) => {
-                    const next = { ...prev };
-                    for (const day of Object.keys(next)) {
-                      const dayNum = Number(day);
-                      next[dayNum] = next[dayNum].map((sess) =>
-                        sess.id === sessionId
-                          ? {
-                              ...sess,
-                              alunos: sess.alunos + 1,
-                              alunosList: [
-                                ...sess.alunosList,
-                                {
-                                  id: studentId,
-                                  name: studentName,
-                                  paymentStatus: "unpaid",
-                                },
-                              ],
-                            }
-                          : sess
-                      );
-                    }
-                    return next;
-                  });
+                  setSessions((prev) =>
+                    updateSessionsAddStudent(prev, sessionId, studentId, studentName)
+                  );
                   setPendingPackStudent(null);
                   setAddingToSession(null);
                   setStudentSearch("");
-                  fetchSessions(year, month);
                 }}
                 className="w-full rounded-xl bg-accent/20 py-3 font-body text-sm font-semibold text-accent transition-colors hover:bg-accent/30 mb-2"
               >
