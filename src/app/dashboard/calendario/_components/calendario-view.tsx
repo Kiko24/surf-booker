@@ -8,7 +8,8 @@ import {
   updateSession,
   deleteSession,
   cancelSession,
-  completeSession,
+  closeSession,
+  markAttendance,
   getSchoolStudents,
   createBooking,
   addGuestToSession,
@@ -18,6 +19,7 @@ import {
   togglePaymentStatus,
   getInstructorsForSchool,
   type SessionData,
+  type SessionAluno,
   type AvulsoServico,
   type StudentProfile,
   type StudentProfilePack,
@@ -35,7 +37,7 @@ type Props = {
   schoolId: string | null;
 };
 
-type AlunoInscrito = { id: string; name: string; paymentStatus: string };
+type AlunoInscrito = { id: string; bookingId: string; name: string; paymentStatus: string; attendanceStatus: "confirmed" | "attended" | "no_show" };
 
 type DaySession = {
   id: string;
@@ -68,7 +70,7 @@ function updateSessionsAddStudent(
             alunos: sess.alunos + 1,
             alunosList: [
               ...sess.alunosList,
-              { id: studentId, name: studentName, paymentStatus: "unpaid" },
+              { id: studentId, bookingId: "", name: studentName, paymentStatus: "unpaid", attendanceStatus: "confirmed" },
             ],
           }
         : sess,
@@ -131,9 +133,6 @@ export function CalendarioView({ schoolId }: Props) {
   const [editingSession, setEditingSession] = useState<number | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingSession, setDeletingSession] = useState<number | null>(null);
-  const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
-  const [completingSession, setCompletingSession] = useState<number | null>(null);
-  const [completingSaving, setCompletingSaving] = useState(false);
   const [addingToSession, setAddingToSession] = useState<number | null>(null);
   const [studentSearch, setStudentSearch] = useState("");
   const [schoolStudents, setSchoolStudents] = useState<{ id: string; name: string }[]>([]);
@@ -153,6 +152,8 @@ export function CalendarioView({ schoolId }: Props) {
   const [groupName, setGroupName] = useState("");
   const [groupPeople, setGroupPeople] = useState("2");
   const [groupError, setGroupError] = useState("");
+  const [attendanceLoading, setAttendanceLoading] = useState<Record<string, boolean>>({});
+  const [closingSession, setClosingSession] = useState<string | null>(null);
 
   const wrapperRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -488,12 +489,66 @@ className="inline-flex items-center gap-1 rounded-full bg-accent/10 px-2.5 py-1 
                                     if (isPast) {
                                       return (
                                         <>
+                                          {session.alunosList.length > 0 && (
+                                            <div className="w-full space-y-1.5 mb-2">
+                                              <p className="font-body text-xs text-text-muted">Presenças</p>
+                                              {session.alunosList.map((aluno) => {
+                                                const isAttended = aluno.attendanceStatus === "attended";
+                                                const isNoShow = aluno.attendanceStatus === "no_show";
+                                                const loading = attendanceLoading[aluno.bookingId];
+                                                return (
+                                                  <div key={aluno.bookingId || aluno.id} className="flex items-center justify-between gap-2 bg-[#2A2A2A] rounded-lg px-2.5 py-1.5">
+                                                    <span className="font-body text-xs text-text-secondary truncate min-w-0">{aluno.name}</span>
+                                                    <div className="flex gap-1 shrink-0">
+                                                      <button
+                                                        type="button"
+                                                        disabled={loading}
+                                                        onClick={async (e) => {
+                                                          e.stopPropagation();
+                                                          if (!aluno.bookingId || loading) return;
+                                                          setAttendanceLoading((prev) => ({ ...prev, [aluno.bookingId]: true }));
+                                                          await markAttendance(session.id, aluno.id, "attended");
+                                                          setAttendanceLoading((prev) => ({ ...prev, [aluno.bookingId]: false }));
+                                                          fetchSessions(year, month);
+                                                        }}
+                                                        className={`rounded-lg px-2.5 py-1 font-body text-xs font-semibold transition-colors ${isAttended ? "bg-success/20 text-success" : "bg-[#1A1A1A] text-text-muted hover:text-success hover:bg-success/10"}`}
+                                                      >
+                                                        Presente
+                                                      </button>
+                                                      <button
+                                                        type="button"
+                                                        disabled={loading}
+                                                        onClick={async (e) => {
+                                                          e.stopPropagation();
+                                                          if (!aluno.bookingId || loading) return;
+                                                          setAttendanceLoading((prev) => ({ ...prev, [aluno.bookingId]: true }));
+                                                          await markAttendance(session.id, aluno.id, "no_show");
+                                                          setAttendanceLoading((prev) => ({ ...prev, [aluno.bookingId]: false }));
+                                                          fetchSessions(year, month);
+                                                        }}
+                                                        className={`rounded-lg px-2.5 py-1 font-body text-xs font-semibold transition-colors ${isNoShow ? "bg-error/20 text-error" : "bg-[#1A1A1A] text-text-muted hover:text-error hover:bg-error/10"}`}
+                                                      >
+                                                        Falta
+                                                      </button>
+                                                    </div>
+                                                  </div>
+                                                );
+                                              })}
+                                            </div>
+                                          )}
                                           <button
                                             type="button"
-                                            onClick={(e) => { e.stopPropagation(); setCompletingSession(si); setShowCompleteConfirm(true) }}
-                                            className="flex-1 rounded-lg bg-success/20 py-2 lg:py-2.5 font-body text-xs lg:text-sm font-semibold text-success transition-colors hover:bg-success/30"
+                                            disabled={closingSession === session.id}
+                                            onClick={async (e) => {
+                                              e.stopPropagation();
+                                              setClosingSession(session.id);
+                                              await closeSession(session.id);
+                                              setClosingSession(null);
+                                              fetchSessions(year, month);
+                                            }}
+                                            className="flex-1 rounded-lg bg-success/20 py-2 lg:py-2.5 font-body text-xs lg:text-sm font-semibold text-success transition-colors hover:bg-success/30 disabled:opacity-50"
                                           >
-                                            Realizada
+                                            {closingSession === session.id ? "A fechar..." : "Fechar sessão"}
                                           </button>
                                           <button
                                             type="button"
@@ -538,14 +593,14 @@ className="inline-flex items-center gap-1 rounded-full bg-accent/10 px-2.5 py-1 
                                             fetchServicos();
                                             fetchInstrutores();
                                           }}
-className="flex-1 rounded-lg bg-[#2A2A2A] py-2 lg:py-2.5 font-body text-xs lg:text-sm font-semibold text-text-secondary transition-colors hover:bg-accent/10"
+                                          className="flex-1 rounded-lg bg-[#2A2A2A] py-2 lg:py-2.5 font-body text-xs lg:text-sm font-semibold text-text-secondary transition-colors hover:bg-accent/10"
                                         >
                                           Editar
                                         </button>
                                         <button
                                           type="button"
                                           onClick={(e) => { e.stopPropagation(); setDeletingSession(si); setShowDeleteConfirm(true) }}
-className="flex-1 rounded-lg bg-error-bg py-2 lg:py-2.5 font-body text-xs lg:text-sm font-semibold text-error transition-colors hover:brightness-110"
+                                          className="flex-1 rounded-lg bg-error-bg py-2 lg:py-2.5 font-body text-xs lg:text-sm font-semibold text-error transition-colors hover:brightness-110"
                                         >
                                           Cancelar
                                         </button>
@@ -662,12 +717,66 @@ className="flex-1 rounded-lg bg-error-bg py-2 lg:py-2.5 font-body text-xs lg:tex
                                 if (isPast) {
                                   return (
                                     <>
+                                      {session.alunosList.length > 0 && (
+                                        <div className="w-full space-y-1.5 mb-2">
+                                          <p className="font-body text-xs text-text-muted">Presenças</p>
+                                          {session.alunosList.map((aluno) => {
+                                            const isAttended = aluno.attendanceStatus === "attended";
+                                            const isNoShow = aluno.attendanceStatus === "no_show";
+                                            const loading = attendanceLoading[aluno.bookingId];
+                                            return (
+                                              <div key={aluno.bookingId || aluno.id} className="flex items-center justify-between gap-2 bg-[#2A2A2A] rounded-lg px-2.5 py-1.5">
+                                                <span className="font-body text-xs text-text-secondary truncate min-w-0">{aluno.name}</span>
+                                                <div className="flex gap-1 shrink-0">
+                                                  <button
+                                                    type="button"
+                                                    disabled={loading}
+                                                    onClick={async (e) => {
+                                                      e.stopPropagation();
+                                                      if (!aluno.bookingId || loading) return;
+                                                      setAttendanceLoading((prev) => ({ ...prev, [aluno.bookingId]: true }));
+                                                      await markAttendance(session.id, aluno.id, "attended");
+                                                      setAttendanceLoading((prev) => ({ ...prev, [aluno.bookingId]: false }));
+                                                      fetchSessions(year, month);
+                                                    }}
+                                                    className={`rounded-lg px-2.5 py-1 font-body text-xs font-semibold transition-colors ${isAttended ? "bg-success/20 text-success" : "bg-[#1A1A1A] text-text-muted hover:text-success hover:bg-success/10"}`}
+                                                  >
+                                                    Presente
+                                                  </button>
+                                                  <button
+                                                    type="button"
+                                                    disabled={loading}
+                                                    onClick={async (e) => {
+                                                      e.stopPropagation();
+                                                      if (!aluno.bookingId || loading) return;
+                                                      setAttendanceLoading((prev) => ({ ...prev, [aluno.bookingId]: true }));
+                                                      await markAttendance(session.id, aluno.id, "no_show");
+                                                      setAttendanceLoading((prev) => ({ ...prev, [aluno.bookingId]: false }));
+                                                      fetchSessions(year, month);
+                                                    }}
+                                                    className={`rounded-lg px-2.5 py-1 font-body text-xs font-semibold transition-colors ${isNoShow ? "bg-error/20 text-error" : "bg-[#1A1A1A] text-text-muted hover:text-error hover:bg-error/10"}`}
+                                                  >
+                                                    Falta
+                                                  </button>
+                                                </div>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
                                       <button
                                         type="button"
-                                        onClick={(e) => { e.stopPropagation(); setCompletingSession(si); setShowCompleteConfirm(true) }}
-                                        className="flex-1 rounded-lg bg-success/20 py-2 font-body text-xs font-semibold text-success transition-colors hover:bg-success/30"
+                                        disabled={closingSession === session.id}
+                                        onClick={async (e) => {
+                                          e.stopPropagation();
+                                          setClosingSession(session.id);
+                                          await closeSession(session.id);
+                                          setClosingSession(null);
+                                          fetchSessions(year, month);
+                                        }}
+                                        className="flex-1 rounded-lg bg-success/20 py-2 font-body text-xs font-semibold text-success transition-colors hover:bg-success/30 disabled:opacity-50"
                                       >
-                                        Realizada
+                                        {closingSession === session.id ? "A fechar..." : "Fechar sessão"}
                                       </button>
                                       <button
                                         type="button"
@@ -826,50 +935,6 @@ className="flex-1 rounded-lg bg-error-bg py-2 lg:py-2.5 font-body text-xs lg:tex
                 className="flex-1 rounded-xl bg-error py-3 font-body text-sm font-semibold text-error-foreground transition-transform active:scale-95"
               >
                 Sim, cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Complete confirmation */}
-      {showCompleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-5">
-          <div className="w-full max-w-sm rounded-2xl bg-surface p-6 text-center">
-            <p className="font-heading text-xl font-bold text-foreground mb-2">
-              Marcar como realizada
-            </p>
-            <p className="font-body text-sm text-text-secondary mb-6">
-              Alunos com pagamento pendente serão marcados como pagos, créditos
-              de pack serão descontados e a sessão será fechada.
-            </p>
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => setShowCompleteConfirm(false)}
-                className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
-              >
-                Voltar
-              </button>
-              <button
-                type="button"
-                disabled={completingSaving}
-                onClick={async () => {
-                  if (
-                    completingSession === null ||
-                    !daySessions[completingSession]
-                  )
-                    return;
-                  setCompletingSaving(true);
-                  await completeSession(daySessions[completingSession].id);
-                  setShowCompleteConfirm(false);
-                  setCompletingSession(null);
-                  setCompletingSaving(false);
-                  fetchSessions(year, month);
-                }}
-                className="flex-1 rounded-xl bg-success py-3 font-body text-sm font-semibold text-foreground transition-transform active:scale-95 disabled:opacity-50"
-              >
-                {completingSaving ? "A processar..." : "Sim, realizar"}
               </button>
             </div>
           </div>

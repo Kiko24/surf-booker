@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 
-import { deleteStudent, toggleWaiver, createStudent, type StudentRecord } from "../actions";
+import { deleteStudent, toggleWaiver, createStudent, getStudentProfile, type StudentRecord, type StudentProfileData } from "../actions";
 import { getAvailablePacks, buyPack, type AvailablePack } from "../../calendario/actions";
 
 type Props = {
@@ -29,10 +29,7 @@ function StatusDot({ active }: { active: boolean }) {
 }
 
 function isInactive(student: StudentRecord): boolean {
-  if (!student.classDateRaw) return false;
-  const twoMonthsAgo = new Date();
-  twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
-  return new Date(student.classDateRaw) < twoMonthsAgo;
+  return student.totalClasses === 0;
 }
 
 function filterStudents(students: StudentRecord[], filter: string): StudentRecord[] {
@@ -73,6 +70,9 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
   const [showBuyPack, setShowBuyPack] = useState(false);
   const [availablePacks, setAvailablePacks] = useState<AvailablePack[]>([]);
   const [buyingPackId, setBuyingPackId] = useState<string | null>(null);
+  const [studentProfile, setStudentProfile] = useState<StudentProfileData | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [waiverError, setWaiverError] = useState("");
   const [displayCount, setDisplayCount] = useState(20);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -80,6 +80,19 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
   const filteredByFilter = filterStudents(students, activeFilter);
   const filtered = searchStudents(filteredByFilter, searchQuery);
   const displayed = filtered.slice(0, displayCount);
+
+  useEffect(() => {
+    if (selectedStudent) {
+      setProfileLoading(true);
+      setStudentProfile(null);
+      getStudentProfile(selectedStudent.id, schoolId).then((data) => {
+        setStudentProfile(data);
+        setProfileLoading(false);
+      });
+    } else {
+      setStudentProfile(null);
+    }
+  }, [selectedStudent, schoolId]);
 
   useEffect(() => {
     if (displayCount >= filtered.length) return;
@@ -238,7 +251,7 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
                   <div className="flex-1 min-w-0">
                     <h3 className="font-body text-base font-bold text-foreground truncate">{s.name}</h3>
                     <div className="mt-0.5 text-xs text-text-secondary">
-                      {s.classLabel && s.classDate ? `${s.classLabel}: ${s.classDate}` : "Sem aulas"}
+                      Total de Aulas: {s.totalClasses}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -275,7 +288,7 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
               <tr>
                 <th className="px-5 py-3 font-body text-[10px] text-text-secondary uppercase tracking-widest text-center">Nome do Aluno</th>
                 <th className="px-5 py-3 font-body text-[10px] text-text-secondary uppercase tracking-widest text-center">Status do Pack</th>
-                <th className="px-5 py-3 font-body text-[10px] text-text-secondary uppercase tracking-widest text-center">Última Aula</th>
+                <th className="px-5 py-3 font-body text-[10px] text-text-secondary uppercase tracking-widest text-center">Total Aulas</th>
                 <th className="px-5 py-3 font-body text-[10px] text-text-secondary uppercase tracking-widest text-center">Estado</th>
                 <th className="px-5 py-3 font-body text-[10px] text-text-secondary uppercase tracking-widest text-center">Waiver</th>
                 <th className="px-5 py-3"></th>
@@ -296,7 +309,7 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
                     {s.packs.length > 0 ? `${s.packs[0].remaining} aulas` : "Sem pack"}
                   </td>
                   <td className="px-5 py-3 font-body text-sm text-text-secondary align-middle text-center">
-                    {s.classDate ?? "N/A"}
+                    {s.totalClasses}
                   </td>
                   <td className="px-5 py-3 align-middle text-center">
                     <span className={`text-[10px] font-bold uppercase tracking-wider ${s.isGuest ? "text-text-muted" : "text-success"}`}>
@@ -357,11 +370,9 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
 
       {/* Student popup */}
       {selectedStudent && !showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50">
-          <div className="flex max-h-[85vh] w-full max-w-md flex-col rounded-t-2xl bg-surface">
-            <div className="mx-auto mt-6 mb-2 h-1 w-10 shrink-0 rounded-full bg-text-muted" />
-
-            <div className="overflow-y-auto px-6 pb-24 [&::-webkit-scrollbar]:hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-5" onClick={() => setSelectedStudent(null)}>
+          <div className="flex max-h-[95vh] w-full max-w-2xl flex-col rounded-2xl bg-surface" onClick={(e) => e.stopPropagation()}>
+            <div className="overflow-y-auto px-6 py-6 [&::-webkit-scrollbar]:hidden">
               <div className="flex items-center gap-4 mb-6">
                 <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-background text-xl font-bold text-accent">
                   {getInitials(selectedStudent.name)}
@@ -388,75 +399,143 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
                   </div>
                 )}
                 <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
-                  <p className="font-body text-xs text-text-secondary">{selectedStudent.classLabel ?? "Aulas"}</p>
-                  <p className="font-body text-sm text-foreground">{selectedStudent.classDate ?? "Nenhuma"}</p>
+                  <p className="font-body text-xs text-text-secondary">Total de Aulas</p>
+                  <p className="font-body text-sm text-foreground">{selectedStudent.totalClasses}</p>
                 </div>
               </div>
 
-              {/* Packs section (apenas registados) */}
-              {!selectedStudent.isGuest && (
-                <div className="mt-4 rounded-xl border border-accent/10 bg-[#2A2A2A] px-4 py-3">
-                  <p className="font-body text-xs text-text-secondary mb-2">Packs</p>
-                  {selectedStudent.packs.length === 0 ? (
-                    <p className="font-body text-sm text-text-muted">Não tem packs ativos</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {selectedStudent.packs.map((p) => (
-                        <div key={p.name} className="flex items-center justify-between">
-                          <span className="font-body text-sm text-foreground">{p.name}</span>
-                          <span className="font-body text-xs text-text-secondary">
-                            {p.remaining === 1 ? "1 aula restante" : `${p.remaining} aulas restantes`}
-                          </span>
+              {/* Stats + Packs + Booking History (from profile async fetch) */}
+              {profileLoading ? (
+                <div className="mt-4 flex items-center justify-center py-6">
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+                </div>
+              ) : studentProfile ? (
+                <>
+                  <div className="mt-4 rounded-xl border border-accent/10 bg-[#2A2A2A] px-4 py-3">
+                    <p className="font-body text-xs text-text-secondary mb-2">Packs</p>
+                    {studentProfile.activePack ? (
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-body text-sm font-semibold text-foreground">{studentProfile.activePack.name}</p>
+                          <p className="font-body text-xs text-text-secondary">
+                            {studentProfile.activePack.remaining} / {studentProfile.activePack.total} aulas
+                          </p>
                         </div>
-                      ))}
+                        <span className="font-body text-sm font-semibold text-accent">
+                          {studentProfile.activePack.remaining === studentProfile.activePack.total ? "Cheio" : `${Math.round((studentProfile.activePack.remaining / studentProfile.activePack.total) * 100)}%`}
+                        </span>
+                      </div>
+                    ) : (
+                      <p className="font-body text-sm text-text-muted">Não tem pack ativo</p>
+                    )}
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const packs = await getAvailablePacks(schoolId);
+                        setAvailablePacks(packs);
+                        setShowBuyPack(true);
+                      }}
+                      className="mt-2 w-full rounded-lg bg-accent/20 py-2 text-sm font-semibold text-accent transition-colors hover:bg-accent/30"
+                    >
+                      Comprar pack
+                    </button>
+                  </div>
+
+                  {studentProfile.bookings.length > 0 && (
+                    <div className="mt-4 rounded-xl bg-[#2A2A2A] px-4 py-3">
+                      <p className="font-body text-xs text-text-secondary mb-3">Histórico de aulas</p>
+                      <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                        {studentProfile.bookings.map((b) => {
+                          const d = new Date(b.startsAt);
+                          const formatted = d.toLocaleDateString("pt-PT", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                          });
+                          const time = d.toLocaleTimeString("pt-PT", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          });
+                          const statusColor =
+                            b.status === "attended"
+                              ? "bg-success/20 text-success"
+                              : b.status === "no_show"
+                                ? "bg-error/20 text-error"
+                                : b.status === "cancelled_by_student" || b.status === "cancelled_by_school"
+                                  ? "bg-white/5 text-text-muted"
+                                  : "bg-accent/10 text-accent";
+                          const statusLabel =
+                            b.status === "attended"
+                              ? "Presente"
+                              : b.status === "no_show"
+                                ? "Falta"
+                                : b.status.startsWith("cancelled")
+                                  ? "Cancelada"
+                                  : "Confirmada";
+                          return (
+                            <div key={b.id} className="flex items-center justify-between gap-2 rounded-lg bg-[#1A1A1A] px-3 py-2">
+                              <div className="min-w-0 flex-1">
+                                <p className="font-body text-sm text-foreground truncate">
+                                  {formatted} · {time}
+                                </p>
+                                <p className="font-body text-xs text-text-muted truncate">
+                                  {b.classTypeName ?? "—"}
+                                  {b.instructorName ? ` · ${b.instructorName}` : ""}
+                                </p>
+                              </div>
+                              <span className={`shrink-0 rounded-md px-2 py-0.5 font-body text-xs font-semibold ${statusColor}`}>
+                                {statusLabel}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
-                          <button
-                            type="button"
-                            role="checkbox"
-                            aria-checked={selectedStudent.waiverSigned}
-                            aria-label="Termo de responsabilidade"
-                            onClick={async () => {
-                      const packs = await getAvailablePacks(schoolId);
-                      setAvailablePacks(packs);
-                      setShowBuyPack(true);
-                    }}
-                    className="mt-2 w-full rounded-lg bg-accent/20 py-2 text-sm font-semibold text-accent transition-colors hover:bg-accent/30"
-                  >
-                    Comprar pack
-                  </button>
-                </div>
-              )}
+                </>
+              ) : null}
 
               {/* Waiver */}
-              <div className="mt-4 flex items-center justify-between rounded-xl bg-[#2A2A2A] px-4 py-3">
-                <div>
-                  <p className="font-body text-sm font-semibold text-foreground">Termo de responsabilidade</p>
-                  <p className="font-body text-xs text-text-secondary">
-                    {selectedStudent.waiverSigned ? "Assinado" : "Não assinado"}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const res = await toggleWaiver(selectedStudent.id, !selectedStudent.waiverSigned);
-                    if (res.ok) {
-                      setSelectedStudent({
-                        ...selectedStudent,
-                        waiverSigned: !selectedStudent.waiverSigned,
-                      });
-                    }
-                  }}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    selectedStudent.waiverSigned ? "bg-accent" : "bg-[#444]"
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
-                      selectedStudent.waiverSigned ? "translate-x-[1.375rem]" : "translate-x-[1px]"
+              <div className="mt-4 rounded-xl bg-[#2A2A2A] px-4 py-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-body text-sm font-semibold text-foreground">Termo de responsabilidade</p>
+                    <p className="font-body text-xs text-text-secondary">
+                      {selectedStudent.waiverSigned ? "Assinado" : "Não assinado"}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={selectedStudent.waiverSigned}
+                    onClick={async () => {
+                      setWaiverError("");
+                      const next = !selectedStudent.waiverSigned;
+                      const res = await toggleWaiver(selectedStudent.id, next);
+                      if (res.ok) {
+                        setSelectedStudent({
+                          ...selectedStudent,
+                          waiverSigned: next,
+                        });
+                        router.refresh();
+                      } else {
+                        setWaiverError(res.error ?? "Erro ao atualizar");
+                      }
+                    }}
+                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                      selectedStudent.waiverSigned ? "bg-accent" : "bg-[#444]"
                     }`}
-                  />
-                </button>
+                  >
+                    <span
+                      className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                        selectedStudent.waiverSigned ? "translate-x-[1.375rem]" : "translate-x-[1px]"
+                      }`}
+                    />
+                  </button>
+                </div>
+                {waiverError && (
+                  <p className="mt-2 font-body text-xs text-error">{waiverError}</p>
+                )}
               </div>
 
               <button
@@ -591,9 +670,10 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
                 </label>
                 <input
                   type="tel"
+                  inputMode="numeric"
                   value={addPhone}
-                  onChange={(e) => setAddPhone(e.target.value)}
-                  placeholder="Ex: 912 345 678"
+                  onChange={(e) => setAddPhone(e.target.value.replace(/\s/g, ""))}
+                  placeholder="Ex: 912345678"
                   className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
                 />
                 <p className="mt-1 font-body text-xs text-text-muted">Poderá ser usado para ligar a uma conta futura.</p>

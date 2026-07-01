@@ -11,7 +11,13 @@ type ClassTypeName = { name: string };
 type InstructorName = { name: string };
 type StudentName = { id: string; full_name: string };
 
-export type SessionAluno = { id: string; name: string; paymentStatus: string };
+export type SessionAluno = {
+  id: string;
+  bookingId: string;
+  name: string;
+  paymentStatus: string;
+  attendanceStatus: "confirmed" | "attended" | "no_show";
+};
 
 export type SessionData = {
   id: string;
@@ -59,9 +65,9 @@ export async function getSessionsForMonth(
 
   const { data: allBookings } = await supabase
     .from("bookings")
-    .select("session_id, student_id, payment_status")
+    .select("id, session_id, student_id, payment_status, status")
     .in("session_id", sessionIds)
-    .in("status", ["confirmed", "attended"]);
+    .in("status", ["confirmed", "attended", "no_show"]);
 
   const studentIds = [...new Set((allBookings ?? []).map((b) => b.student_id))];
 
@@ -72,12 +78,18 @@ export async function getSessionsForMonth(
 
   const studentNameMap = new Map((students ?? []).map((s) => [s.id, s.full_name]));
 
-  const bookingMap: Record<string, { count: number; alunos: { id: string; name: string; paymentStatus: string }[] }> = {};
+  const bookingMap: Record<string, { count: number; alunos: SessionAluno[] }> = {};
   for (const b of allBookings ?? []) {
     if (!bookingMap[b.session_id]) bookingMap[b.session_id] = { count: 0, alunos: [] };
-    bookingMap[b.session_id].count++;
+    if (b.status !== "no_show") bookingMap[b.session_id].count++;
     const name = studentNameMap.get(b.student_id);
-    if (name) bookingMap[b.session_id].alunos.push({ id: b.student_id, name, paymentStatus: b.payment_status });
+    if (name) bookingMap[b.session_id].alunos.push({
+      id: b.student_id,
+      bookingId: b.id,
+      name,
+      paymentStatus: b.payment_status,
+      attendanceStatus: b.status as "confirmed" | "attended" | "no_show",
+    });
   }
 
   for (const s of sessions) {
@@ -88,7 +100,7 @@ export async function getSessionsForMonth(
 
     if (!result[day]) result[day] = [];
 
-    const bData = bookingMap[s.id] ?? { count: 0, alunos: [] as { id: string; name: string; paymentStatus: string }[] };
+    const bData = bookingMap[s.id] ?? { count: 0, alunos: [] as SessionAluno[] };
 
     const instructor = s.instructors as unknown as InstructorName | null;
     result[day].push({
@@ -280,12 +292,72 @@ export async function cancelSession(sessionId: string): Promise<{ ok: boolean; e
   return { ok: true };
 }
 
-export async function completeSession(sessionId: string): Promise<{ ok: boolean; error?: string }> {
+export async function markAttendance(
+  sessionId: string,
+  studentId: string,
+  status: "attended" | "no_show",
+): Promise<{ ok: boolean; error?: string }> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Não autenticado" };
 
-  const rl = await rateLimitByUser(user.id, "completeSession");
+  const rl = await rateLimitByUser(user.id, "markAttendance");
+  if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
+
+  const { data: session } = await supabase
+    .from("sessions")
+    .select("school_id")
+    .eq("id", sessionId)
+    .single();
+  if (!session) return { ok: false, error: "Sessão não encontrada" };
+
+  const { data: booking } = await supabase
+    .from("bookings")
+    .select("id, payment_method, payment_status, pack_purchase_id")
+    .eq("session_id", sessionId)
+    .eq("student_id", studentId)
+    .maybeSingle();
+  if (!booking) return { ok: false, error: "Booking não encontrado" };
+
+  const updates: Record<string, unknown> = { status };
+
+  if (status === "attended") {
+    if (booking.payment_method === "single" && booking.payment_status === "unpaid") {
+      updates.payment_status = "paid_offline";
+    }
+
+    if (booking.payment_method === "pack" && booking.pack_purchase_id) {
+      await supabase.rpc("decrement_pack_credit", {
+        p_purchase_id: booking.pack_purchase_id,
+      });
+    }
+  }
+
+  const { error } = await supabase
+    .from("bookings")
+    .update(updates)
+    .eq("id", booking.id);
+
+  if (error) return { ok: false, error: error.message };
+
+  logAudit({
+    schoolId: session.school_id,
+    userId: user.id,
+    action: "mark_attendance",
+    entityType: "booking",
+    entityId: booking.id,
+    metadata: { sessionId, studentId, status },
+  });
+
+  return { ok: true };
+}
+
+export async function closeSession(sessionId: string): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Não autenticado" };
+
+  const rl = await rateLimitByUser(user.id, "closeSession");
   if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
 
   const { data: session } = await supabase
@@ -297,39 +369,19 @@ export async function completeSession(sessionId: string): Promise<{ ok: boolean;
 
   const { data: bookings } = await supabase
     .from("bookings")
-    .select("id, student_id, payment_method, payment_status, pack_purchase_id")
+    .select("id")
     .eq("session_id", sessionId)
-    .in("status", ["confirmed"]);
+    .eq("status", "confirmed");
 
-  const promises: PromiseLike<unknown>[] = [];
+  if (bookings && bookings.length > 0) {
+    const { error: bErr } = await supabase
+      .from("bookings")
+      .update({ status: "no_show" })
+      .eq("session_id", sessionId)
+      .eq("status", "confirmed");
 
-  for (const b of bookings ?? []) {
-    if (b.payment_method === "single" && b.payment_status === "unpaid") {
-      promises.push(
-        supabase
-          .from("bookings")
-          .update({ payment_status: "paid_offline" })
-          .eq("id", b.id)
-      );
-    }
-
-    if (b.payment_method === "pack" && b.pack_purchase_id) {
-      promises.push(
-        supabase.rpc("decrement_pack_credit", {
-          p_purchase_id: b.pack_purchase_id,
-        })
-      );
-    }
-
-    promises.push(
-      supabase
-        .from("bookings")
-        .update({ status: "attended" })
-        .eq("id", b.id)
-    );
+    if (bErr) return { ok: false, error: bErr.message };
   }
-
-  await Promise.all(promises);
 
   const { error } = await supabase
     .from("sessions")
@@ -341,7 +393,7 @@ export async function completeSession(sessionId: string): Promise<{ ok: boolean;
   logAudit({
     schoolId: session.school_id,
     userId: user.id,
-    action: "complete_session",
+    action: "close_session",
     entityType: "session",
     entityId: sessionId,
   });
@@ -619,7 +671,7 @@ export async function addGroupBooking(
   contactName: string,
   numberOfPeople: number,
   schoolId: string
-): Promise<{ ok: boolean; error?: string; students?: { id: string; name: string; paymentStatus: string }[] }> {
+): Promise<{ ok: boolean; error?: string; students?: SessionAluno[] }> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Não autenticado" };
@@ -701,8 +753,9 @@ export async function addGroupBooking(
   }
 
   // One booking per student
+  const bookingIds: string[] = [];
   for (let i = 0; i < studentIds.length; i++) {
-    const { error: bErr } = await supabase
+    const { data: booking, error: bErr } = await supabase
       .from("bookings")
       .insert({
         booking_group_id: bg.id,
@@ -711,12 +764,15 @@ export async function addGroupBooking(
         payment_method: "single",
         payment_status: "unpaid",
         price_cents: priceCents,
-      });
+      })
+      .select("id")
+      .single();
     if (bErr) {
       await supabase.from("bookings").delete().eq("booking_group_id", bg.id);
       for (const sid of studentIds) { await admin.from("students").delete().eq("id", sid); }
       return { ok: false, error: bErr.message };
     }
+    bookingIds.push(booking.id);
   }
 
   logAudit({
@@ -732,8 +788,10 @@ export async function addGroupBooking(
 
   const groupStudents = studentIds.map((sid, idx) => ({
     id: sid,
+    bookingId: bookingIds[idx],
     name: idx === 0 ? `Grupo de ${contactName}` : `Grupo de ${contactName} (${idx + 1})`,
     paymentStatus: "unpaid" as const,
+    attendanceStatus: "confirmed" as const,
   }));
 
   return { ok: true, students: groupStudents };

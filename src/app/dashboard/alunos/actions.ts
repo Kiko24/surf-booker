@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { rateLimitByUser } from "@/lib/rate-limit";
@@ -12,14 +13,10 @@ export type StudentPack = {
   remaining: number;
 };
 
-type StudentId = { id: string };
 type StudentWithName = { id: string; full_name: string };
-type StudentDetails = { id: string; full_name: string; email: string | null; phone: string | null; is_guest: boolean };
+type StudentDetails = { id: string; full_name: string; email: string | null; phone: string | null; is_guest: boolean; waiver_signed: boolean };
 type PackInfo = { name: string; is_active: boolean };
-type StudentWithWaiver = { waiver_signed: boolean };
 type SchoolOwner = { owner_user_id: string };
-type NestedStudentName = { student: { full_name: string } };
-type SessionRow = { id: string; starts_at: string };
 type DeleteStudentRecord = { school_id: string; student: { full_name: string } | null };
 
 export type StudentRecord = {
@@ -30,62 +27,51 @@ export type StudentRecord = {
   isGuest: boolean;
   waiverSigned: boolean;
   hasActivePack: boolean;
-  classLabel: string | null;
-  classDate: string | null;
-  classDateRaw: string | null;
+  totalClasses: number;
   firstSeenAt: string;
   packs: StudentPack[];
 };
 
 export async function getStudents(schoolId: string): Promise<StudentRecord[]> {
-  const supabase = await createClient();
+  const admin = createAdminClient();
 
-  // get all school_students for this school, joined with students
-  const { data: rows } = await supabase
+  const { data: rows, error: ssErr } = await admin
     .from("school_students")
-    .select(`
-      first_seen_at,
-      student:students(id, full_name, email, phone, is_guest, waiver_signed)
-    `)
+    .select("student_id, first_seen_at")
     .eq("school_id", schoolId)
     .order("first_seen_at", { ascending: false });
 
   if (!rows) return [];
 
-  const studentIds = rows
-    .map((r) => (r.student as unknown as StudentId | null)?.id)
-    .filter(Boolean);
-
+  const studentIds = rows.map(r => r.student_id).filter(Boolean);
   if (studentIds.length === 0) return [];
 
+  const { data: studentRows, error: stErr } = await admin
+    .from("students")
+    .select("id, full_name, email, phone, is_guest, waiver_signed")
+    .in("id", studentIds);
+
+  const studentMap = new Map(studentRows?.map(s => [s.id, s]) ?? []);
+
   // get bookings for each student
-  const { data: allBookings } = await supabase
+  const { data: allBookings } = await admin
     .from("bookings")
-    .select("student_id, session_id")
+    .select("student_id, session_id, status")
     .in("student_id", studentIds)
-    .in("status", ["confirmed", "attended"]);
+    .in("status", ["confirmed", "attended", "no_show"]);
 
-  const sessionIds = [...new Set((allBookings ?? []).map(b => b.session_id))];
-
-  const { data: sessions } = await supabase
-    .from("sessions")
-    .select("id, starts_at")
-    .in("id", sessionIds)
-    .order("starts_at", { ascending: true });
-
-  const sessionStartsMap = new Map(sessions?.map(s => { const row = s as SessionRow; return [row.id, row.starts_at]; }) ?? []);
-
-  // group bookings by student
-  const studentBookings = new Map<string, string[]>();
+  // count total classes per student
+  const totalClassesMap = new Map<string, number>();
   if (allBookings) {
     for (const b of allBookings) {
-      if (!studentBookings.has(b.student_id)) studentBookings.set(b.student_id, []);
-      studentBookings.get(b.student_id)!.push(b.session_id);
+      totalClassesMap.set(b.student_id, (totalClassesMap.get(b.student_id) ?? 0) + 1);
     }
   }
 
+
+
   // get pack purchases for all students
-  const { data: studentPacks } = await supabase
+  const { data: studentPacks } = await admin
     .from("pack_purchases")
     .select("student_id, lessons_remaining, pack:packs!inner(name, is_active)")
     .eq("school_id", schoolId)
@@ -100,31 +86,11 @@ export async function getStudents(schoolId: string): Promise<StudentRecord[]> {
     packsByStudent.set(sp.student_id, list);
   }
 
-  const now = new Date();
   const result: StudentRecord[] = [];
 
   for (const r of rows) {
-    const s = r.student as unknown as StudentDetails | null;
-
+    const s = studentMap.get(r.student_id) ?? null;
     if (!s) continue;
-
-    const bookingSessions = studentBookings.get(s.id) ?? [];
-    let pastDate: Date | null = null;
-    let nextDate: Date | null = null;
-
-    for (const sid of bookingSessions) {
-      const startsAt = sessionStartsMap.get(sid);
-      if (!startsAt) continue;
-      const d = new Date(startsAt);
-      if (d >= now) {
-        if (!nextDate || d < nextDate) nextDate = d;
-      } else {
-        if (!pastDate || d > pastDate) pastDate = d;
-      }
-    }
-
-    const targetDate = nextDate ?? pastDate;
-    const label = nextDate ? "Próxima aula" : pastDate ? "Última aula" : null;
 
     result.push({
       id: s.id,
@@ -132,13 +98,9 @@ export async function getStudents(schoolId: string): Promise<StudentRecord[]> {
       email: s.email,
       phone: s.phone,
       isGuest: s.is_guest,
-      waiverSigned: (s as unknown as StudentWithWaiver).waiver_signed ?? false,
+      waiverSigned: s.waiver_signed ?? false,
       hasActivePack: (packsByStudent.get(s.id)?.length ?? 0) > 0,
-      classLabel: label,
-      classDate: targetDate
-        ? targetDate.toLocaleDateString("pt-PT", { day: "numeric", month: "long", year: "numeric" })
-        : null,
-      classDateRaw: targetDate ? targetDate.toISOString().split("T")[0] : null,
+      totalClasses: totalClassesMap.get(s.id) ?? 0,
       firstSeenAt: r.first_seen_at,
       packs: packsByStudent.get(s.id) ?? [],
     });
@@ -158,17 +120,24 @@ export async function toggleWaiver(
   const rl = await rateLimitByUser(user.id, "toggleWaiver");
   if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
 
-  const { data: school } = await supabase
+  // find student's school (admin client, same as getStudents)
+  const admin = createAdminClient();
+  const { data: link } = await admin
     .from("school_students")
-    .select("school:schools!inner(owner_user_id)")
+    .select("school_id")
     .eq("student_id", studentId)
     .maybeSingle();
-  if (!school) return { ok: false, error: "Aluno não encontrado na escola" };
-  if ((school.school as unknown as SchoolOwner).owner_user_id !== user.id) {
-    return { ok: false, error: "Sem permissão" };
-  }
+  if (!link) return { ok: false, error: "Aluno não encontrado" };
 
-  const { error } = await supabase
+  // verify ownership
+  const { data: school } = await supabase
+    .from("schools")
+    .select("id")
+    .eq("id", link.school_id)
+    .eq("owner_user_id", user.id)
+    .maybeSingle();
+  if (!school) return { ok: false, error: "Sem permissão" };
+  const { error } = await admin
     .from("students")
     .update({ waiver_signed: signed })
     .eq("id", studentId);
@@ -186,15 +155,21 @@ export async function deleteStudent(studentId: string): Promise<{ ok: boolean; e
   if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
 
   // verify ownership before deleting
-  const { data: student } = await supabase
-    .from("school_students")
-    .select("school_id, student:students(full_name), school:schools!inner(owner_user_id)")
-    .eq("student_id", studentId)
-    .eq("school.owner_user_id", user.id)
-    .maybeSingle();
-  if (!student) return { ok: false, error: "Aluno não encontrado" };
-
   const admin = createAdminClient();
+  const { data: link } = await admin
+    .from("school_students")
+    .select("school_id")
+    .eq("student_id", studentId)
+    .maybeSingle();
+  if (!link) return { ok: false, error: "Aluno não encontrado" };
+
+  const { data: school } = await supabase
+    .from("schools")
+    .select("id")
+    .eq("id", link.school_id)
+    .eq("owner_user_id", user.id)
+    .maybeSingle();
+  if (!school) return { ok: false, error: "Sem permissão" };
 
   const { error: bErr } = await admin.from("bookings").delete().eq("student_id", studentId);
   if (bErr) return { ok: false, error: bErr.message };
@@ -208,18 +183,14 @@ export async function deleteStudent(studentId: string): Promise<{ ok: boolean; e
   const { error: sErr } = await admin.from("students").delete().eq("id", studentId);
   if (sErr) return { ok: false, error: sErr.message };
 
-  if (student) {
-    logAudit({
-      schoolId: (student as unknown as DeleteStudentRecord).school_id,
-      userId: user.id,
-      action: "delete_student",
-      entityType: "student",
-      entityId: studentId,
-      metadata: {
-        studentName: ((student as unknown as DeleteStudentRecord).student?.full_name) ?? null,
-      },
-    });
-  }
+  logAudit({
+    schoolId: link.school_id,
+    userId: user.id,
+    action: "delete_student",
+    entityType: "student",
+    entityId: studentId,
+    metadata: { studentName: null },
+  });
 
   return { ok: true };
 }
@@ -251,8 +222,8 @@ export async function createStudent(
   if (!trimmedName) return { ok: false, error: "Nome é obrigatório" };
   if (trimmedName.length > 120) return { ok: false, error: "Nome demasiado longo (máx. 120 caracteres)" };
 
-  if (phone && !/^[0-9\s]+$/.test(phone)) return { ok: false, error: "Telemóvel inválido — apenas dígitos e espaços" };
-  if (phone && (phone.replace(/\s/g, "").length < 6 || phone.replace(/\s/g, "").length > 20)) return { ok: false, error: "Telemóvel deve ter entre 6 e 20 dígitos" };
+  if (phone && !/^[0-9]+$/.test(phone)) return { ok: false, error: "Telemóvel inválido — apenas dígitos, sem espaços" };
+  if (phone && (phone.length < 6 || phone.length > 20)) return { ok: false, error: "Telemóvel deve ter entre 6 e 20 dígitos" };
 
   if (email) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -293,5 +264,136 @@ export async function createStudent(
     metadata: { studentName: trimmedName, hasPack: !!packId, hasEmail: !!email },
   });
 
+  revalidatePath("/dashboard/alunos");
   return { ok: true, studentId: student.id };
+}
+
+export type BookingHistoryItem = {
+  id: string;
+  startsAt: string;
+  classTypeName: string | null;
+  instructorName: string | null;
+  status: string;
+};
+
+export type StudentProfileData = {
+  bookings: BookingHistoryItem[];
+  activePack: { name: string; remaining: number; total: number } | null;
+  stats: { totalClasses: number; attendanceRate: number | null };
+};
+
+export async function getStudentProfile(
+  studentId: string,
+  schoolId: string
+): Promise<StudentProfileData> {
+  const supabase = await createClient();
+
+  // fetch bookings with session, class_type, instructor details
+  const { data: bookingRows } = await supabase
+    .from("bookings")
+    .select(`
+      id,
+      status,
+      session:sessions!inner(
+        starts_at,
+        instructor_id,
+        class_type_id,
+        class_types(name)
+      )
+    `)
+    .eq("student_id", studentId)
+    .order("created_at", { ascending: false });
+
+  let bookingItems: BookingHistoryItem[] = [];
+  let attendedCount = 0;
+  let noShowCount = 0;
+  let totalCount = 0;
+
+  if (bookingRows) {
+    for (const b of bookingRows) {
+      const sess = b.session as unknown as {
+        starts_at: string;
+        instructor_id: string | null;
+        class_type_id: string | null;
+        class_types: { name: string } | null;
+      } | null;
+
+      if (!sess) continue;
+
+      const bookingStatus = b.status as string;
+
+      bookingItems.push({
+        id: b.id as string,
+        startsAt: sess.starts_at,
+        classTypeName: sess.class_types?.name ?? null,
+        instructorName: null, // will resolve below
+        status: bookingStatus,
+      });
+
+      if (bookingStatus === "attended") attendedCount++;
+      else if (bookingStatus === "no_show") noShowCount++;
+      if (["confirmed", "attended", "no_show"].includes(bookingStatus)) totalCount++;
+    }
+  }
+
+  // resolve instructor names in batch
+  const instructorIds = [...new Set(bookingRows?.map(b => {
+    const sess = b.session as unknown as { instructor_id: string | null } | null;
+    return sess?.instructor_id;
+  }).filter(Boolean) as string[])];
+
+  const instructorMap = new Map<string, string>();
+  if (instructorIds.length > 0) {
+    const { data: instructors } = await supabase
+      .from("instructors")
+      .select("id, name")
+      .in("id", instructorIds);
+    for (const inst of instructors ?? []) {
+      instructorMap.set(inst.id, inst.name);
+    }
+  }
+
+  for (const item of bookingItems) {
+    const sess = bookingRows?.find(b => b.id === item.id)?.session as unknown as {
+      instructor_id: string | null;
+    } | null;
+    if (sess?.instructor_id) {
+      item.instructorName = instructorMap.get(sess.instructor_id) ?? null;
+    }
+  }
+
+  // fetch active pack
+  const { data: packRow } = await supabase
+    .from("pack_purchases")
+    .select("lessons_remaining, pack:packs!inner(name, total_lessons)")
+    .eq("student_id", studentId)
+    .eq("school_id", schoolId)
+    .eq("status", "active")
+    .order("purchased_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  let activePack: StudentProfileData["activePack"] = null;
+  if (packRow) {
+    const p = packRow.pack as unknown as { name: string; total_lessons: number } | null;
+    if (p) {
+      activePack = {
+        name: p.name,
+        remaining: packRow.lessons_remaining,
+        total: p.total_lessons,
+      };
+    }
+  }
+
+  return {
+    bookings: bookingItems,
+    activePack,
+    stats: {
+      totalClasses: totalCount,
+      attendanceRate:
+        attendedCount + noShowCount > 0
+          ? Math.round((attendedCount / (attendedCount + noShowCount)) * 100)
+          : null,
+    },
+  };
 }
