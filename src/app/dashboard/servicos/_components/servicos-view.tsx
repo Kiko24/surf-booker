@@ -9,7 +9,6 @@ import type { ServicoRecord } from "../actions";
 import { addServico, deleteServico, updateServico } from "../actions";
 
 type Props = {
-  fullName: string;
   sessions: ServicoRecord[];
   schoolId: string | null;
 };
@@ -44,6 +43,7 @@ export function ServicosView({ sessions, schoolId }: Props) {
   const [duracaoAluguer, setDuracaoAluguer] = useState("");
   const [unidadeAluguer, setUnidadeAluguer] = useState<"hora" | "dia">("hora");
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [servicoError, setServicoError] = useState("");
 
   function resetForm() {
     setNome("");
@@ -56,6 +56,7 @@ export function ServicosView({ sessions, schoolId }: Props) {
     setDuracaoAluguer("");
     setUnidadeAluguer("hora");
     setFormErrors({});
+    setServicoError("");
   }
 
   function fillEditForm(s: ServicoRecord) {
@@ -127,17 +128,29 @@ export function ServicosView({ sessions, schoolId }: Props) {
                   <h3 className="font-body text-base font-bold text-foreground"><span className="inline-block w-2 h-2 rounded-full bg-accent mr-2 mb-0.5" />{s.nome}</h3>
                   <p className="text-xs text-text-secondary">{s.modalidade} &middot; {s.duracao}min</p>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedSession(s)}
-                  className="shrink-0 p-1 text-text-secondary hover:text-foreground transition-colors"
-                  aria-label="Opções do serviço"
-                  aria-haspopup="dialog"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
-                    <path d="M5 12h.01M12 12h.01M19 12h.01" />
-                  </svg>
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSession(s)}
+                    className="shrink-0 p-1 text-text-secondary hover:text-foreground transition-colors"
+                    aria-label="Opções do serviço"
+                    aria-haspopup="dialog"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                      <path d="M5 12h.01M12 12h.01M19 12h.01" />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeletingServico(s)}
+                    className="shrink-0 p-1 text-text-secondary hover:text-error transition-colors"
+                    aria-label="Eliminar serviço"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                      <path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -167,11 +180,23 @@ export function ServicosView({ sessions, schoolId }: Props) {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right align-middle">
-                    <button onClick={() => setSelectedSession(s)} className="p-2 text-text-secondary hover:text-foreground transition-colors" aria-label="Opções do serviço" aria-haspopup="dialog">
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
-                        <path d="M5 12h.01M12 12h.01M19 12h.01" />
-                      </svg>
-                    </button>
+                    <div className="flex items-center justify-end gap-1">
+                      <button onClick={() => setSelectedSession(s)} className="p-2 text-text-secondary hover:text-foreground transition-colors" aria-label="Opções do serviço" aria-haspopup="dialog">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                          <path d="M5 12h.01M12 12h.01M19 12h.01" />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeletingServico(s)}
+                        className="p-2 text-text-secondary hover:text-error transition-colors"
+                        aria-label="Eliminar serviço"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                          <path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" />
+                        </svg>
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -312,6 +337,8 @@ export function ServicosView({ sessions, schoolId }: Props) {
                   <select
                     value={modalidade}
                     onChange={(e) => { setModalidade(e.target.value); setFormErrors((prev) => ({ ...prev, modalidade: "" })); }}
+                    aria-invalid={!!formErrors.modalidade}
+                    aria-describedby={formErrors.modalidade ? "error-modalidade" : undefined}
                     className="w-full appearance-none rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground outline-none focus:outline-2 focus:outline-accent"
                   >
                     <option value="" disabled>Selecionar modalidade</option>
@@ -323,6 +350,7 @@ export function ServicosView({ sessions, schoolId }: Props) {
                     <path d="m6 9 6 6 6-6" />
                   </svg>
                 </div>
+                {formErrors.modalidade && <p id="error-modalidade" className="mt-1 font-body text-sm text-error">{formErrors.modalidade}</p>}
               </div>
 
               {/* Categoria */}
@@ -333,9 +361,12 @@ export function ServicosView({ sessions, schoolId }: Props) {
                 <div className="relative">
                   <select
                     value={categoria}
-                    onChange={(e) => setCategoria(e.target.value)}
+                    onChange={(e) => { setCategoria(e.target.value); setFormErrors((prev) => ({ ...prev, categoria: "" })); }}
+                    aria-invalid={!!formErrors.categoria}
+                    aria-describedby={formErrors.categoria ? "error-categoria" : undefined}
                     className="w-full appearance-none rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground outline-none focus:outline-2 focus:outline-accent"
                   >
+                    <option value="" disabled>Selecionar categoria</option>
                     {CATEGORIAS.map((c) => (
                       <option key={c.value} value={c.value}>{c.label}</option>
                     ))}
@@ -344,6 +375,7 @@ export function ServicosView({ sessions, schoolId }: Props) {
                     <path d="m6 9 6 6 6-6" />
                   </svg>
                 </div>
+                {formErrors.categoria && <p id="error-categoria" className="mt-1 font-body text-sm text-error">{formErrors.categoria}</p>}
               </div>
 
               {/* Preço + Nº aulas (lado a lado para packs) / Preço + Duração (lado a lado para aluguer) */}
@@ -480,6 +512,11 @@ export function ServicosView({ sessions, schoolId }: Props) {
                 />
               </div>
 
+              {/* Error */}
+              {servicoError && (
+                <p className="font-body text-sm text-error text-center">{servicoError}</p>
+              )}
+
               {/* Actions */}
               <div className="flex gap-3 pt-2">
                 <button
@@ -492,6 +529,7 @@ export function ServicosView({ sessions, schoolId }: Props) {
                 <button
                   type="button"
                   onClick={async () => {
+                    setServicoError("");
                     const errors: Record<string, string> = {};
                     if (!nome.trim()) errors.nome = "O nome é obrigatório";
                     if (!modalidade) errors.modalidade = "Seleciona a modalidade";
@@ -503,7 +541,7 @@ export function ServicosView({ sessions, schoolId }: Props) {
 
                     setFormErrors(errors);
                     if (Object.keys(errors).length > 0) return;
-                    if (!schoolId) return;
+                    if (!schoolId) { setServicoError("Escola não encontrada"); return; }
 
                     let duracaoFinal = Number(duracao);
                     if (categoria === "aluguer") {
@@ -512,39 +550,47 @@ export function ServicosView({ sessions, schoolId }: Props) {
                         : Number(duracaoAluguer) * 60;
                     }
 
-                    if (editingServico) {
-                      const res = await updateServico(editingServico.id, {
-                        nome,
-                        modalidade,
-                        duracao: duracaoFinal,
-                        sobre,
-                        avulsoDisponivel: true,
-                        avulsoPreco: Math.round(Number(preco) * 100),
-                        categoria: (categoria || undefined) as "aula" | "pack" | "aluguer" | undefined,
-                        totalLessons: categoria === "pack" ? Number(totalLessons) : undefined,
-                        packs: [],
-                      });
-                      if (res.ok) {
-                        setShowModal(false);
-                        setEditingServico(null);
-                        router.refresh();
+                    try {
+                      if (editingServico) {
+                        const res = await updateServico(editingServico.id, {
+                          nome,
+                          modalidade,
+                          duracao: duracaoFinal,
+                          sobre,
+                          avulsoDisponivel: true,
+                          avulsoPreco: Math.round(Number(preco) * 100),
+                          categoria: (categoria || undefined) as "aula" | "pack" | "aluguer" | undefined,
+                          totalLessons: categoria === "pack" ? Number(totalLessons) : undefined,
+                          packs: [],
+                        });
+                        if (res.ok) {
+                          setShowModal(false);
+                          setEditingServico(null);
+                          router.refresh();
+                        } else {
+                          setServicoError(res.error ?? "Erro ao guardar serviço");
+                        }
+                      } else {
+                        const res = await addServico(schoolId, {
+                          nome,
+                          modalidade,
+                          duracao: duracaoFinal,
+                          sobre,
+                          avulsoDisponivel: true,
+                          avulsoPreco: Math.round(Number(preco) * 100),
+                          categoria: (categoria || undefined) as "aula" | "pack" | "aluguer" | undefined,
+                          totalLessons: categoria === "pack" ? Number(totalLessons) : undefined,
+                          packs: [],
+                        });
+                        if (res.ok) {
+                          setShowModal(false);
+                          router.refresh();
+                        } else {
+                          setServicoError(res.error ?? "Erro ao adicionar serviço");
+                        }
                       }
-                    } else {
-                      const res = await addServico(schoolId, {
-                        nome,
-                        modalidade,
-                        duracao: duracaoFinal,
-                        sobre,
-                        avulsoDisponivel: true,
-                        avulsoPreco: Math.round(Number(preco) * 100),
-                        categoria: (categoria || undefined) as "aula" | "pack" | "aluguer" | undefined,
-                        totalLessons: categoria === "pack" ? Number(totalLessons) : undefined,
-                        packs: [],
-                      });
-                      if (res.ok) {
-                        setShowModal(false);
-                        router.refresh();
-                      }
+                    } catch {
+                      setServicoError("Erro inesperado. Tenta novamente.");
                     }
                   }}
                   className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95"
@@ -562,14 +608,17 @@ export function ServicosView({ sessions, schoolId }: Props) {
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-5">
           <div className="w-full max-w-sm rounded-2xl bg-surface p-6 text-center">
             <p className="font-heading text-xl font-bold text-foreground mb-2">Eliminar serviço</p>
-            <p className="font-body text-sm text-text-secondary mb-6">
-              Tens a certeza que queres eliminar <strong>{deletingServico.nome}</strong>?
-              Esta ação não pode ser desfeita.
-            </p>
-            <div className="flex gap-3">
+              <p className="font-body text-sm text-text-secondary mb-6">
+                Tens a certeza que queres eliminar <strong>{deletingServico.nome}</strong>?
+                Esta ação não pode ser desfeita.
+              </p>
+              {servicoError && (
+                <p className="font-body text-sm text-error mb-4">{servicoError}</p>
+              )}
+              <div className="flex gap-3">
               <button
                 type="button"
-                onClick={() => setDeletingServico(null)}
+                onClick={() => { setDeletingServico(null); setServicoError(""); }}
                 className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
               >
                 Cancelar
@@ -578,10 +627,13 @@ export function ServicosView({ sessions, schoolId }: Props) {
                 type="button"
                 onClick={async () => {
                   if (!schoolId) return;
+                  setServicoError("");
                   const res = await deleteServico(deletingServico.id);
                   if (res.ok) {
                     setDeletingServico(null);
                     router.refresh();
+                  } else {
+                    setServicoError(res.error ?? "Erro ao eliminar serviço");
                   }
                 }}
                 className="flex-1 rounded-xl bg-error py-3 font-body text-sm font-semibold text-error-foreground transition-transform active:scale-95"

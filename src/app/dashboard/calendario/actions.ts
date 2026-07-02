@@ -4,7 +4,6 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { rateLimitByUser } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
-import { getSchoolId } from "@/lib/school";
 import { sendBookingNotification, sendCancellationNotification } from "@/lib/email";
 
 type ClassTypeName = { name: string };
@@ -469,21 +468,24 @@ export async function getSchoolStudents(schoolId: string): Promise<{ id: string;
     .map((s) => ({ id: s!.id, name: s!.full_name }));
 }
 
-async function notifyOwnerBooking(
+export async function notifyOwnerBooking(
   schoolId: string,
   sessionId: string,
   studentName: string,
-  ownerEmail: string
 ): Promise<void> {
   try {
-    const supabase = await createClient();
+    const admin = createAdminClient();
     const [sessionRes, schoolRes] = await Promise.all([
-      supabase.from("sessions").select("starts_at, class_types(name)").eq("id", sessionId).single(),
-      supabase.from("schools").select("name").eq("id", schoolId).single(),
+      admin.from("sessions").select("starts_at, class_types(name)").eq("id", sessionId).single(),
+      admin.from("schools").select("name, owner_user_id").eq("id", schoolId).single(),
     ]);
     const session = sessionRes.data;
     const school = schoolRes.data;
     if (!session || !school) return;
+
+    const { data: ownerUser } = await admin.auth.admin.getUserById(school.owner_user_id);
+    const ownerEmail = ownerUser?.user?.email;
+    if (!ownerEmail) return;
 
     const d = new Date(session.starts_at);
     const date = d.toLocaleDateString("pt-PT", { day: "numeric", month: "long" });
@@ -585,8 +587,6 @@ export async function createBooking(
     metadata: { sessionId, studentName: student.full_name, paymentMethod },
   });
 
-  notifyOwnerBooking(schoolId, sessionId, student.full_name, user.email!);
-
   return { ok: true };
 }
 
@@ -660,8 +660,6 @@ export async function addGuestToSession(
     entityId: student.id,
     metadata: { sessionId, guestName: name, phone },
   });
-
-  notifyOwnerBooking(schoolId, sessionId, name, user.email!);
 
   return { ok: true, studentId: student.id, studentName: name };
 }
@@ -783,8 +781,6 @@ export async function addGroupBooking(
     entityId: studentIds[0],
     metadata: { sessionId, contactName, numberOfPeople, priceCents, totalCents: priceCents * numberOfPeople },
   });
-
-  notifyOwnerBooking(schoolId, sessionId, `Grupo de ${contactName} (${numberOfPeople} pessoas)`, user.email!);
 
   const groupStudents = studentIds.map((sid, idx) => ({
     id: sid,
@@ -961,11 +957,47 @@ export async function buyPack(
 
   const { data: pack } = await supabase
     .from("packs")
-    .select("total_lessons")
+    .select("id, total_lessons")
     .eq("id", packId)
     .eq("school_id", schoolId)
     .single();
-  if (!pack) return { ok: false, error: "Pack não encontrado" };
+
+  let packRecord: { id: string; total_lessons: number };
+
+  if (pack) {
+    packRecord = pack;
+  } else {
+    const { data: classType } = await supabase
+      .from("class_types")
+      .select("id, name, total_lessons, price_cents")
+      .eq("id", packId)
+      .eq("school_id", schoolId)
+      .eq("category", "pack")
+      .single();
+
+    if (!classType || !classType.total_lessons) {
+      return { ok: false, error: "Pack não encontrado" };
+    }
+
+    const { data: newPack, error: createError } = await supabase
+      .from("packs")
+      .insert({
+        school_id: schoolId,
+        class_type_id: classType.id,
+        name: classType.name,
+        total_lessons: classType.total_lessons,
+        price_cents: classType.price_cents ?? 0,
+        is_active: true,
+      })
+      .select("id, total_lessons")
+      .single();
+
+    if (createError || !newPack) {
+      return { ok: false, error: "Erro ao criar pack" };
+    }
+
+    packRecord = newPack;
+  }
 
   if (lessonsOverride !== undefined && (isNaN(lessonsOverride) || lessonsOverride < 1 || lessonsOverride > 100)) {
     return { ok: false, error: "Número de aulas inválido" };
@@ -973,9 +1005,9 @@ export async function buyPack(
 
   const { error } = await supabase.from("pack_purchases").insert({
     school_id: schoolId,
-    pack_id: packId,
+    pack_id: packRecord.id,
     student_id: studentId,
-    lessons_remaining: lessonsOverride ?? pack.total_lessons,
+    lessons_remaining: lessonsOverride ?? packRecord.total_lessons,
   });
 
   if (error) return { ok: false, error: error.message };
@@ -985,8 +1017,8 @@ export async function buyPack(
     userId: user.id,
     action: "buy_pack",
     entityType: "pack_purchase",
-    entityId: packId,
-    metadata: { studentId, lessons: pack.total_lessons },
+    entityId: packRecord.id,
+    metadata: { studentId, lessons: packRecord.total_lessons },
   });
 
   return { ok: true };
@@ -1029,4 +1061,51 @@ export async function togglePaymentStatus(
   if (error) return { ok: false, error: error.message };
 
   return { ok: true, newStatus };
+}
+
+export async function cancelBooking(
+  sessionId: string,
+  studentId: string,
+  schoolId: string
+): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Não autenticado" };
+
+  const { data: school } = await supabase
+    .from("schools")
+    .select("id")
+    .eq("id", schoolId)
+    .eq("owner_user_id", user.id)
+    .maybeSingle();
+  if (!school) return { ok: false, error: "Sem permissão" };
+
+  const rl = await rateLimitByUser(user.id, "cancelBooking");
+  if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
+
+  const { data: booking } = await supabase
+    .from("bookings")
+    .select("id")
+    .eq("session_id", sessionId)
+    .eq("student_id", studentId)
+    .maybeSingle();
+  if (!booking) return { ok: false, error: "Reserva não encontrada" };
+
+  const { error } = await supabase
+    .from("bookings")
+    .update({ status: "cancelled_by_school", cancelled_at: new Date().toISOString() })
+    .eq("id", booking.id);
+
+  if (error) return { ok: false, error: error.message };
+
+  logAudit({
+    schoolId,
+    userId: user.id,
+    action: "cancel_booking",
+    entityType: "booking",
+    entityId: booking.id,
+    metadata: { sessionId, studentId },
+  });
+
+  return { ok: true };
 }

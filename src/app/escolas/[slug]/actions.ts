@@ -3,6 +3,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { rateLimitPublic } from "@/lib/rate-limit";
+import { notifyOwnerBooking } from "@/app/dashboard/calendario/actions";
 
 export type PublicSchoolImage = {
   id: string;
@@ -519,6 +520,8 @@ export async function criarReservaPublica(
       return { ok: false, error: "Falha ao debitar pack. Tente novamente." };
     }
   }
+
+  await notifyOwnerBooking(schoolId, sessionId, data.name.trim());
 
   return { ok: true };
 }

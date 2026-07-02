@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { DashboardView } from "./_components/dashboard-view";
-import { getTodaySessions, getAlertas, getRecentActivity } from "./actions";
+import { getTodaySessions, getAlertas } from "./actions";
 import { getMetricas } from "./mais-metricas/actions";
 import { getSchoolId } from "@/lib/school";
 
@@ -23,7 +23,6 @@ export default async function DashboardPage() {
   const todaySessions = schoolId ? await getTodaySessions(schoolId) : [];
   const metricas = schoolId ? await getMetricas("esta_semana") : null;
   const alertas = schoolId ? await getAlertas(schoolId) : [];
-  const recentActivity = schoolId ? await getRecentActivity(schoolId) : [];
 
   return (
     <DashboardView
@@ -32,7 +31,6 @@ export default async function DashboardPage() {
       metricas={metricas}
       alertas={alertas}
       schoolId={schoolId ?? ""}
-      recentActivity={recentActivity}
     />
   );
 }

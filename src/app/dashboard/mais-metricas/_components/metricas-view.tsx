@@ -46,6 +46,7 @@ export function MetricasView() {
   const [customLabel, setCustomLabel] = useState("");
   const [customAmount, setCustomAmount] = useState(30);
   const [customUnit, setCustomUnit] = useState<SavedFilter["unit"]>("days");
+  const [selectedSavedIdx, setSelectedSavedIdx] = useState<number | null>(null);
   const [savedFilters, setSavedFilters] = useState<SavedFilter[]>(() => {
     if (typeof window === "undefined") return [];
     try {
@@ -63,13 +64,13 @@ export function MetricasView() {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const activeSaved = savedFilters[0];
+    const activeSaved = selectedSavedIdx !== null ? savedFilters[selectedSavedIdx] : undefined;
     const res = activeFilter === "personalizado" && activeSaved
       ? await getMetricas("personalizado", activeSaved.amount, activeSaved.unit)
       : await getMetricas(activeFilter);
     setData(res);
     setLoading(false);
-  }, [activeFilter, savedFilters]);
+  }, [activeFilter, savedFilters, selectedSavedIdx]);
 
   useEffect(() => { const id = requestAnimationFrame(() => fetchData()); return () => cancelAnimationFrame(id); }, [fetchData]);
 
@@ -103,9 +104,9 @@ export function MetricasView() {
             >{f.label}</button>
           ))}
           {savedFilters.map((sf, i) => (
-            <button key={`c-${i}`} type="button" onClick={() => setActiveFilter("personalizado")}
-              aria-pressed={activeFilter === "personalizado"}
-              className={activeFilter === "personalizado" ? "whitespace-nowrap rounded-full bg-accent px-4 py-1.5 font-body text-sm font-semibold text-primary-foreground" : "whitespace-nowrap rounded-full bg-surface px-4 py-1.5 font-body text-sm font-semibold text-text-secondary"}
+            <button key={`c-${i}`} type="button" onClick={() => { setActiveFilter("personalizado"); setSelectedSavedIdx(i); }}
+              aria-pressed={activeFilter === "personalizado" && selectedSavedIdx === i}
+              className={activeFilter === "personalizado" && selectedSavedIdx === i ? "whitespace-nowrap rounded-full bg-accent px-4 py-1.5 font-body text-sm font-semibold text-primary-foreground" : "whitespace-nowrap rounded-full bg-surface px-4 py-1.5 font-body text-sm font-semibold text-text-secondary"}
             >{sf.label}</button>
           ))}
           <button type="button" onClick={() => { setCustomLabel(""); setCustomAmount(30); setCustomUnit("days"); setShowCustom(true); }}

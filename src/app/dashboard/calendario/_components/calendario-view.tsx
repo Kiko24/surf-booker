@@ -6,29 +6,23 @@ import {
   getSessionsForMonth,
   createSession,
   updateSession,
-  deleteSession,
   cancelSession,
   closeSession,
   markAttendance,
-  getSchoolStudents,
   createBooking,
   addGuestToSession,
   addGroupBooking,
   getAvulsoServicos,
-  getStudentProfile,
-  togglePaymentStatus,
+  cancelBooking,
   getInstructorsForSchool,
-  type SessionData,
-  type SessionAluno,
   type AvulsoServico,
-  type StudentProfile,
   type StudentProfilePack,
 } from "../actions";
 import {
   PlusIcon,
-  ArrowRightIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  TrashIcon,
 } from "@/app/dashboard/_components/icons";
 import { WEEKDAYS, MONTHS } from "@/app/dashboard/_components/constants";
 
@@ -99,8 +93,7 @@ export function CalendarioView({ schoolId }: Props) {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [expandedSession, setExpandedSession] = useState<number | null>(null);
   const [loadingSessions, setLoadingSessions] = useState(false);
-  const [profileStudent, setProfileStudent] = useState<StudentProfile | null>(null);
-  const [loadingProfile, setLoadingProfile] = useState(false);
+
 
   const fetchSessions = useCallback(
     async (y: number, m: number) => {
@@ -134,8 +127,6 @@ export function CalendarioView({ schoolId }: Props) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingSession, setDeletingSession] = useState<number | null>(null);
   const [addingToSession, setAddingToSession] = useState<number | null>(null);
-  const [studentSearch, setStudentSearch] = useState("");
-  const [schoolStudents, setSchoolStudents] = useState<{ id: string; name: string }[]>([]);
   const [pendingPackStudent, setPendingPackStudent] = useState<{
     sessionId: string;
     studentId: string;
@@ -146,6 +137,7 @@ export function CalendarioView({ schoolId }: Props) {
   const [guestSessionId, setGuestSessionId] = useState("");
   const [guestName, setGuestName] = useState("");
   const [guestPhone, setGuestPhone] = useState("");
+  const [removingStudents, setRemovingStudents] = useState<Record<string, boolean>>({});
   const [guestError, setGuestError] = useState("");
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [groupSessionId, setGroupSessionId] = useState("");
@@ -157,7 +149,7 @@ export function CalendarioView({ schoolId }: Props) {
 
   const wrapperRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
-  const [fabRight, setFabRight] = useState(0);
+  const [fabRight, setFabRight] = useState(20);
 
   const handleDayKeyDown = (e: React.KeyboardEvent, day: number) => {
     let newDay: number | null = null;
@@ -195,27 +187,22 @@ export function CalendarioView({ schoolId }: Props) {
   };
 
   useEffect(() => {
-    function updateFabPosition() {
-      if (!wrapperRef.current) return;
-      const rect = wrapperRef.current.getBoundingClientRect();
-      setFabRight(window.innerWidth - rect.right - 4);
-    }
-    updateFabPosition();
-    window.addEventListener("resize", updateFabPosition);
-    const observer = new ResizeObserver(updateFabPosition);
-    if (wrapperRef.current) observer.observe(wrapperRef.current);
-    return () => {
-      window.removeEventListener("resize", updateFabPosition);
-      observer.disconnect();
-    };
-  }, []);
-
-  useEffect(() => {
     if (searchParams.get("nova") === "true") {
       const id = requestAnimationFrame(() => setShowModal(true));
       return () => cancelAnimationFrame(id);
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    function update() {
+      if (!wrapperRef.current) return;
+      const rect = wrapperRef.current.getBoundingClientRect();
+      setFabRight(Math.max(20, window.innerWidth - rect.right + 20));
+    }
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
 
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstDayOfWeek = new Date(year, month, 1).getDay();
@@ -250,7 +237,7 @@ export function CalendarioView({ schoolId }: Props) {
           {/* Title + Month nav */}
           <div className="flex flex-col items-start gap-0 max-md:mt-4 shrink-0 md:pb-5">
 
-            <h1 className="font-heading text-2xl font-bold text-foreground shrink-0 md:fixed md:left-[288px] md:top-[48px] 2xl:top-2 md:z-10">
+            <h1 className="font-heading text-2xl font-bold text-foreground">
               Calendário
             </h1>
             <div className="flex items-center gap-1.5 self-center mt-8 md:mt-4 2xl:mt-0">
@@ -440,21 +427,39 @@ export function CalendarioView({ schoolId }: Props) {
                               <div className="px-3 lg:px-5 pb-3 lg:pb-4 space-y-3">
                                 {session.alunosList.length > 0 && (
                                   <div className="flex flex-wrap gap-1.5">
-                                    {session.alunosList.map((aluno, ai) => (
-                                      <span key={ai} className="inline-flex items-center gap-1 rounded-full bg-[#2A2A2A] px-2.5 py-1 font-body text-xs lg:text-sm text-text-secondary">
-                                        {aluno.name}
-                                        {aluno.paymentStatus === "paid_offline" && (
-                                          <svg className="h-3 w-3 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                          </svg>
-                                        )}
-                                        {aluno.paymentStatus === "unpaid" && (
-                                          <svg className="h-3 w-3 text-error" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                          </svg>
-                                        )}
-                                      </span>
-                                    ))}
+                                    {session.alunosList.map((aluno, ai) => {
+                                      const isFutura = new Date(session.starts_at) > new Date();
+                                      const removing = removingStudents[`${session.id}-${aluno.id}`];
+                                      return (
+                                        <span key={ai} className="inline-flex items-center gap-1 rounded-full bg-[#2A2A2A] px-2.5 py-1 font-body text-xs lg:text-sm text-text-secondary">
+                                          {aluno.name}
+                                          {isFutura && (
+                                            <button
+                                              type="button"
+                                              disabled={removing}
+                                              onClick={async (e) => {
+                                                e.stopPropagation();
+                                                if (!schoolId || removing) return;
+                                                setRemovingStudents((prev) => ({ ...prev, [`${session.id}-${aluno.id}`]: true }));
+                                                const res = await cancelBooking(session.id, aluno.id, schoolId);
+                                                setRemovingStudents((prev) => ({ ...prev, [`${session.id}-${aluno.id}`]: false }));
+                                                if (res.ok) fetchSessions(year, month);
+                                                else console.error("Erro ao remover aluno:", res.error);
+                                              }}
+                                              className="ml-0.5 hover:text-error transition-colors disabled:opacity-50"
+                                            >
+                                              <TrashIcon className="h-3 w-3" />
+                                            </button>
+                                          )}
+                                          {aluno.paymentStatus === "paid_offline" && (
+                                            <svg className="h-3 w-3 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                            </svg>
+                                          )}
+
+                                        </span>
+                                      );
+                                    })}
                                     {session.alunos < session.capacidade && (
                                       <button
                                         type="button"
@@ -621,258 +626,6 @@ className="inline-flex items-center gap-1 rounded-full bg-accent/10 px-2.5 py-1 
                   </div>
                 </div>
               )}
-        {/* Sessions sidebar — same height as calendar */}
-        {showSidebar && (
-          <div className="hidden absolute left-[calc(100%+24px)] top-0 bottom-0 w-[380px] flex flex-col overflow-hidden 2xl:z-10 pt-20">
-            <div className="rounded-2xl bg-surface border border-white/5 flex flex-col overflow-hidden flex-1 min-h-0">
-              <div className="p-4 border-b border-white/5 shrink-0">
-                <h3 className="font-heading text-lg font-bold text-foreground">
-                  {eventCount > 0
-                    ? `${eventCount} ${eventCount === 1 ? "sessão" : "sessões"}`
-                    : "Nenhuma sessão"}
-                </h3>
-                <p className="font-body text-sm text-text-secondary">
-                  {selectedDay} de {MONTHS[month]} de {year}
-                </p>
-              </div>
-              {eventCount > 0 ? (
-                <div className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden">
-                  {daySessions.map((session, si) => {
-                    const isExpanded = expandedSession === si;
-                    return (
-                      <div key={session.id} className="border-b border-white/5 last:border-b-0">
-                        <button
-                          type="button"
-                          onClick={() => setExpandedSession(isExpanded ? null : si)}
-                          className="w-full flex items-center justify-between gap-2 px-4 py-3 text-left transition-colors hover:bg-accent/10"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <p className="font-body text-sm font-semibold text-foreground truncate">{session.nome}</p>
-                            <p className="font-body text-xs text-text-secondary">{session.time}</p>
-                          </div>
-                          <div className="flex items-center gap-3 shrink-0">
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-body text-sm text-text-muted">Inscritos</span>
-                              <span className="rounded-md bg-accent/15 px-2.5 py-0.5 font-body text-sm font-bold text-accent">
-                                {session.alunos}{session.capacidade > 0 ? `/${session.capacidade}` : ""}
-                              </span>
-                            </div>
-                            <ChevronRightIcon className={`h-4 w-4 text-text-secondary transition-transform ${isExpanded ? "rotate-90" : ""}`} />
-                          </div>
-                        </button>
-
-                        {isExpanded && (
-                          <div className="px-4 pb-4 space-y-3">
-                            {session.alunosList.length > 0 && (
-                              <div className="flex flex-wrap gap-1.5">
-                                {session.alunosList.map((aluno, ai) => (
-                                  <span key={ai} className="inline-flex items-center gap-1 rounded-full bg-[#2A2A2A] px-2.5 py-1 font-body text-xs text-text-secondary">
-                                    {aluno.name}
-                                    {aluno.paymentStatus === "paid_offline" && (
-                                      <svg className="h-3 w-3 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                      </svg>
-                                    )}
-                                    {aluno.paymentStatus === "unpaid" && (
-                                      <svg className="h-3 w-3 text-error" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                      </svg>
-                                    )}
-                                  </span>
-                                ))}
-                                {session.alunos < session.capacidade && (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => { e.stopPropagation(); setGuestSessionId(session.id); setShowGuestModal(true); }}
-                                    className="inline-flex items-center gap-1 rounded-full bg-accent/10 px-2.5 py-1 font-body text-xs text-accent transition-colors hover:bg-accent/20"
-                                  >
-                                    <PlusIcon className="h-3 w-3" /> Aluno
-                                  </button>
-                                )}
-                              </div>
-                            )}
-
-                            {session.instructorName && (
-                              <div className="flex items-center gap-2">
-                                <span className="font-body text-xs text-text-muted">Instrutor:</span>
-                                <span className="inline-flex items-center gap-1 rounded-full bg-[#2A2A2A] px-2.5 py-1 font-body text-xs text-text-secondary">{session.instructorName}</span>
-                              </div>
-                            )}
-
-                            {session.capacidade > 0 && (
-                              <div>
-                                <div className="flex items-center justify-between mb-1">
-                                  <span className="font-body text-xs text-text-muted">Ocupação</span>
-                                  <span className="font-body text-xs text-text-muted">{Math.round((session.alunos / session.capacidade) * 100)}%</span>
-                                </div>
-                                <div className="h-1.5 w-full rounded-full bg-[#2A2A2A] overflow-hidden">
-                                  <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${Math.round((session.alunos / session.capacidade) * 100)}%` }} />
-                                </div>
-                              </div>
-                            )}
-
-                            <div className="flex flex-nowrap gap-2 pt-1">
-                              {(() => {
-                                const isPast = new Date(session.starts_at) < new Date();
-                                if (isPast) {
-                                  return (
-                                    <>
-                                      {session.alunosList.length > 0 && (
-                                        <div className="w-full space-y-1.5 mb-2">
-                                          <p className="font-body text-xs text-text-muted">Presenças</p>
-                                          {session.alunosList.map((aluno) => {
-                                            const isAttended = aluno.attendanceStatus === "attended";
-                                            const isNoShow = aluno.attendanceStatus === "no_show";
-                                            const loading = attendanceLoading[aluno.bookingId];
-                                            return (
-                                              <div key={aluno.bookingId || aluno.id} className="flex items-center justify-between gap-2 bg-[#2A2A2A] rounded-lg px-2.5 py-1.5">
-                                                <span className="font-body text-xs text-text-secondary truncate min-w-0">{aluno.name}</span>
-                                                <div className="flex gap-1 shrink-0">
-                                                  <button
-                                                    type="button"
-                                                    disabled={loading}
-                                                    onClick={async (e) => {
-                                                      e.stopPropagation();
-                                                      if (!aluno.bookingId || loading) return;
-                                                      setAttendanceLoading((prev) => ({ ...prev, [aluno.bookingId]: true }));
-                                                      await markAttendance(session.id, aluno.id, "attended");
-                                                      setAttendanceLoading((prev) => ({ ...prev, [aluno.bookingId]: false }));
-                                                      fetchSessions(year, month);
-                                                    }}
-                                                    className={`rounded-lg px-2.5 py-1 font-body text-xs font-semibold transition-colors ${isAttended ? "bg-success/20 text-success" : "bg-[#1A1A1A] text-text-muted hover:text-success hover:bg-success/10"}`}
-                                                  >
-                                                    Presente
-                                                  </button>
-                                                  <button
-                                                    type="button"
-                                                    disabled={loading}
-                                                    onClick={async (e) => {
-                                                      e.stopPropagation();
-                                                      if (!aluno.bookingId || loading) return;
-                                                      setAttendanceLoading((prev) => ({ ...prev, [aluno.bookingId]: true }));
-                                                      await markAttendance(session.id, aluno.id, "no_show");
-                                                      setAttendanceLoading((prev) => ({ ...prev, [aluno.bookingId]: false }));
-                                                      fetchSessions(year, month);
-                                                    }}
-                                                    className={`rounded-lg px-2.5 py-1 font-body text-xs font-semibold transition-colors ${isNoShow ? "bg-error/20 text-error" : "bg-[#1A1A1A] text-text-muted hover:text-error hover:bg-error/10"}`}
-                                                  >
-                                                    Falta
-                                                  </button>
-                                                </div>
-                                              </div>
-                                            );
-                                          })}
-                                        </div>
-                                      )}
-                                      <button
-                                        type="button"
-                                        disabled={closingSession === session.id}
-                                        onClick={async (e) => {
-                                          e.stopPropagation();
-                                          setClosingSession(session.id);
-                                          await closeSession(session.id);
-                                          setClosingSession(null);
-                                          fetchSessions(year, month);
-                                        }}
-                                        className="flex-1 rounded-lg bg-success/20 py-2 font-body text-xs font-semibold text-success transition-colors hover:bg-success/30 disabled:opacity-50"
-                                      >
-                                        {closingSession === session.id ? "A fechar..." : "Fechar sessão"}
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={(e) => { e.stopPropagation(); setDeletingSession(si); setShowDeleteConfirm(true) }}
-                                        className="flex-1 rounded-lg bg-error-bg py-2 font-body text-xs font-semibold text-error transition-colors hover:bg-error/30"
-                                      >
-                                        Cancelada
-                                      </button>
-                                    </>
-                                  );
-                                }
-                                return (
-                                  <>
-                                    <button
-                                      type="button"
-                                      onClick={(e) => { e.stopPropagation(); setGuestSessionId(session.id); setShowGuestModal(true); }}
-                                      className="flex-1 rounded-lg bg-accent/10 py-2 lg:py-2.5 font-body text-xs lg:text-sm font-semibold text-accent transition-colors hover:bg-accent/20"
-                                    >
-                                      + Convidado
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={(e) => { e.stopPropagation(); setShowGroupModal(true); setGroupSessionId(session.id); }}
-                                      className="flex-1 rounded-lg bg-accent/10 py-2 lg:py-2.5 font-body text-xs lg:text-sm font-semibold text-accent transition-colors hover:bg-accent/20"
-                                    >
-                                      + Grupo
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setEditingSession(si);
-                                        setDataAula(`${year}-${String(month + 1).padStart(2, "0")}-${String(selectedDay).padStart(2, "0")}`);
-                                        const [h, m] = session.time.split(":");
-                                        setHorario(`${h.padStart(2, "0")}:${(m ?? "00").padStart(2, "0")}`);
-                                        setSelectedServicoId(session.class_type_id ?? "");
-                                        const svc = servicos.find((sv) => sv.id === session.class_type_id);
-                                        setDuracao(svc?.default_duration_minutes ? String(svc.default_duration_minutes) : "90");
-                                        setCapacidade(session.capacidade ? String(session.capacidade) : "");
-                                        setInstrutorSelecionadoId(session.instructor_id ?? "");
-                                        setShowModal(true);
-                                        fetchServicos();
-                                        fetchInstrutores();
-                                      }}
-                                      className="flex-1 rounded-lg bg-[#2A2A2A] py-2 font-body text-xs font-semibold text-text-secondary transition-colors hover:bg-accent/10"
-                                    >
-                                      Editar
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={(e) => { e.stopPropagation(); setDeletingSession(si); setShowDeleteConfirm(true) }}
-                                      className="flex-1 rounded-lg bg-error-bg py-2 font-body text-xs font-semibold text-error transition-colors hover:brightness-110"
-                                    >
-                                      Cancelar
-                                    </button>
-                                  </>
-                                );
-                              })()}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center flex-1 px-4 py-8">
-                  <p className="font-body text-sm text-text-muted text-center mb-4">Nenhuma sessão agendada para este dia.</p>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const hoje = new Date();
-                      const hojeStr = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-${String(hoje.getDate()).padStart(2, "0")}`;
-                      const selStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(selectedDay).padStart(2, "0")}`;
-                      setEditingSession(null);
-                      setShowModal(true);
-                      setDataAula(selStr < hojeStr ? hojeStr : selStr);
-                      setSelectedServicoId("");
-                      setHorario("");
-                      setDuracao("90");
-                      setSelectedServicoId("");
-                      setCapacidade("");
-                      setInstrutorSelecionadoId("");
-                      fetchServicos();
-                      fetchInstrutores();
-                    }}
-                    className="mt-3 rounded-lg bg-accent/20 px-4 py-2 font-body text-xs font-semibold text-accent transition-colors hover:bg-accent/30"
-                  >
-                    + Criar aula
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* FAB */}
@@ -895,8 +648,8 @@ className="inline-flex items-center gap-1 rounded-full bg-accent/10 px-2.5 py-1 
           fetchServicos();
           fetchInstrutores();
         }}
-        className="fixed bottom-24 md:bottom-12 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-primary-foreground shadow-2xl active:scale-90 transition-all duration-200"
-        style={{ right: `${fabRight}px` }}
+        style={{ right: fabRight ? `${fabRight}px` : "20px" }}
+        className="fixed bottom-24 md:bottom-12 z-30 flex h-[56px] w-[56px] items-center justify-center rounded-full bg-accent text-primary-foreground shadow-2xl active:scale-90 transition-all duration-200"
         aria-label="Adicionar evento"
       >
         <PlusIcon className="h-6 w-6" />
@@ -1009,14 +762,9 @@ className="inline-flex items-center gap-1 rounded-full bg-accent/10 px-2.5 py-1 
                       return;
                     }
                     setShowGuestModal(false);
-                    setStudentSearch(guestName);
                     setSessions((prev) =>
                       updateSessionsAddStudent(prev, guestSessionId, res.studentId!, res.studentName!)
                     );
-                    if (schoolId) {
-                      const list = await getSchoolStudents(schoolId);
-                      setSchoolStudents(list);
-                    }
                   }}
                   className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95"
                 >
@@ -1368,111 +1116,7 @@ className="inline-flex items-center gap-1 rounded-full bg-accent/10 px-2.5 py-1 
         </div>
       )}
 
-      {/* Student profile popup */}
-      {profileStudent && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50">
-          <div className="flex max-h-[70vh] w-full max-w-md flex-col rounded-t-2xl bg-surface">
-            <div className="mx-auto mt-6 mb-2 h-1 w-10 shrink-0 rounded-full bg-text-muted" />
-            <div className="overflow-y-auto px-6 pb-24 [&::-webkit-scrollbar]:hidden">
-              {loadingProfile ? (
-                <div className="flex items-center justify-center py-12">
-                  <p className="font-body text-sm text-text-muted">
-                    A carregar...
-                  </p>
-                </div>
-              ) : (
-                <>
-                  <div className="flex items-center gap-4 mb-6">
-                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-background text-xl font-bold text-accent">
-                      {profileStudent.name
-                        .split(" ")
-                        .map((p) => p[0])
-                        .join("")
-                        .substring(0, 2)
-                        .toUpperCase()}
-                    </div>
-                    <div>
-                      <h3 className="font-heading text-xl font-bold text-foreground">
-                        {profileStudent.name}
-                      </h3>
-                      <p className="font-body text-sm text-text-secondary">
-                        {profileStudent.isGuest ? "Convidado" : "Registado"}
-                      </p>
-                    </div>
-                  </div>
 
-                  <div className="space-y-3">
-                    {profileStudent.email && (
-                      <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
-                        <p className="font-body text-xs text-text-secondary">
-                          Email
-                        </p>
-                        <p className="font-body text-sm text-foreground">
-                          {profileStudent.email}
-                        </p>
-                      </div>
-                    )}
-                    {profileStudent.phone && (
-                      <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
-                        <p className="font-body text-xs text-text-secondary">
-                          Telemóvel
-                        </p>
-                        <p className="font-body text-sm text-foreground">
-                          {profileStudent.phone}
-                        </p>
-                      </div>
-                    )}
-                    <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
-                      <p className="font-body text-xs text-text-secondary">
-                        {profileStudent.classLabel ?? "Aulas"}
-                      </p>
-                      <p className="font-body text-sm text-foreground">
-                        {profileStudent.classDate ?? "Nenhuma"}
-                      </p>
-                    </div>
-                    {!profileStudent.isGuest && (
-                      <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
-                        <p className="font-body text-xs text-text-secondary mb-2">
-                          Packs
-                        </p>
-                        {profileStudent.packs.length === 0 ? (
-                          <p className="font-body text-sm text-text-muted">
-                            Não tem packs ativos
-                          </p>
-                        ) : (
-                          <div className="space-y-2">
-                            {profileStudent.packs.map((p) => (
-                              <div
-                                key={p.id}
-                                className="flex items-center justify-between"
-                              >
-                                <span className="font-body text-sm text-foreground">
-                                  {p.name}
-                                </span>
-                                <span className="font-body text-xs text-text-secondary">
-                                  {p.remaining} restantes
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setProfileStudent(null)}
-                    className="mt-5 mb-4 w-full rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
-                  >
-                    Fechar
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Pack choice modal */}
       {pendingPackStudent && (
@@ -1498,7 +1142,6 @@ className="inline-flex items-center gap-1 rounded-full bg-accent/10 px-2.5 py-1 
                 );
                 setPendingPackStudent(null);
                 setAddingToSession(null);
-                setStudentSearch("");
               }}
               className="w-full rounded-xl bg-surface py-3 font-body text-sm font-semibold text-foreground transition-colors hover:bg-[#2A2A2A] mb-2"
             >
@@ -1522,7 +1165,6 @@ className="inline-flex items-center gap-1 rounded-full bg-accent/10 px-2.5 py-1 
                   );
                   setPendingPackStudent(null);
                   setAddingToSession(null);
-                  setStudentSearch("");
                 }}
                 className="w-full rounded-xl bg-accent/20 py-3 font-body text-sm font-semibold text-accent transition-colors hover:bg-accent/30 mb-2"
               >

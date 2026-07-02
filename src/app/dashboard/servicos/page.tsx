@@ -12,14 +12,8 @@ export default async function ServicosPage() {
 
   if (!user) redirect("/login");
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name")
-    .eq("user_id", user.id)
-    .single();
-
   const schoolId = await getSchoolId();
   const sessions = schoolId ? await getServicos(schoolId) : [];
 
-  return <ServicosView fullName={profile?.full_name ?? "Utilizador"} sessions={sessions} schoolId={schoolId} />;
+  return <ServicosView sessions={sessions} schoolId={schoolId} />;
 }

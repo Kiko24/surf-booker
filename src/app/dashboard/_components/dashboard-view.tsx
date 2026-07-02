@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useState, useRef, useEffect } from "react";
-import { HomeIcon, CalendarIcon, GroupIcon, SurfingIcon, DotsIcon, PlusIcon, ArrowRightIcon } from "./icons";
-import type { TodaySession, Alerta, ActivityItem } from "../actions";
+import { PlusIcon, ArrowRightIcon } from "./icons";
+import type { TodaySession, Alerta } from "../actions";
 import type { MetricasData } from "../mais-metricas/actions";
 import { dismissAlert } from "../actions";
 
@@ -14,7 +14,6 @@ type Props = {
   metricas: MetricasData | null;
   alertas: Alerta[];
   schoolId: string;
-  recentActivity: ActivityItem[];
 };
 
 const weekdays = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
@@ -24,14 +23,6 @@ function todayLabel(): string {
   const d = new Date();
   return `${weekdays[d.getDay()]}, ${d.getDate()} de ${months[d.getMonth()]}`;
 }
-
-const NAV_ITEMS = [
-  { href: "/dashboard", label: "Home", icon: HomeIcon },
-  { href: "/dashboard/agenda", label: "Agenda", icon: CalendarIcon },
-  { href: "/dashboard/alunos", label: "Alunos", icon: GroupIcon },
-  { href: "/dashboard/equipamento", label: "Equipamento", icon: SurfingIcon },
-  { href: "/dashboard/mais", label: "Mais", icon: DotsIcon },
-];
 
 export function DashboardView({ fullName, todaySessions, metricas, alertas, schoolId }: Props) {
   const pathname = usePathname();
@@ -404,29 +395,6 @@ export function DashboardView({ fullName, todaySessions, metricas, alertas, scho
         </div>
       )}
 
-      {/* Bottom Navigation */}
-      <nav
-        className="fixed left-1/2 z-50 flex w-[90%] max-w-md -translate-x-1/2 items-center justify-around rounded-full border border-accent/10 bg-surface-container-high px-2 py-2 shadow-lg backdrop-blur-md md:hidden"
-        style={{ bottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
-      >
-        {NAV_ITEMS.map((item) => {
-          const isActive = pathname === item.href;
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={
-                isActive
-                  ? "flex h-12 w-12 scale-90 items-center justify-center rounded-full bg-accent text-primary-foreground transition-all duration-200"
-                  : "flex h-12 w-12 items-center justify-center rounded-full text-text-secondary transition-all hover:bg-accent/10"
-              }
-            >
-              <Icon className="h-5 w-5" />
-            </Link>
-          );
-        })}
-      </nav>
     </div>
   );
 }

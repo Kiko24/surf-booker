@@ -172,6 +172,14 @@ export async function addServico(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Não autenticado" };
 
+  const { data: school } = await supabase
+    .from("schools")
+    .select("id")
+    .eq("id", schoolId)
+    .eq("owner_user_id", user.id)
+    .maybeSingle();
+  if (!school) return { ok: false, error: "Sem permissão" };
+
   const rl = await rateLimitByUser(user.id, "addServico");
   if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
 
@@ -226,6 +234,22 @@ export async function deleteServico(id: string): Promise<{ ok: boolean; error?: 
   const rl = await rateLimitByUser(user.id, "deleteServico");
   if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
 
+  const { data: ct, error: ctErr } = await supabase
+    .from("class_types")
+    .select("school_id")
+    .eq("id", id)
+    .single();
+
+  if (ctErr || !ct) return { ok: false, error: "Serviço não encontrado" };
+
+  const { data: school } = await supabase
+    .from("schools")
+    .select("id")
+    .eq("id", ct.school_id)
+    .eq("owner_user_id", user.id)
+    .maybeSingle();
+  if (!school) return { ok: false, error: "Sem permissão" };
+
   // Nullify class_type_id on sessions first (FK has on delete restrict)
   const { error: nullifyErr } = await supabase
     .from("sessions")
@@ -239,7 +263,7 @@ export async function deleteServico(id: string): Promise<{ ok: boolean; error?: 
   if (error) return { ok: false, error: error.message };
 
   logAudit({
-    schoolId: null,
+    schoolId: ct.school_id,
     userId: user.id,
     action: "delete_servico",
     entityType: "class_type",
@@ -272,10 +296,25 @@ export async function updateServico(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Não autenticado" };
 
+  const { data: ct, error: ctErr } = await supabase
+    .from("class_types")
+    .select("school_id")
+    .eq("id", id)
+    .single();
+  if (ctErr || !ct) return { ok: false, error: "Serviço não encontrado" };
+
+  const { data: school } = await supabase
+    .from("schools")
+    .select("id")
+    .eq("id", ct.school_id)
+    .eq("owner_user_id", user.id)
+    .maybeSingle();
+  if (!school) return { ok: false, error: "Sem permissão" };
+
   const rl = await rateLimitByUser(user.id, "updateServico");
   if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
 
-  const { error: ctErr } = await supabase
+  const { error: updateErr } = await supabase
     .from("class_types")
     .update({
       name: data.nome,
@@ -289,7 +328,7 @@ export async function updateServico(
     })
     .eq("id", id);
 
-  if (ctErr) return { ok: false, error: ctErr.message };
+  if (updateErr) return { ok: false, error: updateErr.message };
 
   // sync packs: diff incoming vs existing
   const incomingIds = data.packs.filter((p) => p.id).map((p) => p.id!);
@@ -305,12 +344,6 @@ export async function updateServico(
   if (toDelete.length > 0) {
     await supabase.from("packs").delete().in("id", toDelete);
   }
-
-  const { data: ct } = await supabase
-    .from("class_types")
-    .select("school_id")
-    .eq("id", id)
-    .single();
 
   const newPacks = data.packs.filter((p) => !p.id);
   for (const p of data.packs) {

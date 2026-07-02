@@ -5,7 +5,6 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { rateLimitByUser } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
-import { getSchoolId } from "@/lib/school";
 import { buyPack } from "../calendario/actions";
 
 export type StudentPack = {
@@ -13,11 +12,7 @@ export type StudentPack = {
   remaining: number;
 };
 
-type StudentWithName = { id: string; full_name: string };
-type StudentDetails = { id: string; full_name: string; email: string | null; phone: string | null; is_guest: boolean; waiver_signed: boolean };
 type PackInfo = { name: string; is_active: boolean };
-type SchoolOwner = { owner_user_id: string };
-type DeleteStudentRecord = { school_id: string; student: { full_name: string } | null };
 
 export type StudentRecord = {
   id: string;
@@ -278,7 +273,7 @@ export type BookingHistoryItem = {
 
 export type StudentProfileData = {
   bookings: BookingHistoryItem[];
-  activePack: { name: string; remaining: number; total: number } | null;
+  activePack: { id: string; name: string; remaining: number; total: number } | null;
   stats: { totalClasses: number; attendanceRate: number | null };
 };
 
@@ -365,10 +360,11 @@ export async function getStudentProfile(
   // fetch active pack
   const { data: packRow } = await supabase
     .from("pack_purchases")
-    .select("lessons_remaining, pack:packs!inner(name, total_lessons)")
+    .select("id, lessons_remaining, pack:packs!inner(name, total_lessons)")
     .eq("student_id", studentId)
     .eq("school_id", schoolId)
     .eq("status", "active")
+    .gt("lessons_remaining", 0)
     .order("purchased_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -378,6 +374,7 @@ export async function getStudentProfile(
     const p = packRow.pack as unknown as { name: string; total_lessons: number } | null;
     if (p) {
       activePack = {
+        id: packRow.id,
         name: p.name,
         remaining: packRow.lessons_remaining,
         total: p.total_lessons,
@@ -396,4 +393,70 @@ export async function getStudentProfile(
           : null,
     },
   };
+}
+
+export async function cancelPackPurchase(
+  purchaseId: string,
+  schoolId: string
+): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Não autenticado" };
+
+  const rl = await rateLimitByUser(user.id, "cancelPack");
+  if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
+
+  const { error } = await supabase
+    .from("pack_purchases")
+    .update({ status: "cancelled" })
+    .eq("id", purchaseId)
+    .eq("school_id", schoolId);
+
+  if (error) return { ok: false, error: error.message };
+
+  logAudit({
+    schoolId,
+    userId: user.id,
+    action: "cancel_pack",
+    entityType: "pack_purchase",
+    entityId: purchaseId,
+  });
+
+  return { ok: true };
+}
+
+export async function updatePackRemaining(
+  purchaseId: string,
+  schoolId: string,
+  remaining: number
+): Promise<{ ok: boolean; error?: string }> {
+  if (isNaN(remaining) || remaining < 0 || remaining > 100) {
+    return { ok: false, error: "Número de aulas inválido" };
+  }
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Não autenticado" };
+
+  const rl = await rateLimitByUser(user.id, "updatePack");
+  if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
+
+  const { error } = await supabase
+    .from("pack_purchases")
+    .update({ lessons_remaining: remaining })
+    .eq("id", purchaseId)
+    .eq("school_id", schoolId);
+
+  if (error) return { ok: false, error: error.message };
+
+  logAudit({
+    schoolId,
+    userId: user.id,
+    action: "update_pack",
+    entityType: "pack_purchase",
+    entityId: purchaseId,
+    metadata: { remaining },
+  });
+
+  return { ok: true };
 }

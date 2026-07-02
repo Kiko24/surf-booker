@@ -94,7 +94,7 @@ export function DashboardLayout({ children }: Props) {
           <button
             type="button"
             onClick={async () => {
-              const { logoutOwner } = await import("../../dashboard/actions");
+              const { logoutOwner } = await import("../actions");
               await logoutOwner();
               window.location.href = "/";
             }}

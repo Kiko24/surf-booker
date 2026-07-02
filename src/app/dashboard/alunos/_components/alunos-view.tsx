@@ -3,11 +3,11 @@
 import { useRouter } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 
-import { deleteStudent, toggleWaiver, createStudent, getStudentProfile, type StudentRecord, type StudentProfileData } from "../actions";
+import { deleteStudent, toggleWaiver, createStudent, getStudentProfile, cancelPackPurchase, updatePackRemaining, type StudentRecord, type StudentProfileData } from "../actions";
 import { getAvailablePacks, buyPack, type AvailablePack } from "../../calendario/actions";
+import { DotsIcon, TrashIcon } from "../../_components/icons";
 
 type Props = {
-  fullName: string;
   schoolId: string;
   students: StudentRecord[];
 };
@@ -51,8 +51,9 @@ function searchStudents(students: StudentRecord[], query: string): StudentRecord
   );
 }
 
-export function AlunosView({ fullName, schoolId, students }: Props) {
+export function AlunosView({ schoolId, students }: Props) {
   const router = useRouter();
+  const [localStudents, setLocalStudents] = useState(students);
   const [activeFilter, setActiveFilter] = useState("Todos");
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -67,19 +68,31 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
   const [addSaving, setAddSaving] = useState(false);
   const [addError, setAddError] = useState("");
   const [addPacks, setAddPacks] = useState<AvailablePack[]>([]);
-  const [showBuyPack, setShowBuyPack] = useState(false);
-  const [availablePacks, setAvailablePacks] = useState<AvailablePack[]>([]);
-  const [buyingPackId, setBuyingPackId] = useState<string | null>(null);
+  const [showAssignPack, setShowAssignPack] = useState(false);
+  const [assignPacks, setAssignPacks] = useState<AvailablePack[]>([]);
+  const [assignPackId, setAssignPackId] = useState("");
+  const [assignRemainingLessons, setAssignRemainingLessons] = useState("");
+  const [assigningPack, setAssigningPack] = useState(false);
+  const [assignPackError, setAssignPackError] = useState("");
   const [studentProfile, setStudentProfile] = useState<StudentProfileData | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [waiverError, setWaiverError] = useState("");
+  const [deleteError, setDeleteError] = useState("");
+  const [showEditPack, setShowEditPack] = useState(false);
+  const [editPackRemaining, setEditPackRemaining] = useState("");
+  const [editPackSaving, setEditPackSaving] = useState(false);
+  const [editPackError, setEditPackError] = useState("");
+  const [showDeletePackConfirm, setShowDeletePackConfirm] = useState(false);
+  const [deletingPack, setDeletingPack] = useState(false);
   const [displayCount, setDisplayCount] = useState(20);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  const filteredByFilter = filterStudents(students, activeFilter);
+  const filteredByFilter = filterStudents(localStudents, activeFilter);
   const filtered = searchStudents(filteredByFilter, searchQuery);
   const displayed = filtered.slice(0, displayCount);
+
+  useEffect(() => { setLocalStudents(students); }, [students]);
 
   useEffect(() => {
     if (selectedStudent) {
@@ -351,19 +364,10 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
         <div className="hidden md:flex mt-auto pt-6 md:mb-4 flex items-center justify-between border-t border-white/10">
           <div className="flex flex-col">
             <span className="font-body text-[10px] text-text-secondary uppercase tracking-widest">Total Alunos</span>
-            <span className="font-heading text-xl text-foreground">{students.length}</span>
+            <span className="font-heading text-xl text-foreground">{localStudents.length}</span>
           </div>
           
-          {/* Pagination Placeholder */}
-          <div className="flex items-center gap-2">
-            <button className="p-2 border border-white/10 rounded-lg text-text-secondary hover:bg-surface transition-colors disabled:opacity-30" disabled>
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="m15 18-6-6 6-6"/></svg>
-            </button>
-            <span className="font-body text-sm px-4 text-foreground">1 de 1</span>
-            <button className="p-2 border border-white/10 rounded-lg text-text-secondary hover:bg-surface transition-colors disabled:opacity-30" disabled>
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="m9 18 6-6-6-6"/></svg>
-            </button>
-          </div>
+
         </div>
       </main>
       </div>
@@ -412,7 +416,7 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
               ) : studentProfile ? (
                 <>
                   <div className="mt-4 rounded-xl border border-accent/10 bg-[#2A2A2A] px-4 py-3">
-                    <p className="font-body text-xs text-text-secondary mb-2">Packs</p>
+                    <p className="font-body text-xs text-text-secondary mb-2">Packs ativos</p>
                     {studentProfile.activePack ? (
                       <div className="flex items-center justify-between">
                         <div>
@@ -421,9 +425,31 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
                             {studentProfile.activePack.remaining} / {studentProfile.activePack.total} aulas
                           </p>
                         </div>
-                        <span className="font-body text-sm font-semibold text-accent">
-                          {studentProfile.activePack.remaining === studentProfile.activePack.total ? "Cheio" : `${Math.round((studentProfile.activePack.remaining / studentProfile.activePack.total) * 100)}%`}
-                        </span>
+                        <div className="flex items-center gap-1">
+                          <span className="font-body text-sm font-semibold text-accent">
+                            {Math.round((studentProfile.activePack.remaining / studentProfile.activePack.total) * 100)}%
+                          </span>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              setEditPackRemaining(String(studentProfile.activePack!.remaining));
+                              setEditPackError("");
+                              setShowEditPack(true);
+                            }}
+                            className="ml-2 rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-white/5 hover:text-foreground"
+                          >
+                            <DotsIcon className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowDeletePackConfirm(true);
+                            }}
+                            className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-error/10 hover:text-error"
+                          >
+                            <TrashIcon className="h-4 w-4" />
+                          </button>
+                        </div>
                       </div>
                     ) : (
                       <p className="font-body text-sm text-text-muted">Não tem pack ativo</p>
@@ -432,12 +458,15 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
                       type="button"
                       onClick={async () => {
                         const packs = await getAvailablePacks(schoolId);
-                        setAvailablePacks(packs);
-                        setShowBuyPack(true);
+                        setAssignPacks(packs);
+                        setAssignPackId("");
+                        setAssignRemainingLessons("");
+                        setAssignPackError("");
+                        setShowAssignPack(true);
                       }}
-                      className="mt-2 w-full rounded-lg bg-accent/20 py-2 text-sm font-semibold text-accent transition-colors hover:bg-accent/30"
+                      className="mt-3 w-full rounded-lg bg-accent/20 py-2 text-sm font-semibold text-accent transition-colors hover:bg-accent/30"
                     >
-                      Comprar pack
+                      Atribuir pack
                     </button>
                   </div>
 
@@ -511,14 +540,19 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
                     onClick={async () => {
                       setWaiverError("");
                       const next = !selectedStudent.waiverSigned;
-                      const res = await toggleWaiver(selectedStudent.id, next);
-                      if (res.ok) {
-                        setSelectedStudent({
-                          ...selectedStudent,
-                          waiverSigned: next,
-                        });
-                        router.refresh();
-                      } else {
+                      const studentId = selectedStudent.id;
+                      setLocalStudents((prev) =>
+                        prev.map((s) => (s.id === studentId ? { ...s, waiverSigned: next } : s))
+                      );
+                      setSelectedStudent((prev) => (prev ? { ...prev, waiverSigned: next } : null));
+                      const res = await toggleWaiver(studentId, next);
+                      if (!res.ok) {
+                        setLocalStudents((prev) =>
+                          prev.map((s) => (s.id === studentId ? { ...s, waiverSigned: !next } : s))
+                        );
+                        setSelectedStudent((prev) =>
+                          prev && prev.id === studentId ? { ...prev, waiverSigned: !next } : prev
+                        );
                         setWaiverError(res.error ?? "Erro ao atualizar");
                       }
                     }}
@@ -560,17 +594,20 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
 
       {/* Delete confirmation */}
       {selectedStudent && showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-5">
-          <div className="w-full max-w-sm rounded-2xl bg-surface p-6 text-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-5" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="w-full max-w-sm rounded-2xl bg-surface p-6 text-center" onClick={(e) => e.stopPropagation()}>
             <p className="font-heading text-xl font-bold text-foreground mb-2">Eliminar aluno</p>
             <p className="font-body text-sm text-text-secondary mb-6">
               Tens a certeza que queres eliminar <strong>{selectedStudent.name}</strong>?
               Esta ação remove o aluno de todas as aulas e não pode ser desfeita.
             </p>
+            {deleteError && (
+              <p className="mb-4 font-body text-xs text-error">{deleteError}</p>
+            )}
             <div className="flex gap-3">
               <button
                 type="button"
-                onClick={() => setShowDeleteConfirm(false)}
+                onClick={() => { setShowDeleteConfirm(false); setDeleteError(""); }}
                 className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
               >
                 Cancelar
@@ -578,11 +615,16 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
               <button
                 type="button"
                 onClick={async () => {
-                  const res = await deleteStudent(selectedStudent.id);
-                  if (res.ok) {
-                    setSelectedStudent(null);
-                    setShowDeleteConfirm(false);
-                    router.refresh();
+                  setDeleteError("");
+                  const deletedId = selectedStudent.id;
+                  const deletedStudent = selectedStudent;
+                  setLocalStudents((prev) => prev.filter((s) => s.id !== deletedId));
+                  setSelectedStudent(null);
+                  setShowDeleteConfirm(false);
+                  const res = await deleteStudent(deletedId);
+                  if (!res.ok) {
+                    setLocalStudents((prev) => [...prev, deletedStudent].sort((a, b) => a.name.localeCompare(b.name)));
+                    setDeleteError(res.error ?? "Erro ao eliminar aluno");
                   }
                 }}
                 className="flex-1 rounded-xl bg-error py-3 font-body text-sm font-semibold text-error-foreground transition-transform active:scale-95"
@@ -590,55 +632,6 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
                 Sim, eliminar
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Buy pack modal */}
-      {showBuyPack && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-10">
-            <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted" />
-            <h3 className="font-heading text-xl font-bold text-foreground mb-4">Comprar pack</h3>
-            {availablePacks.length === 0 ? (
-              <p className="font-body text-sm text-text-muted mb-6">Nenhum pack disponível. Cria packs nos Serviços primeiro.</p>
-            ) : (
-              <div className="space-y-3 mb-6">
-                {availablePacks.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    disabled={buyingPackId === p.id}
-                    onClick={async () => {
-                      if (!selectedStudent) return;
-                      setBuyingPackId(p.id);
-                      const res = await buyPack(selectedStudent.id, p.id, schoolId);
-                      if (res.ok) {
-                        setShowBuyPack(false);
-                        router.refresh();
-                      }
-                      setBuyingPackId(null);
-                    }}
-                    className="flex w-full items-center justify-between rounded-xl bg-[#2A2A2A] px-4 py-3 text-left transition-colors hover:bg-[#333] disabled:opacity-50"
-                  >
-                    <div>
-                      <p className="font-body text-sm font-semibold text-foreground">{p.name}</p>
-                      <p className="font-body text-xs text-text-secondary">{p.total_lessons} aulas</p>
-                    </div>
-                    <span className="font-body text-sm font-semibold text-accent">
-                      {buyingPackId === p.id ? "..." : `${(p.price_cents / 100).toFixed(2).replace(".", ",")}€`}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-            <button
-              type="button"
-              onClick={() => setShowBuyPack(false)}
-              className="w-full rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
-            >
-              Cancelar
-            </button>
           </div>
         </div>
       )}
@@ -762,6 +755,201 @@ export function AlunosView({ fullName, schoolId, students }: Props) {
                   {addSaving ? "A adicionar..." : "Adicionar"}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assign pack modal */}
+      {showAssignPack && (
+        <div className="fixed inset-0 z-[70] flex items-end md:items-center justify-center bg-black/50 md:px-5" onClick={() => setShowAssignPack(false)}>
+          <div className="w-full max-w-md rounded-t-2xl md:rounded-2xl bg-surface p-6 pb-10 md:pb-6" onClick={(e) => e.stopPropagation()}>
+            <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted md:hidden" />
+            <h3 className="font-heading text-xl font-bold text-foreground mb-4">Atribuir pack</h3>
+
+            {assignPackError && (
+              <p className="mb-4 font-body text-sm text-error">{assignPackError}</p>
+            )}
+
+            {assignPacks.length === 0 ? (
+              <p className="font-body text-sm text-text-muted mb-6">Nenhum pack disponível. Cria packs nos Serviços primeiro.</p>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">Pack</label>
+                  <div className="relative">
+                    <select
+                      value={assignPackId}
+                      onChange={(e) => { setAssignPackId(e.target.value); setAssignPackError(""); }}
+                      className="w-full appearance-none rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground outline-none focus:outline-2 focus:outline-accent"
+                    >
+                      <option value="">Selecionar pack</option>
+                      {assignPacks.map((p) => (
+                        <option key={p.id} value={p.id}>{p.name} — {p.total_lessons} aulas — {(p.price_cents / 100).toFixed(2).replace(".", ",")}€</option>
+                      ))}
+                    </select>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted">
+                      <path d="m6 9 6 6 6-6" />
+                    </svg>
+                  </div>
+                </div>
+                {assignPackId && (
+                  <div>
+                    <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+                      Aulas restantes <span className="text-text-muted font-normal">(opcional)</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={assignRemainingLessons}
+                      onChange={(e) => setAssignRemainingLessons(e.target.value)}
+                      placeholder="Por defeito: todas as aulas do pack"
+                      className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => { setShowAssignPack(false); setAssignPackError(""); }}
+                className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={!assignPackId || assigningPack}
+                onClick={async () => {
+                  if (!selectedStudent || !assignPackId) return;
+                  setAssignPackError("");
+                  setAssigningPack(true);
+                  const res = await buyPack(selectedStudent.id, assignPackId, schoolId, assignRemainingLessons ? Number(assignRemainingLessons) : undefined);
+                  if (res.ok) {
+                    setShowAssignPack(false);
+                    const profile = await getStudentProfile(selectedStudent.id, schoolId);
+                    if (profile) setStudentProfile(profile);
+                    router.refresh();
+                  } else {
+                    setAssignPackError(res.error ?? "Erro ao atribuir pack");
+                  }
+                  setAssigningPack(false);
+                }}
+                className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95 disabled:opacity-50"
+              >
+                {assigningPack ? "A atribuir..." : "Confirmar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit pack remaining lessons */}
+      {showEditPack && studentProfile?.activePack && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50">
+          <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-10">
+            <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted" />
+            <h3 className="font-heading text-2xl font-bold text-foreground mb-6">Editar pack</h3>
+            <p className="font-body text-sm text-text-secondary mb-4">
+              {studentProfile.activePack.name}
+            </p>
+            <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+              Aulas restantes
+            </label>
+            <input
+              type="number"
+              min="0"
+              max="100"
+              value={editPackRemaining}
+              onChange={(e) => setEditPackRemaining(e.target.value)}
+              className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+            />
+            {editPackError && (
+              <p className="mt-2 font-body text-xs text-error">{editPackError}</p>
+            )}
+            <div className="flex gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => { setShowEditPack(false); setEditPackError(""); }}
+                className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={editPackSaving}
+                onClick={async () => {
+                  if (!studentProfile?.activePack || !selectedStudent) return;
+                  setEditPackError("");
+                  setEditPackSaving(true);
+                  const res = await updatePackRemaining(
+                    studentProfile.activePack.id,
+                    schoolId,
+                    Number(editPackRemaining)
+                  );
+                  if (res.ok) {
+                    setShowEditPack(false);
+                    const profile = await getStudentProfile(selectedStudent.id, schoolId);
+                    if (profile) setStudentProfile(profile);
+                    router.refresh();
+                  } else {
+                    setEditPackError(res.error ?? "Erro ao editar pack");
+                  }
+                  setEditPackSaving(false);
+                }}
+                className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95 disabled:opacity-50"
+              >
+                {editPackSaving ? "A guardar..." : "Guardar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete pack confirmation */}
+      {showDeletePackConfirm && studentProfile?.activePack && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-5">
+          <div className="w-full max-w-sm rounded-2xl bg-surface p-6 text-center">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-error/10">
+              <TrashIcon className="h-6 w-6 text-error" />
+            </div>
+            <h3 className="font-heading text-xl font-bold text-foreground mb-2">Eliminar pack</h3>
+            <p className="font-body text-sm text-text-secondary mb-6">
+              Tens a certeza que queres eliminar o pack "{studentProfile.activePack.name}" deste aluno?
+            </p>
+            {editPackError && (
+              <p className="mb-4 font-body text-xs text-error">{editPackError}</p>
+            )}
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => { setShowDeletePackConfirm(false); }}
+                className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={deletingPack}
+                onClick={async () => {
+                  if (!studentProfile?.activePack) return;
+                  setDeletingPack(true);
+                  const res = await cancelPackPurchase(studentProfile.activePack.id, schoolId);
+                  if (res.ok) {
+                    setShowDeletePackConfirm(false);
+                    setStudentProfile(prev => prev ? { ...prev, activePack: null } : null);
+                    router.refresh();
+                  } else {
+                    setEditPackError(res.error ?? "Erro ao eliminar pack");
+                  }
+                  setDeletingPack(false);
+                }}
+                className="flex-1 rounded-xl bg-error py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95 disabled:opacity-50"
+              >
+                Sim, eliminar
+              </button>
             </div>
           </div>
         </div>
