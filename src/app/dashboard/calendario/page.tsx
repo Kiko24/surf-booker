@@ -11,13 +11,7 @@ export default async function CalendarioPage() {
     redirect("/login?next=/dashboard/calendario");
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name")
-    .eq("id", user.id)
-    .single();
-
   const schoolId = await getSchoolId();
 
-  return <CalendarioView fullName={profile?.full_name ?? "Utilizador"} schoolId={schoolId} />;
+  return <CalendarioView schoolId={schoolId} />;
 }

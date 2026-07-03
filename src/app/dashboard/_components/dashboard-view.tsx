@@ -6,13 +6,10 @@ import { useCallback, useState, useRef, useEffect } from "react";
 import { PlusIcon, ArrowRightIcon } from "./icons";
 import type { TodaySession, Alerta } from "../actions";
 import type { MetricasData } from "../mais-metricas/actions";
-import { dismissAlert } from "../actions";
+import { dismissAlert, getTodaySessions, getAlertas, getProfileName } from "../actions";
+import { getMetricas } from "../mais-metricas/actions";
 
 type Props = {
-  fullName: string;
-  todaySessions: TodaySession[];
-  metricas: MetricasData | null;
-  alertas: Alerta[];
   schoolId: string;
 };
 
@@ -24,10 +21,30 @@ function todayLabel(): string {
   return `${weekdays[d.getDay()]}, ${d.getDate()} de ${months[d.getMonth()]}`;
 }
 
-export function DashboardView({ fullName, todaySessions, metricas, alertas, schoolId }: Props) {
+export function DashboardView({ schoolId }: Props) {
   const pathname = usePathname();
   const router = useRouter();
-  const firstName = fullName.split(" ")[0];
+  const [firstName, setFirstName] = useState("");
+  const [todaySessions, setTodaySessions] = useState<TodaySession[]>([]);
+  const [metricas, setMetricas] = useState<MetricasData | null>(null);
+  const [alertas, setAlertas] = useState<Alerta[]>([]);
+  useEffect(() => {
+    if (!schoolId) return;
+    let cancelled = false;
+    Promise.all([
+      getTodaySessions(schoolId),
+      getMetricas("esta_semana"),
+      getAlertas(schoolId),
+      getProfileName(),
+    ]).then(([sessionsData, metricasData, alertasData, name]) => {
+      if (cancelled) return;
+      setTodaySessions(sessionsData);
+      setMetricas(metricasData);
+      setAlertas(alertasData);
+      setFirstName(name.split(" ")[0]);
+    });
+    return () => { cancelled = true; };
+  }, [schoolId]);
 
   const displayedSessions = todaySessions.slice(0, 2);
   const displayedAlertas = alertas.slice(0, 3);
@@ -96,7 +113,7 @@ export function DashboardView({ fullName, todaySessions, metricas, alertas, scho
         {/* Greeting */}
         <section>
           <h1 className="font-heading text-3xl text-foreground">
-            Bom dia, {firstName}
+            Bom dia{firstName ? `, ${firstName}` : ""}
           </h1>
           <p className="mt-1 text-sm text-text-secondary">
             {todayLabel()} &nbsp;&middot; {todaySessions.length} {todaySessions.length === 1 ? "sessão" : "sessões"} hoje

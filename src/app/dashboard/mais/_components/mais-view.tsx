@@ -5,33 +5,58 @@ import { useRouter } from "next/navigation";
 import { useState, useCallback, useRef, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { addSchoolImage, deleteImage, getImages, saveInstructor, deleteInstructor, getInstructors, getSchoolSettings, saveSchoolSettings, saveSchoolInfo, saveProfile, saveSchoolLogo, getWaiverVersions, getWaiverAcceptances, saveWaiverVersion, type SchoolImage, type Instructor, type SchoolSettings, type WaiverVersion, type WaiverAcceptanceRow } from "../actions";
+import { getMaisData } from "../../actions";
 
 type Props = {
-  fullName: string;
-  email: string;
-  phone: string;
-  schoolName: string | null;
-  schoolLogoUrl: string | null;
-  schoolLocation: string | null;
-  schoolDescription: string | null;
-  schoolPhone: string | null;
-  cancellationWindowHours: number;
   schoolId: string | null;
 };
 
-export function MaisView({ schoolName, schoolLogoUrl, fullName, email, phone, schoolLocation, schoolDescription, schoolPhone, cancellationWindowHours, schoolId }: Props) {
+export function MaisView({ schoolId }: Props) {
   const router = useRouter();
   const [showProfile, setShowProfile] = useState(false);
-  const [profileName, setProfileName] = useState(fullName);
-  const [profileEmail, setProfileEmail] = useState(email);
-  const [profilePhone, setProfilePhone] = useState(phone);
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [schoolName, setSchoolName] = useState<string | null>(null);
+  const [schoolLogoUrl, setSchoolLogoUrl] = useState<string | null>(null);
+  const [schoolLocation, setSchoolLocation] = useState<string | null>(null);
+  const [schoolDescription, setSchoolDescription] = useState<string | null>(null);
+  const [schoolPhone, setSchoolPhone] = useState<string | null>(null);
+  const [cancellationWindowHours, setCancellationWindowHours] = useState(24);
+  const [loadingMais, setLoadingMais] = useState(true);
+  const [profileName, setProfileName] = useState("");
+  const [profileEmail, setProfileEmail] = useState("");
+  const [profilePhone, setProfilePhone] = useState("");
   const [profilePassword, setProfilePassword] = useState("");
   const [profileConfirmPassword, setProfileConfirmPassword] = useState("");
   const [showCompany, setShowCompany] = useState(false);
-  const [companyName, setCompanyName] = useState(schoolName ?? "");
-  const [companyLocation, setCompanyLocation] = useState(schoolLocation ?? "");
-  const [companyDescription, setCompanyDescription] = useState(schoolDescription ?? "");
-  const [companyPhone, setCompanyPhone] = useState(schoolPhone ?? "");
+  const [companyName, setCompanyName] = useState("");
+  const [companyLocation, setCompanyLocation] = useState("");
+  const [companyDescription, setCompanyDescription] = useState("");
+  const [companyPhone, setCompanyPhone] = useState("");
+
+  useEffect(() => {
+    if (!schoolId) return;
+    setLoadingMais(true);
+    getMaisData().then((d) => {
+      setFullName(d.fullName);
+      setEmail(d.email);
+      setPhone(d.phone);
+      setSchoolName(d.schoolInfo?.name ?? null);
+      setSchoolLogoUrl(d.schoolInfo?.logo_url ?? null);
+      setSchoolLocation(d.schoolInfo?.location ?? null);
+      setSchoolDescription(d.schoolInfo?.description ?? null);
+      setSchoolPhone(d.schoolInfo?.phone ?? null);
+      setCancellationWindowHours(d.schoolInfo?.cancellation_window_hours ?? 24);
+      setProfileName(d.fullName);
+      setProfileEmail(d.email);
+      setProfilePhone(d.phone);
+      setCompanyName(d.schoolInfo?.name ?? "");
+      setCompanyLocation(d.schoolInfo?.location ?? "");
+      setCompanyDescription(d.schoolInfo?.description ?? "");
+      setCompanyPhone(d.schoolInfo?.phone ?? "");
+    }).finally(() => setLoadingMais(false));
+  }, [schoolId]);
   const [showInstructors, setShowInstructors] = useState(false);
   const [instrutorNome, setInstrutorNome] = useState("");
   const [instrutorNivel, setInstrutorNivel] = useState("");

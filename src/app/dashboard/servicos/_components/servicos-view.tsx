@@ -1,15 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   PlusIcon,
 } from "@/app/dashboard/_components/icons";
 import type { ServicoRecord } from "../actions";
-import { addServico, deleteServico, updateServico } from "../actions";
+import { getServicos, addServico, deleteServico, updateServico } from "../actions";
 
 type Props = {
-  sessions: ServicoRecord[];
   schoolId: string | null;
 };
 
@@ -25,9 +24,17 @@ function formatPrice(cents: number): string {
   return (cents / 100).toFixed(2).replace(".", ",") + "€";
 }
 
-export function ServicosView({ sessions, schoolId }: Props) {
+export function ServicosView({ schoolId }: Props) {
   const router = useRouter();
+  const [sessions, setSessions] = useState<ServicoRecord[]>([]);
+  const [loadingServicos, setLoadingServicos] = useState(true);
   const [selectedSession, setSelectedSession] = useState<ServicoRecord | null>(null);
+
+  useEffect(() => {
+    if (!schoolId) return;
+    setLoadingServicos(true);
+    getServicos(schoolId).then(setSessions).finally(() => setLoadingServicos(false));
+  }, [schoolId]);
   const [showModal, setShowModal] = useState(false);
   const [editingServico, setEditingServico] = useState<ServicoRecord | null>(null);
   const [deletingServico, setDeletingServico] = useState<ServicoRecord | null>(null);
@@ -118,7 +125,11 @@ export function ServicosView({ sessions, schoolId }: Props) {
             Adicionar serviços
           </button>
           <div className="mt-4 w-full max-w-md mx-auto divide-y divide-foreground/10">
-            {sessions.length === 0 ? (
+            {loadingServicos ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+              </div>
+            ) : sessions.length === 0 ? (
               <p className="py-8 text-center font-body text-base text-text-secondary">
                 Nenhum serviço criado ainda
               </p>
@@ -169,7 +180,11 @@ export function ServicosView({ sessions, schoolId }: Props) {
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant">
-              {sessions.map((s) => (
+              {loadingServicos ? (
+                <tr><td colSpan={5} className="py-12 text-center"><div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-accent border-t-transparent" /></td></tr>
+              ) : sessions.length === 0 ? (
+                <tr><td colSpan={5} className="py-12 text-center text-text-secondary">Nenhum serviço criado ainda</td></tr>
+              ) : sessions.map((s) => (
                 <tr key={s.id} className="hover:bg-surface-container-high transition-colors group">
                   <td className="px-6 py-4 font-body-lg text-body-lg text-on-surface align-middle text-center"><span className="inline-block w-2 h-2 rounded-full bg-accent mr-2 align-middle" />{s.nome}</td>
                   <td className="px-6 py-4 font-body-md text-body-md text-on-surface-variant align-middle text-center">{s.modalidade}</td>

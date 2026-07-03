@@ -27,7 +27,6 @@ import {
 import { WEEKDAYS, MONTHS } from "@/app/dashboard/_components/constants";
 
 type Props = {
-  fullName: string;
   schoolId: string | null;
 };
 

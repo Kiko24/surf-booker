@@ -172,6 +172,9 @@ export async function deleteStudent(studentId: string): Promise<{ ok: boolean; e
   const { error: bgErr } = await admin.from("booking_groups").delete().eq("booked_by_student_id", studentId);
   if (bgErr) return { ok: false, error: bgErr.message };
 
+  const { error: ppErr } = await admin.from("pack_purchases").delete().eq("student_id", studentId);
+  if (ppErr) return { ok: false, error: ppErr.message };
+
   const { error: ssErr } = await admin.from("school_students").delete().eq("student_id", studentId);
   if (ssErr) return { ok: false, error: ssErr.message };
 

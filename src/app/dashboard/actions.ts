@@ -438,3 +438,33 @@ export async function getRecentActivity(schoolId: string): Promise<ActivityItem[
 
   return items.slice(0, 10);
 }
+
+export async function getProfileName(): Promise<string> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return "Utilizador";
+  const { data } = await supabase.from("profiles").select("full_name").eq("user_id", user.id).single();
+  return data?.full_name ?? "Utilizador";
+}
+
+export async function getMaisData(): Promise<{
+  fullName: string;
+  email: string;
+  phone: string;
+  schoolInfo: SchoolInfo | null;
+}> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const email = user?.email ?? "";
+  if (!user) return { fullName: "Utilizador", email, phone: "", schoolInfo: null };
+  const [profile, schoolInfo] = await Promise.all([
+    supabase.from("profiles").select("full_name, phone").eq("user_id", user.id).single(),
+    getSchoolInfo(),
+  ]);
+  return {
+    fullName: profile.data?.full_name ?? "Utilizador",
+    email,
+    phone: profile.data?.phone ?? "",
+    schoolInfo,
+  };
+}

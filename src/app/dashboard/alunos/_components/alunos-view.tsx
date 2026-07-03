@@ -9,7 +9,6 @@ import { DotsIcon, TrashIcon } from "../../_components/icons";
 
 type Props = {
   schoolId: string;
-  students: StudentRecord[];
 };
 
 function getInitials(name: string): string {
@@ -51,9 +50,18 @@ function searchStudents(students: StudentRecord[], query: string): StudentRecord
   );
 }
 
-export function AlunosView({ schoolId, students }: Props) {
+export function AlunosView({ schoolId }: Props) {
   const router = useRouter();
-  const [localStudents, setLocalStudents] = useState(students);
+  const [localStudents, setLocalStudents] = useState<StudentRecord[]>([]);
+  const [loadingStudents, setLoadingStudents] = useState(true);
+
+  useEffect(() => {
+    if (!schoolId) return;
+    setLoadingStudents(true);
+    import("../actions").then(({ getStudents }) =>
+      getStudents(schoolId).then(setLocalStudents).finally(() => setLoadingStudents(false))
+    );
+  }, [schoolId]);
   const [activeFilter, setActiveFilter] = useState("Todos");
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -91,8 +99,6 @@ export function AlunosView({ schoolId, students }: Props) {
   const filteredByFilter = filterStudents(localStudents, activeFilter);
   const filtered = searchStudents(filteredByFilter, searchQuery);
   const displayed = filtered.slice(0, displayCount);
-
-  useEffect(() => { setLocalStudents(students); }, [students]);
 
   useEffect(() => {
     if (selectedStudent) {
@@ -256,7 +262,13 @@ export function AlunosView({ schoolId, students }: Props) {
         <div className="md:hidden mt-6 w-full rounded-2xl bg-surface text-foreground overflow-hidden flex flex-col flex-1 min-h-0">
           <div className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden px-5 pt-2 pb-4">
             <div className="divide-y divide-foreground/10">
-              {displayed.map((s) => (
+              {loadingStudents ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+                </div>
+              ) : displayed.length === 0 ? (
+                <div className="py-12 text-center text-text-secondary">Nenhum aluno encontrado</div>
+              ) : displayed.map((s) => (
                 <div key={s.id} className="flex items-center gap-4 py-3">
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-background text-lg font-bold text-accent">
                     {getInitials(s.name)}
@@ -308,7 +320,13 @@ export function AlunosView({ schoolId, students }: Props) {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {filtered.map((s) => (
+              {loadingStudents ? (
+                <tr><td colSpan={6} className="py-12 text-center text-text-secondary">
+                  <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+                </td></tr>
+              ) : filtered.length === 0 ? (
+                <tr><td colSpan={6} className="py-12 text-center text-text-secondary">Nenhum aluno encontrado</td></tr>
+              ) : filtered.map((s) => (
                 <tr key={s.id} className="hover:bg-white/5 transition-colors">
                   <td className="px-5 py-3 align-middle text-center">
                     <div className="flex items-center justify-center gap-3">

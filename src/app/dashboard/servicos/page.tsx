@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ServicosView } from "./_components/servicos-view";
-import { getServicos } from "./actions";
 import { getSchoolId } from "@/lib/school";
 
 export default async function ServicosPage() {
@@ -13,7 +12,6 @@ export default async function ServicosPage() {
   if (!user) redirect("/login");
 
   const schoolId = await getSchoolId();
-  const sessions = schoolId ? await getServicos(schoolId) : [];
 
-  return <ServicosView sessions={sessions} schoolId={schoolId} />;
+  return <ServicosView schoolId={schoolId} />;
 }
