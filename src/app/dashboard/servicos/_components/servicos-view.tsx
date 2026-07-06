@@ -1,12 +1,13 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   PlusIcon,
 } from "@/app/dashboard/_components/icons";
 import type { ServicoRecord } from "../actions";
 import { getServicos, addServico, deleteServico, updateServico } from "../actions";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 type Props = {
   schoolId: string | null;
@@ -25,16 +26,19 @@ function formatPrice(cents: number): string {
 }
 
 export function ServicosView({ schoolId }: Props) {
-  const router = useRouter();
   const [sessions, setSessions] = useState<ServicoRecord[]>([]);
   const [loadingServicos, setLoadingServicos] = useState(true);
   const [selectedSession, setSelectedSession] = useState<ServicoRecord | null>(null);
 
-  useEffect(() => {
+  const fetchServicos = useCallback(() => {
     if (!schoolId) return;
     setLoadingServicos(true);
     getServicos(schoolId).then(setSessions).finally(() => setLoadingServicos(false));
   }, [schoolId]);
+
+  useEffect(() => {
+    fetchServicos();
+  }, [fetchServicos]);
   const [showModal, setShowModal] = useState(false);
   const [editingServico, setEditingServico] = useState<ServicoRecord | null>(null);
   const [deletingServico, setDeletingServico] = useState<ServicoRecord | null>(null);
@@ -221,444 +225,411 @@ export function ServicosView({ schoolId }: Props) {
       </main>
       </div>
 
-      {/* Service popup */}
+      <BottomSheet
+        isOpen={!!selectedSession}
+        onClose={() => setSelectedSession(null)}
+        title={selectedSession?.nome}
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setSelectedSession(null)}
+              className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
+            >
+              Fechar
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const s = selectedSession!;
+                setSelectedSession(null);
+                setEditingServico(s);
+                fillEditForm(s);
+                setShowModal(true);
+              }}
+              className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95"
+            >
+              Editar
+            </button>
+          </>
+        }
+      >
         {selectedSession && (
-          <div
-            className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50"
-            onKeyDown={(e) => { if (e.key === "Escape") setSelectedSession(null); }}
-          >
-          <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-10">
-            <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted" />
-
-            <div className="flex items-center gap-4 mb-6">
-              <div>
-                <h3 className="font-heading text-xl font-bold text-foreground">{selectedSession.nome}</h3>
+          <div className="space-y-3">
+            {selectedSession.modalidade && (
+              <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
+                <p className="font-body text-xs text-text-secondary">Modalidade</p>
+                <p className="font-body text-sm text-foreground">{selectedSession.modalidade}</p>
               </div>
+            )}
+
+            {selectedSession.categoria && (
+              <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
+                <p className="font-body text-xs text-text-secondary">Categoria</p>
+                <p className="font-body text-sm text-foreground capitalize">{selectedSession.categoria}</p>
+              </div>
+            )}
+
+            <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
+              <p className="font-body text-xs text-text-secondary">Duração</p>
+              <p className="font-body text-sm text-foreground">
+                {selectedSession.categoria === "aluguer"
+                  ? selectedSession.duracao >= 1440
+                    ? `${selectedSession.duracao / 1440} dia(s)`
+                    : `${selectedSession.duracao / 60} hora(s)`
+                  : `${selectedSession.duracao} minutos`}
+              </p>
             </div>
 
-            <div className="space-y-3">
-              {selectedSession.modalidade && (
-                <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
-                  <p className="font-body text-xs text-text-secondary">Modalidade</p>
-                  <p className="font-body text-sm text-foreground">{selectedSession.modalidade}</p>
-                </div>
-              )}
-
-              {selectedSession.categoria && (
-                <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
-                  <p className="font-body text-xs text-text-secondary">Categoria</p>
-                  <p className="font-body text-sm text-foreground capitalize">{selectedSession.categoria}</p>
-                </div>
-              )}
-
-              <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
-                <p className="font-body text-xs text-text-secondary">Duração</p>
-                <p className="font-body text-sm text-foreground">
-                  {selectedSession.categoria === "aluguer"
-                    ? selectedSession.duracao >= 1440
-                      ? `${selectedSession.duracao / 1440} dia(s)`
-                      : `${selectedSession.duracao / 60} hora(s)`
-                    : `${selectedSession.duracao} minutos`}
-                </p>
-              </div>
-
-              <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
-                <p className="font-body text-xs text-text-secondary">
-                  {selectedSession.categoria === "pack" ? "Preço do pack" : "Preço"}
-                </p>
-                <p className="font-body text-sm text-foreground">{formatPrice(selectedSession.avulsoPreco)}</p>
-              </div>
-
-              {selectedSession.categoria === "pack" && selectedSession.totalLessons && (
-                <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
-                  <p className="font-body text-xs text-text-secondary">Número de aulas</p>
-                  <p className="font-body text-sm text-foreground">{selectedSession.totalLessons} aulas</p>
-                </div>
-              )}
-
-              {selectedSession.vezesUsado > 0 && (
-                <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
-                  <p className="font-body text-xs text-text-secondary">Utilizações</p>
-                  <p className="font-body text-sm text-foreground">{selectedSession.vezesUsado} {selectedSession.vezesUsado === 1 ? "vez" : "vezes"}</p>
-                </div>
-              )}
-
-              <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
-                <p className="font-body text-xs text-text-secondary">Sobre</p>
-                <p className="font-body text-sm text-foreground">{selectedSession.sobre || "—"}</p>
-              </div>
+            <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
+              <p className="font-body text-xs text-text-secondary">
+                {selectedSession.categoria === "pack" ? "Preço do pack" : "Preço"}
+              </p>
+              <p className="font-body text-sm text-foreground">{formatPrice(selectedSession.avulsoPreco)}</p>
             </div>
 
-            <div className="flex gap-3 mt-6">
-              <button
-                type="button"
-                onClick={() => setSelectedSession(null)}
-                className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
-              >
-                Fechar
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const s = selectedSession;
-                  setSelectedSession(null);
-                  setEditingServico(s);
-                  fillEditForm(s);
-                  setShowModal(true);
-                }}
-                className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95"
-              >
-                Editar
-              </button>
+            {selectedSession.categoria === "pack" && selectedSession.totalLessons && (
+              <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
+                <p className="font-body text-xs text-text-secondary">Número de aulas</p>
+                <p className="font-body text-sm text-foreground">{selectedSession.totalLessons} aulas</p>
+              </div>
+            )}
+
+            {selectedSession.vezesUsado > 0 && (
+              <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
+                <p className="font-body text-xs text-text-secondary">Utilizações</p>
+                <p className="font-body text-sm text-foreground">{selectedSession.vezesUsado} {selectedSession.vezesUsado === 1 ? "vez" : "vezes"}</p>
+              </div>
+            )}
+
+            <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
+              <p className="font-body text-xs text-text-secondary">Sobre</p>
+              <p className="font-body text-sm text-foreground">{selectedSession.sobre || "—"}</p>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </BottomSheet>
 
-      {/* Add / Edit Modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center bg-black/50 md:px-5" onClick={() => setShowModal(false)}>
-          <div className="w-full max-w-md rounded-t-2xl md:rounded-2xl bg-surface p-6 pb-10 md:pb-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted md:hidden" />
+      <BottomSheet
+        isOpen={showModal}
+        onClose={() => { setShowModal(false); setEditingServico(null); }}
+        title={editingServico ? "Editar serviço" : "Adicionar serviço"}
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => { setShowModal(false); setEditingServico(null); }}
+              className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                setServicoError("");
+                const errors: Record<string, string> = {};
+                if (!nome.trim()) errors.nome = "O nome é obrigatório";
+                if (!modalidade) errors.modalidade = "Seleciona a modalidade";
+                if (!categoria) errors.categoria = "Seleciona a categoria";
+                if (categoria !== "aluguer" && (!duracao || Number(duracao) < 15)) errors.duracao = "A duração mínima é 15 minutos";
+                if (categoria && (!preco || Number(preco) < 1)) errors.preco = "O preço é obrigatório";
+                if (categoria === "pack" && (!totalLessons || Number(totalLessons) < 1)) errors.totalLessons = "Número de aulas é obrigatório para packs";
+                if (categoria === "aluguer" && (!duracaoAluguer || Number(duracaoAluguer) < 1)) errors.duracaoAluguer = "Duração é obrigatória";
 
-            <h3 className="font-heading text-2xl font-bold text-foreground mb-6">
-              {editingServico ? "Editar serviço" : "Adicionar serviço"}
-            </h3>
+                setFormErrors(errors);
+                if (Object.keys(errors).length > 0) return;
+                if (!schoolId) { setServicoError("Escola não encontrada"); return; }
 
-            <div className="space-y-4">
-              {/* Nome da aula */}
-              <div>
+                let duracaoFinal = Number(duracao);
+                if (categoria === "aluguer") {
+                  duracaoFinal = unidadeAluguer === "dia"
+                    ? Number(duracaoAluguer) * 1440
+                    : Number(duracaoAluguer) * 60;
+                }
+
+                try {
+                  if (editingServico) {
+                    const res = await updateServico(editingServico.id, {
+                      nome,
+                      modalidade,
+                      duracao: duracaoFinal,
+                      sobre,
+                      avulsoDisponivel: true,
+                      avulsoPreco: Math.round(Number(preco) * 100),
+                      categoria: (categoria || undefined) as "aula" | "pack" | "aluguer" | undefined,
+                      totalLessons: categoria === "pack" ? Number(totalLessons) : undefined,
+                      packs: [],
+                    });
+                    if (res.ok) {
+                      setShowModal(false);
+                      setEditingServico(null);
+                      fetchServicos();
+                    } else {
+                      setServicoError(res.error ?? "Erro ao guardar serviço");
+                    }
+                  } else {
+                    const res = await addServico(schoolId, {
+                      nome,
+                      modalidade,
+                      duracao: duracaoFinal,
+                      sobre,
+                      avulsoDisponivel: true,
+                      avulsoPreco: Math.round(Number(preco) * 100),
+                      categoria: (categoria || undefined) as "aula" | "pack" | "aluguer" | undefined,
+                      totalLessons: categoria === "pack" ? Number(totalLessons) : undefined,
+                      packs: [],
+                    });
+                    if (res.ok) {
+                      setShowModal(false);
+                      fetchServicos();
+                    } else {
+                      setServicoError(res.error ?? "Erro ao adicionar serviço");
+                    }
+                  }
+                } catch {
+                  setServicoError("Erro inesperado. Tenta novamente.");
+                }
+              }}
+              className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95"
+            >
+              {editingServico ? "Guardar" : "Confirmar"}
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          {/* Nome da aula */}
+          <div>
+            <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+              Nome da aula <span className="text-error">*</span>
+            </label>
+            <input
+              type="text"
+              value={nome}
+              onChange={(e) => { setNome(e.target.value); setFormErrors((prev) => ({ ...prev, nome: "" })); }}
+              placeholder="Ex: Aula Nível 1"
+              aria-invalid={!!formErrors.nome}
+              aria-describedby={formErrors.nome ? "error-nome" : undefined}
+              className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+            />
+            {formErrors.nome && <p id="error-nome" className="mt-1 font-body text-sm text-error">{formErrors.nome}</p>}
+          </div>
+
+          {/* Modalidade */}
+          <div>
+            <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+              Modalidade <span className="text-error">*</span>
+            </label>
+            <div className="relative">
+              <select
+                value={modalidade}
+                onChange={(e) => { setModalidade(e.target.value); setFormErrors((prev) => ({ ...prev, modalidade: "" })); }}
+                aria-invalid={!!formErrors.modalidade}
+                aria-describedby={formErrors.modalidade ? "error-modalidade" : undefined}
+                className="w-full appearance-none rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground outline-none focus:outline-2 focus:outline-accent"
+              >
+                <option value="" disabled>Selecionar modalidade</option>
+                {MODALIDADES.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </div>
+            {formErrors.modalidade && <p id="error-modalidade" className="mt-1 font-body text-sm text-error">{formErrors.modalidade}</p>}
+          </div>
+
+          {/* Categoria */}
+          <div>
+            <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+              Categoria <span className="text-error">*</span>
+            </label>
+            <div className="relative">
+              <select
+                value={categoria}
+                onChange={(e) => { setCategoria(e.target.value); setFormErrors((prev) => ({ ...prev, categoria: "" })); }}
+                aria-invalid={!!formErrors.categoria}
+                aria-describedby={formErrors.categoria ? "error-categoria" : undefined}
+                className="w-full appearance-none rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground outline-none focus:outline-2 focus:outline-accent"
+              >
+                <option value="" disabled>Selecionar categoria</option>
+                {CATEGORIAS.map((c) => (
+                  <option key={c.value} value={c.value}>{c.label}</option>
+                ))}
+              </select>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </div>
+            {formErrors.categoria && <p id="error-categoria" className="mt-1 font-body text-sm text-error">{formErrors.categoria}</p>}
+          </div>
+
+          {/* Preço + Nº aulas (lado a lado para packs) / Preço + Duração (lado a lado para aluguer) */}
+          {categoria === "pack" ? (
+            <div className="flex gap-3">
+              <div className="flex-1">
                 <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
-                  Nome da aula <span className="text-error">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={nome}
-                  onChange={(e) => { setNome(e.target.value); setFormErrors((prev) => ({ ...prev, nome: "" })); }}
-                  placeholder="Ex: Aula Nível 1"
-                  aria-invalid={!!formErrors.nome}
-                  aria-describedby={formErrors.nome ? "error-nome" : undefined}
-                  className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
-                />
-                {formErrors.nome && <p id="error-nome" className="mt-1 font-body text-sm text-error">{formErrors.nome}</p>}
-              </div>
-
-              {/* Modalidade */}
-              <div>
-                <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
-                  Modalidade <span className="text-error">*</span>
-                </label>
-                <div className="relative">
-                  <select
-                    value={modalidade}
-                    onChange={(e) => { setModalidade(e.target.value); setFormErrors((prev) => ({ ...prev, modalidade: "" })); }}
-                    aria-invalid={!!formErrors.modalidade}
-                    aria-describedby={formErrors.modalidade ? "error-modalidade" : undefined}
-                    className="w-full appearance-none rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground outline-none focus:outline-2 focus:outline-accent"
-                  >
-                    <option value="" disabled>Selecionar modalidade</option>
-                    {MODALIDADES.map((m) => (
-                      <option key={m} value={m}>{m}</option>
-                    ))}
-                  </select>
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted">
-                    <path d="m6 9 6 6 6-6" />
-                  </svg>
-                </div>
-                {formErrors.modalidade && <p id="error-modalidade" className="mt-1 font-body text-sm text-error">{formErrors.modalidade}</p>}
-              </div>
-
-              {/* Categoria */}
-              <div>
-                <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
-                  Categoria <span className="text-error">*</span>
-                </label>
-                <div className="relative">
-                  <select
-                    value={categoria}
-                    onChange={(e) => { setCategoria(e.target.value); setFormErrors((prev) => ({ ...prev, categoria: "" })); }}
-                    aria-invalid={!!formErrors.categoria}
-                    aria-describedby={formErrors.categoria ? "error-categoria" : undefined}
-                    className="w-full appearance-none rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground outline-none focus:outline-2 focus:outline-accent"
-                  >
-                    <option value="" disabled>Selecionar categoria</option>
-                    {CATEGORIAS.map((c) => (
-                      <option key={c.value} value={c.value}>{c.label}</option>
-                    ))}
-                  </select>
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted">
-                    <path d="m6 9 6 6 6-6" />
-                  </svg>
-                </div>
-                {formErrors.categoria && <p id="error-categoria" className="mt-1 font-body text-sm text-error">{formErrors.categoria}</p>}
-              </div>
-
-              {/* Preço + Nº aulas (lado a lado para packs) / Preço + Duração (lado a lado para aluguer) */}
-              {categoria === "pack" ? (
-                <div className="flex gap-3">
-                  <div className="flex-1">
-                    <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
-                      Preço do pack <span className="text-error">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={preco}
-                      onChange={(e) => { setPreco(e.target.value); setFormErrors((prev) => ({ ...prev, preco: "" })); }}
-                      placeholder="150"
-                      aria-invalid={!!formErrors.preco}
-                      aria-describedby={formErrors.preco ? "error-preco-pack" : undefined}
-                      className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
-                    />
-                    {formErrors.preco && <p id="error-preco-pack" className="mt-1 font-body text-sm text-error">{formErrors.preco}</p>}
-                  </div>
-                  <div className="flex-1">
-                    <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
-                      Nº aulas <span className="text-error">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="100"
-                      value={totalLessons}
-                      onChange={(e) => { setTotalLessons(e.target.value); setFormErrors((prev) => ({ ...prev, totalLessons: "" })); }}
-                      placeholder="5"
-                      aria-invalid={!!formErrors.totalLessons}
-                      aria-describedby={formErrors.totalLessons ? "error-totalLessons" : undefined}
-                      className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
-                    />
-                    {formErrors.totalLessons && <p id="error-totalLessons" className="mt-1 font-body text-sm text-error">{formErrors.totalLessons}</p>}
-                  </div>
-                </div>
-              ) : categoria === "aluguer" ? (
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
-                      Preço <span className="text-error">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={preco}
-                      onChange={(e) => { setPreco(e.target.value); setFormErrors((prev) => ({ ...prev, preco: "" })); }}
-                      placeholder="35"
-                      aria-invalid={!!formErrors.preco}
-                      aria-describedby={formErrors.preco ? "error-preco-aluguer" : undefined}
-                      className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
-                    />
-                    {formErrors.preco && <p id="error-preco-aluguer" className="mt-1 font-body text-sm text-error">{formErrors.preco}</p>}
-                  </div>
-                  <div>
-                    <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
-                      Duração <span className="text-error">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={duracaoAluguer}
-                      onChange={(e) => { setDuracaoAluguer(e.target.value); setFormErrors((prev) => ({ ...prev, duracaoAluguer: "" })); }}
-                      placeholder="2"
-                      aria-invalid={!!formErrors.duracaoAluguer}
-                      aria-describedby={formErrors.duracaoAluguer ? "error-duracaoAluguer" : undefined}
-                      className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
-                    />
-                    {formErrors.duracaoAluguer && <p id="error-duracaoAluguer" className="mt-1 font-body text-sm text-error">{formErrors.duracaoAluguer}</p>}
-                  </div>
-                  <div className="mt-6">
-                    <select
-                      value={unidadeAluguer}
-                      onChange={(e) => setUnidadeAluguer(e.target.value as "hora" | "dia")}
-                      className="w-full appearance-none rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground outline-none focus:outline-2 focus:outline-accent"
-                    >
-                      <option value="hora">hora(s)</option>
-                      <option value="dia">dia(s)</option>
-                    </select>
-                  </div>
-                </div>
-              ) : categoria ? (
-                <div>
-                  <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
-                    Preço <span className="text-error">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={preco}
-                    onChange={(e) => { setPreco(e.target.value); setFormErrors((prev) => ({ ...prev, preco: "" })); }}
-                    placeholder="Ex: 35"
-                    aria-invalid={!!formErrors.preco}
-                    aria-describedby={formErrors.preco ? "error-preco" : undefined}
-                    className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
-                  />
-                  {formErrors.preco && <p id="error-preco" className="mt-1 font-body text-sm text-error">{formErrors.preco}</p>}
-                </div>
-              ) : null}
-
-              {/* Duração (minutos) - oculto para aluguer */}
-              <div className={categoria === "aluguer" ? "hidden" : ""}>
-                <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
-                  Duração <span className="text-text-muted">(minutos)</span> <span className="text-error">*</span>
+                  Preço do pack <span className="text-error">*</span>
                 </label>
                 <input
                   type="number"
-                  min="15"
-                  max="480"
-                  value={duracao}
-                  onChange={(e) => { setDuracao(e.target.value); setFormErrors((prev) => ({ ...prev, duracao: "" })); }}
-                  placeholder="Ex: 90"
-                  aria-invalid={!!formErrors.duracao}
-                  aria-describedby={formErrors.duracao ? "error-duracao" : undefined}
+                  min="0"
+                  value={preco}
+                  onChange={(e) => { setPreco(e.target.value); setFormErrors((prev) => ({ ...prev, preco: "" })); }}
+                  placeholder="150"
+                  aria-invalid={!!formErrors.preco}
+                  aria-describedby={formErrors.preco ? "error-preco-pack" : undefined}
                   className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
                 />
-                {formErrors.duracao && <p id="error-duracao" className="mt-1 font-body text-sm text-error">{formErrors.duracao}</p>}
+                {formErrors.preco && <p id="error-preco-pack" className="mt-1 font-body text-sm text-error">{formErrors.preco}</p>}
               </div>
-
-              {/* Sobre */}
+              <div className="flex-1">
+                <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+                  Nº aulas <span className="text-error">*</span>
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={totalLessons}
+                  onChange={(e) => { setTotalLessons(e.target.value); setFormErrors((prev) => ({ ...prev, totalLessons: "" })); }}
+                  placeholder="5"
+                  aria-invalid={!!formErrors.totalLessons}
+                  aria-describedby={formErrors.totalLessons ? "error-totalLessons" : undefined}
+                  className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+                />
+                {formErrors.totalLessons && <p id="error-totalLessons" className="mt-1 font-body text-sm text-error">{formErrors.totalLessons}</p>}
+              </div>
+            </div>
+          ) : categoria === "aluguer" ? (
+            <div className="grid grid-cols-3 gap-3">
               <div>
                 <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
-                  Sobre
+                  Preço <span className="text-error">*</span>
                 </label>
-                <textarea
-                  value={sobre}
-                  onChange={(e) => setSobre(e.target.value)}
-                  placeholder="Descreve o que contém..."
-                  rows={3}
-                  className="w-full resize-none rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+                <input
+                  type="number"
+                  min="0"
+                  value={preco}
+                  onChange={(e) => { setPreco(e.target.value); setFormErrors((prev) => ({ ...prev, preco: "" })); }}
+                  placeholder="100"
+                  aria-invalid={!!formErrors.preco}
+                  aria-describedby={formErrors.preco ? "error-preco-aluguer" : undefined}
+                  className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
                 />
+                {formErrors.preco && <p id="error-preco-aluguer" className="mt-1 font-body text-sm text-error">{formErrors.preco}</p>}
               </div>
-
-              {/* Error */}
-              {servicoError && (
-                <p className="font-body text-sm text-error text-center">{servicoError}</p>
-              )}
-
-              {/* Actions */}
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => { setShowModal(false); setEditingServico(null); }}
-                  className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
+              <div>
+                <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+                  Duração <span className="text-error">*</span>
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={duracaoAluguer}
+                  onChange={(e) => { setDuracaoAluguer(e.target.value); setFormErrors((prev) => ({ ...prev, duracaoAluguer: "" })); }}
+                  placeholder="2"
+                  aria-invalid={!!formErrors.duracaoAluguer}
+                  aria-describedby={formErrors.duracaoAluguer ? "error-duracaoAluguer" : undefined}
+                  className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+                />
+                {formErrors.duracaoAluguer && <p id="error-duracaoAluguer" className="mt-1 font-body text-sm text-error">{formErrors.duracaoAluguer}</p>}
+              </div>
+              <div>
+                <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+                  Unidade
+                </label>
+                <select
+                  value={unidadeAluguer}
+                  onChange={(e) => setUnidadeAluguer(e.target.value as "hora" | "dia")}
+                  className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground outline-none focus:outline-2 focus:outline-accent"
                 >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setServicoError("");
-                    const errors: Record<string, string> = {};
-                    if (!nome.trim()) errors.nome = "O nome é obrigatório";
-                    if (!modalidade) errors.modalidade = "Seleciona a modalidade";
-                    if (!categoria) errors.categoria = "Seleciona a categoria";
-                    if (!duracao || Number(duracao) < 15) errors.duracao = "A duração mínima é 15 minutos";
-                    if (categoria && (!preco || Number(preco) < 1)) errors.preco = "O preço é obrigatório";
-                    if (categoria === "pack" && (!totalLessons || Number(totalLessons) < 1)) errors.totalLessons = "Número de aulas é obrigatório para packs";
-                    if (categoria === "aluguer" && (!duracaoAluguer || Number(duracaoAluguer) < 1)) errors.duracaoAluguer = "Duração é obrigatória";
-
-                    setFormErrors(errors);
-                    if (Object.keys(errors).length > 0) return;
-                    if (!schoolId) { setServicoError("Escola não encontrada"); return; }
-
-                    let duracaoFinal = Number(duracao);
-                    if (categoria === "aluguer") {
-                      duracaoFinal = unidadeAluguer === "dia"
-                        ? Number(duracaoAluguer) * 1440
-                        : Number(duracaoAluguer) * 60;
-                    }
-
-                    try {
-                      if (editingServico) {
-                        const res = await updateServico(editingServico.id, {
-                          nome,
-                          modalidade,
-                          duracao: duracaoFinal,
-                          sobre,
-                          avulsoDisponivel: true,
-                          avulsoPreco: Math.round(Number(preco) * 100),
-                          categoria: (categoria || undefined) as "aula" | "pack" | "aluguer" | undefined,
-                          totalLessons: categoria === "pack" ? Number(totalLessons) : undefined,
-                          packs: [],
-                        });
-                        if (res.ok) {
-                          setShowModal(false);
-                          setEditingServico(null);
-                          router.refresh();
-                        } else {
-                          setServicoError(res.error ?? "Erro ao guardar serviço");
-                        }
-                      } else {
-                        const res = await addServico(schoolId, {
-                          nome,
-                          modalidade,
-                          duracao: duracaoFinal,
-                          sobre,
-                          avulsoDisponivel: true,
-                          avulsoPreco: Math.round(Number(preco) * 100),
-                          categoria: (categoria || undefined) as "aula" | "pack" | "aluguer" | undefined,
-                          totalLessons: categoria === "pack" ? Number(totalLessons) : undefined,
-                          packs: [],
-                        });
-                        if (res.ok) {
-                          setShowModal(false);
-                          router.refresh();
-                        } else {
-                          setServicoError(res.error ?? "Erro ao adicionar serviço");
-                        }
-                      }
-                    } catch {
-                      setServicoError("Erro inesperado. Tenta novamente.");
-                    }
-                  }}
-                  className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95"
-                >
-                  {editingServico ? "Guardar" : "Confirmar"}
-                </button>
+                  <option value="hora">Hora</option>
+                  <option value="dia">Dia</option>
+                </select>
               </div>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete confirmation */}
-      {deletingServico && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-5">
-          <div className="w-full max-w-sm rounded-2xl bg-surface p-6 text-center">
-            <p className="font-heading text-xl font-bold text-foreground mb-2">Eliminar serviço</p>
-              <p className="font-body text-sm text-text-secondary mb-6">
-                Tens a certeza que queres eliminar <strong>{deletingServico.nome}</strong>?
-                Esta ação não pode ser desfeita.
-              </p>
-              {servicoError && (
-                <p className="font-body text-sm text-error mb-4">{servicoError}</p>
-              )}
-              <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => { setDeletingServico(null); setServicoError(""); }}
-                className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={async () => {
-                  if (!schoolId) return;
-                  setServicoError("");
-                  const res = await deleteServico(deletingServico.id);
-                  if (res.ok) {
-                    setDeletingServico(null);
-                    router.refresh();
-                  } else {
-                    setServicoError(res.error ?? "Erro ao eliminar serviço");
-                  }
-                }}
-                className="flex-1 rounded-xl bg-error py-3 font-body text-sm font-semibold text-error-foreground transition-transform active:scale-95"
-              >
-                Sim, eliminar
-              </button>
+          ) : (
+            <div>
+              <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+                Preço <span className="text-error">*</span>
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={preco}
+                onChange={(e) => { setPreco(e.target.value); setFormErrors((prev) => ({ ...prev, preco: "" })); }}
+                placeholder="50"
+                aria-invalid={!!formErrors.preco}
+                aria-describedby={formErrors.preco ? "error-preco-aula" : undefined}
+                className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+              />
+              {formErrors.preco && <p id="error-preco-aula" className="mt-1 font-body text-sm text-error">{formErrors.preco}</p>}
             </div>
+          )}
+
+          {/* Duração (para aula) */}
+          {categoria !== "aluguer" && (
+            <div>
+              <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+                Duração (minutos) <span className="text-error">*</span>
+              </label>
+              <input
+                type="number"
+                min="15"
+                max="240"
+                value={duracao}
+                onChange={(e) => { setDuracao(e.target.value); setFormErrors((prev) => ({ ...prev, duracao: "" })); }}
+                placeholder="60"
+                aria-invalid={!!formErrors.duracao}
+                aria-describedby={formErrors.duracao ? "error-duracao" : undefined}
+                className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+              />
+              {formErrors.duracao && <p id="error-duracao" className="mt-1 font-body text-sm text-error">{formErrors.duracao}</p>}
+            </div>
+          )}
+
+          {/* Sobre */}
+          <div>
+            <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+              Sobre
+            </label>
+            <textarea
+              value={sobre}
+              onChange={(e) => setSobre(e.target.value)}
+              placeholder="Descreve o que contém..."
+              rows={3}
+              className="w-full resize-none rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+            />
           </div>
+
+          {/* Error */}
+          {servicoError && (
+            <p className="font-body text-sm text-error text-center">{servicoError}</p>
+          )}
         </div>
-      )}
+      </BottomSheet>
+
+      <ConfirmDialog
+        isOpen={!!deletingServico}
+        onClose={() => { setDeletingServico(null); setServicoError(""); }}
+        onConfirm={async () => {
+          if (!schoolId) return;
+          setServicoError("");
+          const res = await deleteServico(deletingServico!.id);
+          if (res.ok) {
+            fetchServicos();
+          } else {
+            setServicoError(res.error ?? "Erro ao eliminar serviço");
+          }
+        }}
+        title="Eliminar serviço"
+        message={`Tens a certeza que queres eliminar ${deletingServico?.nome}? Esta ação não pode ser desfeita.`}
+        confirmLabel="Sim, eliminar"
+        cancelLabel="Cancelar"
+        variant="danger"
+      />
 
     </>
   );

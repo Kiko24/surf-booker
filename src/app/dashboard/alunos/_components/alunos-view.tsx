@@ -6,6 +6,8 @@ import { useState, useRef, useEffect } from "react";
 import { deleteStudent, toggleWaiver, createStudent, getStudentProfile, cancelPackPurchase, updatePackRemaining, type StudentRecord, type StudentProfileData } from "../actions";
 import { getAvailablePacks, buyPack, type AvailablePack } from "../../calendario/actions";
 import { DotsIcon, TrashIcon } from "../../_components/icons";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 type Props = {
   schoolId: string;
@@ -610,368 +612,316 @@ export function AlunosView({ schoolId }: Props) {
         </div>
       )}
 
-      {/* Delete confirmation */}
-      {selectedStudent && showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-5" onClick={() => setShowDeleteConfirm(false)}>
-          <div className="w-full max-w-sm rounded-2xl bg-surface p-6 text-center" onClick={(e) => e.stopPropagation()}>
-            <p className="font-heading text-xl font-bold text-foreground mb-2">Eliminar aluno</p>
-            <p className="font-body text-sm text-text-secondary mb-6">
-              Tens a certeza que queres eliminar <strong>{selectedStudent.name}</strong>?
-              Esta ação remove o aluno de todas as aulas e não pode ser desfeita.
-            </p>
-            {deleteError && (
-              <p className="mb-4 font-body text-xs text-error">{deleteError}</p>
-            )}
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => { setShowDeleteConfirm(false); setDeleteError(""); }}
-                className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={async () => {
-                  setDeleteError("");
-                  const deletedId = selectedStudent.id;
-                  const deletedStudent = selectedStudent;
-                  setLocalStudents((prev) => prev.filter((s) => s.id !== deletedId));
-                  setSelectedStudent(null);
-                  setShowDeleteConfirm(false);
-                  const res = await deleteStudent(deletedId);
-                  if (!res.ok) {
-                    setLocalStudents((prev) => [...prev, deletedStudent].sort((a, b) => a.name.localeCompare(b.name)));
-                    setDeleteError(res.error ?? "Erro ao eliminar aluno");
-                  }
-                }}
-                className="flex-1 rounded-xl bg-error py-3 font-body text-sm font-semibold text-error-foreground transition-transform active:scale-95"
-              >
-                Sim, eliminar
-              </button>
-            </div>
-          </div>
+      <ConfirmDialog
+        isOpen={showDeleteConfirm && !!selectedStudent}
+        onClose={() => { setShowDeleteConfirm(false); setDeleteError(""); }}
+        onConfirm={async () => {
+          if (!selectedStudent) return;
+          setDeleteError("");
+          const deletedId = selectedStudent.id;
+          const deletedStudent = selectedStudent;
+          setLocalStudents((prev) => prev.filter((s) => s.id !== deletedId));
+          setSelectedStudent(null);
+          const res = await deleteStudent(deletedId);
+          if (!res.ok) {
+            setLocalStudents((prev) => [...prev, deletedStudent].sort((a, b) => a.name.localeCompare(b.name)));
+            setDeleteError(res.error ?? "Erro ao eliminar aluno");
+          }
+        }}
+        title="Eliminar aluno"
+        message={`Tens a certeza que queres eliminar "${selectedStudent?.name}"? Esta ação remove o aluno de todas as aulas e não pode ser desfeita.`}
+        confirmLabel="Sim, eliminar"
+        cancelLabel="Cancelar"
+        variant="danger"
+      />
+
+      <BottomSheet
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        title="Adicionar aluno"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setShowAddModal(false)}
+              className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              disabled={addSaving}
+              onClick={async () => {
+                if (!addName.trim()) { setAddError("O nome é obrigatório"); return; }
+                setAddSaving(true);
+                setAddError("");
+                const res = await createStudent(addName.trim(), addPhone.trim() || undefined, addEmail.trim() || undefined, addPackId || undefined, addRemainingLessons || undefined, schoolId);
+                if (!res.ok) { setAddError(res.error ?? "Erro ao adicionar aluno"); setAddSaving(false); return; }
+                setShowAddModal(false);
+                setAddSaving(false);
+                router.refresh();
+              }}
+              className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95 disabled:opacity-50"
+            >
+              {addSaving ? "A adicionar..." : "Adicionar"}
+            </button>
+          </>
+        }
+      >
+        <div>
+          <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+            Nome <span className="text-error">*</span>
+          </label>
+          <input
+            type="text"
+            value={addName}
+            onChange={(e) => setAddName(e.target.value)}
+            placeholder="Nome do aluno"
+            className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+          />
         </div>
-      )}
 
-      {/* Add student modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 md:px-5" onClick={() => setShowAddModal(false)}>
-          <div className="w-full max-w-md rounded-t-2xl md:rounded-2xl bg-surface p-6 pb-24 md:pb-6" onClick={(e) => e.stopPropagation()}>
-            <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted md:hidden" />
-            <h3 className="font-heading text-2xl font-bold text-foreground mb-6">Adicionar aluno</h3>
+        <div>
+          <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+            Telemóvel <span className="text-text-muted">(opcional)</span>
+          </label>
+          <input
+            type="tel"
+            inputMode="numeric"
+            value={addPhone}
+            onChange={(e) => setAddPhone(e.target.value.replace(/\s/g, ""))}
+            placeholder="Ex: 912345678"
+            className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+          />
+          <p className="mt-1 font-body text-xs text-text-muted">Poderá ser usado para ligar a uma conta futura.</p>
+        </div>
 
-            <div className="space-y-4">
-              <div>
-                <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
-                  Nome <span className="text-error">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={addName}
-                  onChange={(e) => setAddName(e.target.value)}
-                  placeholder="Nome do aluno"
-                  className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
-                />
-              </div>
+        <div>
+          <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+            Email <span className="text-text-muted">(opcional)</span>
+          </label>
+          <input
+            type="email"
+            value={addEmail}
+            onChange={(e) => setAddEmail(e.target.value)}
+            placeholder="Ex: aluno@email.com"
+            className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+          />
+          <p className="mt-1 font-body text-xs text-text-muted">Se preenchido, o aluno receberá um convite por email para definir a sua palavra-passe.</p>
+        </div>
 
-              <div>
-                <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
-                  Telemóvel <span className="text-text-muted">(opcional)</span>
-                </label>
-                <input
-                  type="tel"
-                  inputMode="numeric"
-                  value={addPhone}
-                  onChange={(e) => setAddPhone(e.target.value.replace(/\s/g, ""))}
-                  placeholder="Ex: 912345678"
-                  className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
-                />
-                <p className="mt-1 font-body text-xs text-text-muted">Poderá ser usado para ligar a uma conta futura.</p>
-              </div>
-
-              <div>
-                <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
-                  Email <span className="text-text-muted">(opcional)</span>
-                </label>
-                <input
-                  type="email"
-                  value={addEmail}
-                  onChange={(e) => setAddEmail(e.target.value)}
-                  placeholder="Ex: aluno@email.com"
-                  className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
-                />
-              </div>
-
-              <div>
-                <div className="flex gap-3">
-                  <div className="flex-1">
-                    <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
-                      Pack <span className="text-text-muted">(opcional)</span>
-                    </label>
-                    <div className="relative">
-                      <select
-                        value={addPackId}
-                        onChange={(e) => setAddPackId(e.target.value)}
-                        className="w-full appearance-none rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground outline-none focus:outline-2 focus:outline-accent"
-                      >
-                        <option value="">Sem pack</option>
-                        {addPacks.map((p) => (
-                          <option key={p.id} value={p.id}>{p.name} — {p.total_lessons} aulas</option>
-                        ))}
-                      </select>
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted">
-                        <path d="m6 9 6 6 6-6" />
-                      </svg>
-                    </div>
-                  </div>
-                  {addPackId && (
-                    <div className="flex-1">
-                      <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
-                        Aulas restantes
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={addRemainingLessons}
-                        onChange={(e) => setAddRemainingLessons(e.target.value)}
-                        placeholder="Ex: 10"
-                        className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {addError && (
-                <p className="font-body text-sm text-error">{addError}</p>
-              )}
-
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
+        <div>
+          <div className="flex gap-3">
+            <div className="flex-1">
+              <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+                Pack <span className="text-text-muted">(opcional)</span>
+              </label>
+              <div className="relative">
+                <select
+                  value={addPackId}
+                  onChange={(e) => setAddPackId(e.target.value)}
+                  className="w-full appearance-none rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground outline-none focus:outline-2 focus:outline-accent"
                 >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  disabled={addSaving}
-                  onClick={async () => {
-                    if (!addName.trim()) { setAddError("O nome é obrigatório"); return; }
-                    setAddSaving(true);
-                    setAddError("");
-                    const res = await createStudent(addName.trim(), addPhone.trim() || undefined, addEmail.trim() || undefined, addPackId || undefined, addRemainingLessons || undefined, schoolId);
-                    if (!res.ok) { setAddError(res.error ?? "Erro ao adicionar aluno"); setAddSaving(false); return; }
-                    setShowAddModal(false);
-                    setAddSaving(false);
-                    router.refresh();
-                  }}
-                  className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95 disabled:opacity-50"
+                  <option value="">Sem pack</option>
+                  {addPacks.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name} — {p.total_lessons} aulas</option>
+                  ))}
+                </select>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted">
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </div>
+            </div>
+            {addPackId && (
+              <div className="flex-1">
+                <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+                  Aulas restantes
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={addRemainingLessons}
+                  onChange={(e) => setAddRemainingLessons(e.target.value)}
+                  placeholder="Ex: 10"
+                  className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+                />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {addError && (
+          <p className="font-body text-sm text-error">{addError}</p>
+        )}
+      </BottomSheet>
+
+      <BottomSheet
+        isOpen={showAssignPack}
+        onClose={() => { setShowAssignPack(false); setAssignPackError(""); }}
+        title="Atribuir pack"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => { setShowAssignPack(false); setAssignPackError(""); }}
+              className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              disabled={!assignPackId || assigningPack}
+              onClick={async () => {
+                if (!selectedStudent || !assignPackId) return;
+                setAssignPackError("");
+                setAssigningPack(true);
+                const res = await buyPack(selectedStudent.id, assignPackId, schoolId, assignRemainingLessons ? Number(assignRemainingLessons) : undefined);
+                if (res.ok) {
+                  setShowAssignPack(false);
+                  const profile = await getStudentProfile(selectedStudent.id, schoolId);
+                  if (profile) setStudentProfile(profile);
+                  router.refresh();
+                } else {
+                  setAssignPackError(res.error ?? "Erro ao atribuir pack");
+                }
+                setAssigningPack(false);
+              }}
+              className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95 disabled:opacity-50"
+            >
+              {assigningPack ? "A atribuir..." : "Confirmar"}
+            </button>
+          </>
+        }
+      >
+        {assignPackError && (
+          <p className="font-body text-sm text-error">{assignPackError}</p>
+        )}
+
+        {assignPacks.length === 0 ? (
+          <p className="font-body text-sm text-text-muted">Nenhum pack disponível. Cria packs nos Serviços primeiro.</p>
+        ) : (
+          <>
+            <div>
+              <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">Pack</label>
+              <div className="relative">
+                <select
+                  value={assignPackId}
+                  onChange={(e) => { setAssignPackId(e.target.value); setAssignPackError(""); }}
+                  className="w-full appearance-none rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground outline-none focus:outline-2 focus:outline-accent"
                 >
-                  {addSaving ? "A adicionar..." : "Adicionar"}
-                </button>
+                  <option value="">Selecionar pack</option>
+                  {assignPacks.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name} — {p.total_lessons} aulas — {(p.price_cents / 100).toFixed(2).replace(".", ",")}€</option>
+                  ))}
+                </select>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted">
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
               </div>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Assign pack modal */}
-      {showAssignPack && (
-        <div className="fixed inset-0 z-[70] flex items-end md:items-center justify-center bg-black/50 md:px-5" onClick={() => setShowAssignPack(false)}>
-          <div className="w-full max-w-md rounded-t-2xl md:rounded-2xl bg-surface p-6 pb-10 md:pb-6" onClick={(e) => e.stopPropagation()}>
-            <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted md:hidden" />
-            <h3 className="font-heading text-xl font-bold text-foreground mb-4">Atribuir pack</h3>
-
-            {assignPackError && (
-              <p className="mb-4 font-body text-sm text-error">{assignPackError}</p>
-            )}
-
-            {assignPacks.length === 0 ? (
-              <p className="font-body text-sm text-text-muted mb-6">Nenhum pack disponível. Cria packs nos Serviços primeiro.</p>
-            ) : (
-              <div className="space-y-4">
-                <div>
-                  <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">Pack</label>
-                  <div className="relative">
-                    <select
-                      value={assignPackId}
-                      onChange={(e) => { setAssignPackId(e.target.value); setAssignPackError(""); }}
-                      className="w-full appearance-none rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground outline-none focus:outline-2 focus:outline-accent"
-                    >
-                      <option value="">Selecionar pack</option>
-                      {assignPacks.map((p) => (
-                        <option key={p.id} value={p.id}>{p.name} — {p.total_lessons} aulas — {(p.price_cents / 100).toFixed(2).replace(".", ",")}€</option>
-                      ))}
-                    </select>
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted">
-                      <path d="m6 9 6 6 6-6" />
-                    </svg>
-                  </div>
-                </div>
-                {assignPackId && (
-                  <div>
-                    <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
-                      Aulas restantes <span className="text-text-muted font-normal">(opcional)</span>
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={assignRemainingLessons}
-                      onChange={(e) => setAssignRemainingLessons(e.target.value)}
-                      placeholder="Por defeito: todas as aulas do pack"
-                      className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
-                    />
-                  </div>
-                )}
+            {assignPackId && (
+              <div>
+                <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+                  Aulas restantes <span className="text-text-muted font-normal">(opcional)</span>
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={assignRemainingLessons}
+                  onChange={(e) => setAssignRemainingLessons(e.target.value)}
+                  placeholder="Por defeito: todas as aulas do pack"
+                  className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+                />
               </div>
             )}
+          </>
+        )}
+      </BottomSheet>
 
-            <div className="flex gap-3 mt-6">
-              <button
-                type="button"
-                onClick={() => { setShowAssignPack(false); setAssignPackError(""); }}
-                className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                disabled={!assignPackId || assigningPack}
-                onClick={async () => {
-                  if (!selectedStudent || !assignPackId) return;
-                  setAssignPackError("");
-                  setAssigningPack(true);
-                  const res = await buyPack(selectedStudent.id, assignPackId, schoolId, assignRemainingLessons ? Number(assignRemainingLessons) : undefined);
-                  if (res.ok) {
-                    setShowAssignPack(false);
-                    const profile = await getStudentProfile(selectedStudent.id, schoolId);
-                    if (profile) setStudentProfile(profile);
-                    router.refresh();
-                  } else {
-                    setAssignPackError(res.error ?? "Erro ao atribuir pack");
-                  }
-                  setAssigningPack(false);
-                }}
-                className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95 disabled:opacity-50"
-              >
-                {assigningPack ? "A atribuir..." : "Confirmar"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <BottomSheet
+        isOpen={showEditPack && !!studentProfile?.activePack}
+        onClose={() => { setShowEditPack(false); setEditPackError(""); }}
+        title="Editar pack"
+        showHandle
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => { setShowEditPack(false); setEditPackError(""); }}
+              className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              disabled={editPackSaving}
+              onClick={async () => {
+                if (!studentProfile?.activePack || !selectedStudent) return;
+                setEditPackError("");
+                setEditPackSaving(true);
+                const res = await updatePackRemaining(
+                  studentProfile.activePack.id,
+                  schoolId,
+                  Number(editPackRemaining)
+                );
+                if (res.ok) {
+                  setShowEditPack(false);
+                  const profile = await getStudentProfile(selectedStudent.id, schoolId);
+                  if (profile) setStudentProfile(profile);
+                  router.refresh();
+                } else {
+                  setEditPackError(res.error ?? "Erro ao editar pack");
+                }
+                setEditPackSaving(false);
+              }}
+              className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95 disabled:opacity-50"
+            >
+              {editPackSaving ? "A guardar..." : "Guardar"}
+            </button>
+          </>
+        }
+      >
+        <p className="font-body text-sm text-text-secondary mb-4">
+          {studentProfile?.activePack?.name}
+        </p>
+        <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+          Aulas restantes
+        </label>
+        <input
+          type="number"
+          min="0"
+          max="100"
+          value={editPackRemaining}
+          onChange={(e) => setEditPackRemaining(e.target.value)}
+          className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+        />
+        {editPackError && (
+          <p className="font-body text-xs text-error">{editPackError}</p>
+        )}
+      </BottomSheet>
 
-      {/* Edit pack remaining lessons */}
-      {showEditPack && studentProfile?.activePack && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-10">
-            <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted" />
-            <h3 className="font-heading text-2xl font-bold text-foreground mb-6">Editar pack</h3>
-            <p className="font-body text-sm text-text-secondary mb-4">
-              {studentProfile.activePack.name}
-            </p>
-            <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
-              Aulas restantes
-            </label>
-            <input
-              type="number"
-              min="0"
-              max="100"
-              value={editPackRemaining}
-              onChange={(e) => setEditPackRemaining(e.target.value)}
-              className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
-            />
-            {editPackError && (
-              <p className="mt-2 font-body text-xs text-error">{editPackError}</p>
-            )}
-            <div className="flex gap-3 mt-6">
-              <button
-                type="button"
-                onClick={() => { setShowEditPack(false); setEditPackError(""); }}
-                className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                disabled={editPackSaving}
-                onClick={async () => {
-                  if (!studentProfile?.activePack || !selectedStudent) return;
-                  setEditPackError("");
-                  setEditPackSaving(true);
-                  const res = await updatePackRemaining(
-                    studentProfile.activePack.id,
-                    schoolId,
-                    Number(editPackRemaining)
-                  );
-                  if (res.ok) {
-                    setShowEditPack(false);
-                    const profile = await getStudentProfile(selectedStudent.id, schoolId);
-                    if (profile) setStudentProfile(profile);
-                    router.refresh();
-                  } else {
-                    setEditPackError(res.error ?? "Erro ao editar pack");
-                  }
-                  setEditPackSaving(false);
-                }}
-                className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95 disabled:opacity-50"
-              >
-                {editPackSaving ? "A guardar..." : "Guardar"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete pack confirmation */}
-      {showDeletePackConfirm && studentProfile?.activePack && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-5">
-          <div className="w-full max-w-sm rounded-2xl bg-surface p-6 text-center">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-error/10">
-              <TrashIcon className="h-6 w-6 text-error" />
-            </div>
-            <h3 className="font-heading text-xl font-bold text-foreground mb-2">Eliminar pack</h3>
-            <p className="font-body text-sm text-text-secondary mb-6">
-              Tens a certeza que queres eliminar o pack "{studentProfile.activePack.name}" deste aluno?
-            </p>
-            {editPackError && (
-              <p className="mb-4 font-body text-xs text-error">{editPackError}</p>
-            )}
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => { setShowDeletePackConfirm(false); }}
-                className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                disabled={deletingPack}
-                onClick={async () => {
-                  if (!studentProfile?.activePack) return;
-                  setDeletingPack(true);
-                  const res = await cancelPackPurchase(studentProfile.activePack.id, schoolId);
-                  if (res.ok) {
-                    setShowDeletePackConfirm(false);
-                    setStudentProfile(prev => prev ? { ...prev, activePack: null } : null);
-                    router.refresh();
-                  } else {
-                    setEditPackError(res.error ?? "Erro ao eliminar pack");
-                  }
-                  setDeletingPack(false);
-                }}
-                className="flex-1 rounded-xl bg-error py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95 disabled:opacity-50"
-              >
-                Sim, eliminar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        isOpen={showDeletePackConfirm && !!studentProfile?.activePack}
+        onClose={() => { setShowDeletePackConfirm(false); }}
+        onConfirm={async () => {
+          if (!studentProfile?.activePack) return;
+          setDeletingPack(true);
+          const res = await cancelPackPurchase(studentProfile.activePack.id, schoolId);
+          if (res.ok) {
+            setStudentProfile(prev => prev ? { ...prev, activePack: null } : null);
+            router.refresh();
+          } else {
+            setEditPackError(res.error ?? "Erro ao eliminar pack");
+          }
+          setDeletingPack(false);
+        }}
+        title="Eliminar pack"
+        message={`Tens a certeza que queres eliminar o pack "${studentProfile?.activePack?.name}" deste aluno?`}
+        confirmLabel="Sim, eliminar"
+        cancelLabel="Cancelar"
+        variant="danger"
+        icon={<TrashIcon className="h-6 w-6 text-error" />}
+      />
 
     </>
   );

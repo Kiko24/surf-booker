@@ -23,7 +23,7 @@ export default function PrivacidadePage() {
           <p>Utilizamos cookies essenciais para o funcionamento da plataforma. Não usamos cookies de rastreio de terceiros para publicidade.</p>
           <h2 className="font-heading text-lg font-bold text-gray-900">5. Os Teus Direitos</h2>
           <p>Podes solicitar a exportação ou eliminação dos teus dados a qualquer momento através do nosso formulário de contacto.</p>
-          <p className="text-gray-500 pt-4">Este documento serve como placeholder. Consulta um advogado para versão final.</p>
+
         </div>
       </div>
     </main>

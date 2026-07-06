@@ -72,7 +72,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 |--------|------|-------|
 | id | uuid PK | |
 | school_id | uuid FK → schools | |
-| name | text | |
+| name | text | partial unique index per school, excludes aluguer (migration 0023) |
 | description | text? | max 1000 (added manually, migration 0019) |
 | default_duration_minutes | int | |
 | price_cents | int | |
@@ -296,27 +296,32 @@ src/
 │               └── mais-view.tsx        # Business info form, instructor upload (desktop + mobile), showcase images
 │
 └── supabase/
-    ├── migrations/                      # SQL migration files (0001-0019)
-    │   ├── 0001_schools_rls.sql
-    │   ├── 0002_students_school_students.sql
-    │   ├── 0003_sessions.sql
-    │   ├── 0004_sessions_cascade.sql
-    │   ├── 0005_booking_groups.sql
-    │   ├── 0006_bookings.sql
-    │   ├── 0007_audit_logs_class_types.sql
-    │   ├── 0008_schools_table.sql
-    │   ├── 0009_school_slug.sql
-    │   ├── 0010_school_slug_check.sql
-    │   ├── 0011_favorites_rls.sql
-    │   ├── 0012_schools_public_policies.sql
+    ├── migrations/                      # SQL migration files (0001-0022)
+    │   ├── 0001_init.sql
+    │   ├── 0002_rls.sql
+    │   ├── 0003_profiles_and_class_types.sql
+    │   ├── 0004_students_insert_policy.sql
+    │   ├── 0005_audit_logs.sql
+    │   ├── 0007_service_refactor.sql
+    │   ├── 0008_instructors_rls.sql
+    │   ├── 0008_school_images.sql
+    │   ├── 0009_instructor_and_payment.sql
+    │   ├── 0010_alert_dismissals.sql
+    │   ├── 0011_school_settings.sql
+    │   ├── 0011_waiver_signed.sql
+    │   ├── 0012_add_completed_status.sql
     │   ├── 0013_class_types_category.sql
-    │   ├── 0014_schools_phone.sql
-    │   ├── 0015_instructors_table.sql
+    │   ├── 0014_favorites.sql
+    │   ├── 0014_school_phone.sql
+    │   ├── 0015_set_service_categories.sql
     │   ├── 0016_class_types_total_lessons.sql
-    │   ├── 0017_school_images.sql
+    │   ├── 0017_instructor_avatars_bucket.sql
     │   ├── 0018_storage_bucket_policies.sql
-    │   └── 0019_class_types_description.sql
-    └── seed-test-session.sql            # Test sessions for June 4-5 2026 (BSS)
+    │   ├── 0019_class_types_description.sql
+    │   ├── 0020_atomic_pack_decrement.sql
+    │   ├── 0021_student_self_service.sql
+    │   └── 0022_fix_rls_recursion.sql
+    │   └── 0023_allow_duplicate_rental_names.sql
 ```
 
 ## Supabase Client Usage
@@ -565,6 +570,7 @@ SELECT id, full_name FROM students WHERE id IN (...);
 26. **Student identified by email** across pack purchase and booking — both `comprarPackPublico()` and `criarReservaPublica()` call `findOrCreateStudent()` which reuses existing students by email + school
 27. **Theme initialisation via in-body sync script** (no blocking `<head>` script) — runs during HTML parsing before paint, applies `.light` for public pages; `ThemeInit` useEffect restores localStorage preference for dashboard pages
 28. **Inline scripts stripped from `<head>` by Next.js** — plain `<script>` tags with `dangerouslySetInnerHTML` in `<body>` render and execute correctly
+29. **Rental grouping by name**: `getPublicSchoolData()` collapses same-name rentals (aluguer) into one `PublicService` with a `rental_options[]` array; `ServiceCard` shows duration chips; detail modal and ServicePicker right column show a duration/price selector; bottom bar and `handleContinue` use `selectedRentalVariantId` (or fall back to the first option). `comprarPackPublico()` receives the variant's `class_type_id` when purchasing a grouped rental.
 
 ### Landing Page — Responsive Layout
 - Breakpoints: `sm: 640px`, `md: 768px`, `lg: 1024px`, `xl: 1280px`, `2xl: 1440px` (custom)
@@ -583,6 +589,36 @@ SELECT id, full_name FROM students WHERE id IN (...);
 6. Only commit when explicitly asked
 7. For public page work: always use `createAdminClient()` for data fetching (bypass RLS); never send service_role key to client
 8. All copy must be in Portuguese (PT)
+
+## Progress
+
+### Cleanup Completed
+| Item | What |
+|------|------|
+| P1 | `middleware.ts` → `proxy.ts` rename |
+| P2 | `expose-debug.ts` deleted |
+| P3 | `landing-page-view.tsx` (647 linhas) → 8 componentes em `_components/landing/` |
+| P4 | `schemas.ts` (496 linhas) → `validation/schemas/{helpers,schools,students,...}.ts` |
+| P6 | Lógica signup extraída para `lib/auth/signup.ts` |
+| P15 | `requireOwner()` extraído para `lib/school.ts` |
+| P19 | `calendario/actions.ts` e `mais/actions.ts` partidos por domínio |
+| P20 | `StepPersonal` partilhado em `components/auth/step-personal.tsx` |
+| P10+17 | `AGENTS.md` atualizado com 24 migrations |
+| P18 | Ref `seed-test-session` removida |
+| Low | `eslint.json` apagado; pastas vazias removidas; dead code removido; -3 unused images; placeholder disclaimers removidos |
+| CSS | `react-datepicker` + `fadeSlideDown` dead CSS removido de `global.css` |
+| Zod | `cancelledAtRefinement()` extraído para `helpers.ts`, aplicado em 4 schemas de bookings |
+
+### Pendentes (MEDIUM)
+- ErrorBoundary partilhado (não existe atualmente)
+- Extrair padrão bottom-sheet modal para componente reutilizável (14+ instâncias)
+- Extrair `ConfirmDialog` (4 instâncias de delete confirmation)
+
+### Pendentes (HIGH — após MEDIUM)
+- `console.log` em produção
+- Botões sem `type` explícito
+- `step-email` duplicado
+- `aria-labels` em falta
 
 ## Security Checks
 1. Security is the most important thing on the software, NEVER compromise it for whatever reason.

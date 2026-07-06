@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useCallback, useRef, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { addSchoolImage, deleteImage, getImages, saveInstructor, deleteInstructor, getInstructors, getSchoolSettings, saveSchoolSettings, saveSchoolInfo, saveProfile, saveSchoolLogo, getWaiverVersions, getWaiverAcceptances, saveWaiverVersion, type SchoolImage, type Instructor, type SchoolSettings, type WaiverVersion, type WaiverAcceptanceRow } from "../actions";
 import { getMaisData } from "../../actions";
 
@@ -888,699 +889,639 @@ export function MaisView({ schoolId }: Props) {
         </div>
       </main>
 
-      {showProfile && (
-        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 md:hidden" onClick={() => setShowProfile(false)}>
-          <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-24 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted" />
-
-            <div className="flex items-center gap-4 mb-6">
-              <div>
-                <h3 className="font-heading text-xl font-bold text-foreground">Editar Perfil</h3>
-                <p className="font-body text-sm text-text-secondary">Atualiza os teus dados</p>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
-                  Nome <span className="text-error">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={profileName}
-                  onChange={(e) => setProfileName(e.target.value)}
-                  placeholder="O teu nome"
-                  className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
-                />
-              </div>
-
-              <div>
-                <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
-                  Email <span className="text-error">*</span>
-                </label>
-                <input
-                  type="email"
-                  value={profileEmail}
-                  onChange={(e) => setProfileEmail(e.target.value)}
-                  placeholder="O teu email"
-                  className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
-                />
-              </div>
-
-              <div>
-                <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
-                  Telemóvel <span className="text-error">*</span>
-                </label>
-                <input
-                  type="tel"
-                  value={profilePhone}
-                  onChange={(e) => setProfilePhone(e.target.value)}
-                  placeholder="Telemóvel"
-                  className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
-                />
-              </div>
-
-              <div>
-                <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
-                  Palavra-passe <span className="text-text-muted">(opcional)</span>
-                </label>
-                <input
-                  type="password"
-                  value={profilePassword}
-                  onChange={(e) => setProfilePassword(e.target.value)}
-                  placeholder="Nova palavra-passe"
-                  className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
-                />
-              </div>
-
-              <div>
-                <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
-                  Confirmar palavra-passe <span className="text-text-muted">(opcional)</span>
-                </label>
-                <input
-                  type="password"
-                  value={profileConfirmPassword}
-                  onChange={(e) => setProfileConfirmPassword(e.target.value)}
-                  placeholder="Repetir nova palavra-passe"
-                  className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
-                />
-                {profilePassword && profileConfirmPassword && profilePassword !== profileConfirmPassword && (
-                  <p className="mt-1 font-body text-sm text-error">As palavras-passe não coincidem</p>
-                )}
-              </div>
-
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowProfile(false)}
-                  className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  disabled={profileSaving}
-                  onClick={async () => {
-                    setProfileError("");
-                    if (profilePassword && profilePassword !== profileConfirmPassword) { setProfileError("As palavras-passe não coincidem"); return; }
-                    setProfileSaving(true);
-                    const res = await saveProfile({ name: profileName, email: profileEmail, phone: profilePhone, password: profilePassword || undefined });
-                    setProfileSaving(false);
-                    if (!res.ok) { setProfileError(res.error ?? "Erro ao guardar"); return; }
-                    setShowProfile(false);
-                  }}
-                  className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95 disabled:opacity-50"
-                >
-                  {profileSaving ? "A guardar..." : "Guardar"}
-                </button>
-              </div>
-              {profileError && <p className="font-body text-sm text-error mt-2">{profileError}</p>}
-            </div>
-          </div>
+      <BottomSheet
+        isOpen={showProfile}
+        onClose={() => setShowProfile(false)}
+        title="Editar Perfil"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setShowProfile(false)}
+              className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              disabled={profileSaving}
+              onClick={async () => {
+                setProfileError("");
+                if (profilePassword && profilePassword !== profileConfirmPassword) { setProfileError("As palavras-passe não coincidem"); return; }
+                setProfileSaving(true);
+                const res = await saveProfile({ name: profileName, email: profileEmail, phone: profilePhone, password: profilePassword || undefined });
+                setProfileSaving(false);
+                if (!res.ok) { setProfileError(res.error ?? "Erro ao guardar"); return; }
+                setShowProfile(false);
+              }}
+              className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95 disabled:opacity-50"
+            >
+              {profileSaving ? "A guardar..." : "Guardar"}
+            </button>
+          </>
+        }
+      >
+        <p className="font-body text-sm text-text-secondary -mt-4">Atualiza os teus dados</p>
+        <div>
+          <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+            Nome <span className="text-error">*</span>
+          </label>
+          <input
+            type="text"
+            value={profileName}
+            onChange={(e) => setProfileName(e.target.value)}
+            placeholder="O teu nome"
+            className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+          />
         </div>
-      )}
+        <div>
+          <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+            Email <span className="text-error">*</span>
+          </label>
+          <input
+            type="email"
+            value={profileEmail}
+            onChange={(e) => setProfileEmail(e.target.value)}
+            placeholder="O teu email"
+            className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+          />
+        </div>
+        <div>
+          <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+            Telemóvel <span className="text-error">*</span>
+          </label>
+          <input
+            type="tel"
+            value={profilePhone}
+            onChange={(e) => setProfilePhone(e.target.value)}
+            placeholder="Telemóvel"
+            className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+          />
+        </div>
+        <div>
+          <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+            Palavra-passe <span className="text-text-muted">(opcional)</span>
+          </label>
+          <input
+            type="password"
+            value={profilePassword}
+            onChange={(e) => setProfilePassword(e.target.value)}
+            placeholder="Nova palavra-passe"
+            className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+          />
+        </div>
+        <div>
+          <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+            Confirmar palavra-passe <span className="text-text-muted">(opcional)</span>
+          </label>
+          <input
+            type="password"
+            value={profileConfirmPassword}
+            onChange={(e) => setProfileConfirmPassword(e.target.value)}
+            placeholder="Repetir nova palavra-passe"
+            className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+          />
+          {profilePassword && profileConfirmPassword && profilePassword !== profileConfirmPassword && (
+            <p className="mt-1 font-body text-sm text-error">As palavras-passe não coincidem</p>
+          )}
+        </div>
+        {profileError && <p className="font-body text-sm text-error">{profileError}</p>}
+      </BottomSheet>
 
-      {/* Company Modal */}
-      {showCompany && (
-        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 md:hidden" onClick={() => setShowCompany(false)}>
-          <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-24 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted" />
-
-            <div className="flex items-center gap-4 mb-6">
-              {schoolLogoUrl ? (
-                <img src={schoolLogoUrl} alt="" className="h-14 w-14 shrink-0 rounded-full object-cover" />
-              ) : (
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-background text-xl font-bold text-accent">
-                  {schoolName?.charAt(0).toUpperCase() ?? "E"}
-                </div>
-              )}
-              <div>
-                <h3 className="font-heading text-xl font-bold text-foreground">Editar Empresa</h3>
-                <p className="font-body text-sm text-text-secondary">Atualiza os dados do negócio</p>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
-                  Nome do negócio <span className="text-error">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={companyName}
-                  onChange={(e) => setCompanyName(e.target.value)}
-                  placeholder="Nome da escola"
-                  className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
-                />
-              </div>
-
-              <div>
-                <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
-                  Localização
-                </label>
-                <input
-                  type="text"
-                  value={companyLocation}
-                  onChange={(e) => setCompanyLocation(e.target.value)}
-                  placeholder="Ex: Praia do Guincho, Cascais"
-                  className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
-                />
-              </div>
-
-              <div>
-                <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
-                  Contacto (WhatsApp) <span className="text-text-muted">(opcional)</span>
-                </label>
-                <input
-                  type="text"
-                  value={companyPhone}
-                  onChange={(e) => setCompanyPhone(e.target.value)}
-                  placeholder="+351 9XXXXXXXX"
-                  className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
-                />
-              </div>
-
-              <div>
-                <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
-                  Descrição
-                </label>
-                <textarea
-                  value={companyDescription}
-                  onChange={(e) => setCompanyDescription(e.target.value)}
-                  placeholder="Breve descrição da tua escola de surf"
-                  rows={2}
-                  className="w-full resize-none rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent focus:outline-offset-[-2px]"
-                />
-              </div>
-
-              {/* Images gallery */}
-              <div className="pt-4 border-t border-foreground/10">
-                <p className="font-body text-sm font-semibold text-text-secondary mb-4">Imagens do negócio</p>
-                <p className="mb-4 text-center font-body text-sm text-text-secondary">
-                  {images.length} / 6 imagens
-                </p>
-
-                {images.length < 6 && (
-                <div className="mb-6 flex justify-center">
+      <BottomSheet
+        isOpen={showCompany}
+        onClose={() => setShowCompany(false)}
+        title="Editar Empresa"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setShowCompany(false)}
+              className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              disabled={companySaving}
+              onClick={async () => {
+                if (!schoolId) return;
+                setCompanySaving(true);
+                const res = await saveSchoolInfo(schoolId, {
+                  name: companyName,
+                  location: companyLocation,
+                  description: companyDescription,
+                  phone: companyPhone,
+                });
+                if (res.ok) setShowCompany(false);
+                setCompanySaving(false);
+              }}
+              className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95 disabled:opacity-50"
+            >
+              {companySaving ? "A guardar..." : "Guardar"}
+            </button>
+          </>
+        }
+      >
+        <p className="font-body text-sm text-text-secondary -mt-4">Atualiza os dados do negócio</p>
+        <div>
+          <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+            Nome do negócio <span className="text-error">*</span>
+          </label>
+          <input
+            type="text"
+            value={companyName}
+            onChange={(e) => setCompanyName(e.target.value)}
+            placeholder="Nome da escola"
+            className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+          />
+        </div>
+        <div>
+          <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+            Localização
+          </label>
+          <input
+            type="text"
+            value={companyLocation}
+            onChange={(e) => setCompanyLocation(e.target.value)}
+            placeholder="Ex: Praia do Guincho, Cascais"
+            className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+          />
+        </div>
+        <div>
+          <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+            Contacto (WhatsApp) <span className="text-text-muted">(opcional)</span>
+          </label>
+          <input
+            type="text"
+            value={companyPhone}
+            onChange={(e) => setCompanyPhone(e.target.value)}
+            placeholder="+351 9XXXXXXXX"
+            className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+          />
+        </div>
+        <div>
+          <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+            Descrição
+          </label>
+          <textarea
+            value={companyDescription}
+            onChange={(e) => setCompanyDescription(e.target.value)}
+            placeholder="Breve descrição da tua escola de surf"
+            rows={2}
+            className="w-full resize-none rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent focus:outline-offset-[-2px]"
+          />
+        </div>
+        <div className="pt-4 border-t border-foreground/10">
+          <p className="font-body text-sm font-semibold text-text-secondary mb-4">Imagens do negócio</p>
+          <p className="mb-4 text-center font-body text-sm text-text-secondary">
+            {images.length} / 6 imagens
+          </p>
+          {images.length < 6 && (
+          <div className="mb-6 flex justify-center">
+            <button
+              type="button"
+              onClick={() => imageFileRef.current?.click()}
+              className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border-2 border-dashed border-text-muted bg-[#2A2A2A] transition-colors hover:border-accent hover:bg-accent/10"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8 text-text-muted">
+                <line x1="12" x2="12" y1="5" y2="19" />
+                <line x1="5" x2="19" y1="12" y2="12" />
+              </svg>
+            </button>
+            <input
+              ref={imageFileRef}
+              type="file"
+              accept="image/png,image/webp,image/jpeg"
+              className="hidden"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file || !schoolId) return;
+                if (!["image/png", "image/webp", "image/jpeg"].includes(file.type)) {
+                  alert("Formato não permitido. Usa PNG, WebP ou JPEG.");
+                  return;
+                }
+                if (file.size > 2 * 1024 * 1024) {
+                  alert("Imagem demasiado grande. Máximo 2MB.");
+                  return;
+                }
+                const res = await addSchoolImage(schoolId, file);
+                if (!res.ok) { console.error("upload error:", res.error); return; }
+                const data = await getImages(schoolId);
+                setImages(data);
+              }}
+            />
+          </div>
+          )}
+          {images.length === 0 ? (
+            <p className="py-8 text-center font-body text-sm text-text-secondary">
+              Nenhuma imagem adicionada ainda
+            </p>
+          ) : (
+            <div className="grid grid-cols-3 gap-2">
+              {images.map((img) => (
+                <div key={img.id} className="relative aspect-square overflow-hidden rounded-xl bg-[#2A2A2A]">
                   <button
                     type="button"
-                    onClick={() => imageFileRef.current?.click()}
-                    className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border-2 border-dashed border-text-muted bg-[#2A2A2A] transition-colors hover:border-accent hover:bg-accent/10"
+                    onClick={() => setLightboxImage(img.public_url)}
+                    className="h-full w-full"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8 text-text-muted">
-                      <line x1="12" x2="12" y1="5" y2="19" />
-                      <line x1="5" x2="19" y1="12" y2="12" />
+                    <img
+                      src={img.public_url}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (schoolId) {
+                        await deleteImage(img.id);
+                        const data = await getImages(schoolId);
+                        setImages(data);
+                      }
+                    }}
+                    className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-error text-white shadow transition-transform active:scale-90"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+                      <path d="M18 6 6 18" />
+                      <path d="m6 6 12 12" />
                     </svg>
                   </button>
-                  <input
-                    ref={imageFileRef}
-                    type="file"
-                    accept="image/png,image/webp,image/jpeg"
-                    className="hidden"
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (!file || !schoolId) return;
-                      if (!["image/png", "image/webp", "image/jpeg"].includes(file.type)) {
-                        alert("Formato não permitido. Usa PNG, WebP ou JPEG.");
-                        return;
-                      }
-                      if (file.size > 2 * 1024 * 1024) {
-                        alert("Imagem demasiado grande. Máximo 2MB.");
-                        return;
-                      }
-                      const res = await addSchoolImage(schoolId, file);
-                      if (!res.ok) { console.error("upload error:", res.error); return; }
-                      const data = await getImages(schoolId);
-                      setImages(data);
-                    }}
-                  />
                 </div>
-                )}
-
-                {images.length === 0 ? (
-                  <p className="py-8 text-center font-body text-sm text-text-secondary">
-                    Nenhuma imagem adicionada ainda
-                  </p>
-                ) : (
-                  <div className="grid grid-cols-3 gap-2">
-                    {images.map((img) => (
-                      <div key={img.id} className="relative aspect-square overflow-hidden rounded-xl bg-[#2A2A2A]">
-                        <button
-                          type="button"
-                          onClick={() => setLightboxImage(img.public_url)}
-                          className="h-full w-full"
-                        >
-                          <img
-                            src={img.public_url}
-                            alt=""
-                            className="h-full w-full object-cover"
-                          />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            if (schoolId) {
-                              await deleteImage(img.id);
-                              const data = await getImages(schoolId);
-                              setImages(data);
-                            }
-                          }}
-                          className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-error text-white shadow transition-transform active:scale-90"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
-                            <path d="M18 6 6 18" />
-                            <path d="m6 6 12 12" />
-                          </svg>
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowCompany(false)}
-                  className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  disabled={companySaving}
-                  onClick={async () => {
-                    if (!schoolId) return;
-                    setCompanySaving(true);
-                    const res = await saveSchoolInfo(schoolId, {
-                      name: companyName,
-                      location: companyLocation,
-                      description: companyDescription,
-                      phone: companyPhone,
-                    });
-                    if (res.ok) setShowCompany(false);
-                    setCompanySaving(false);
-                  }}
-                  className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95 disabled:opacity-50"
-                >
-                  {companySaving ? "A guardar..." : "Guardar"}
-                </button>
-              </div>
+              ))}
             </div>
+          )}
+        </div>
+      </BottomSheet>
+
+      <BottomSheet
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        title="Definições"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setShowSettings(false)}
+              className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              disabled={settingsSaving}
+              onClick={async () => {
+                if (!schoolId) return;
+                setSettingsError("");
+                setSettingsSaving(true);
+                const res = await saveSchoolSettings(schoolId, settings);
+                if (res.ok) {
+                  setShowSettings(false);
+                } else {
+                  setSettingsError(res.error ?? "Erro ao guardar definições");
+                }
+                setSettingsSaving(false);
+              }}
+              className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95 disabled:opacity-50"
+            >
+              {settingsSaving ? "A guardar..." : "Guardar"}
+            </button>
+          </>
+        }
+      >
+        {settingsError && <p className="font-body text-sm text-error">{settingsError}</p>}
+
+        <div>
+          <p className="font-heading text-base font-bold text-foreground mb-2">Política de cancelamento</p>
+          <p className="font-body text-sm text-text-secondary mb-4">
+            Os alunos podem cancelar e receber crédito de volta até
+          </p>
+          <div className="flex items-center gap-3 mb-3">
+            <input
+              type="number"
+              min={1}
+              max={720}
+              value={settings.cancellation_window_hours}
+              onChange={(e) => setSettings((prev) => ({ ...prev, cancellation_window_hours: Number(e.target.value) }))}
+              className="w-20 rounded-xl bg-[#2A2A2A] px-4 py-3 text-center text-foreground outline-none focus:outline-2 focus:outline-accent [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            />
+            <span className="font-body text-sm text-text-secondary">horas antes da aula</span>
+          </div>
+          <div className="rounded-xl bg-[#2A2A2A] p-3 space-y-1">
+            <p className="font-body text-xs text-text-secondary">
+              • Se cancelar dentro deste prazo → <span className="text-success">crédito devolvido</span>
+            </p>
+            <p className="font-body text-xs text-text-secondary">
+              • Se cancelar depois → <span className="text-error">crédito não devolvido</span>
+            </p>
           </div>
         </div>
-      )}
 
-      {/* Settings Modal */}
-      {showSettings && (
-        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 md:hidden" onClick={() => setShowSettings(false)}>
-          <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-24 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted" />
+        <div className="h-px bg-foreground/10" />
 
-            <h3 className="font-heading text-2xl font-bold text-foreground mb-6">Definições</h3>
-
-            {settingsError && <p className="font-body text-sm text-error mb-4">{settingsError}</p>}
-
-            {/* Política de cancelamento */}
-            <div className="mb-6">
-              <p className="font-heading text-base font-bold text-foreground mb-2">Política de cancelamento</p>
-              <p className="font-body text-sm text-text-secondary mb-4">
-                Os alunos podem cancelar e receber crédito de volta até
-              </p>
-              <div className="flex items-center gap-3 mb-3">
-                <input
-                  type="number"
-                  min={1}
-                  max={720}
-                  value={settings.cancellation_window_hours}
-                  onChange={(e) => setSettings((prev) => ({ ...prev, cancellation_window_hours: Number(e.target.value) }))}
-                  className="w-20 rounded-xl bg-[#2A2A2A] px-4 py-3 text-center text-foreground outline-none focus:outline-2 focus:outline-accent [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                />
-                <span className="font-body text-sm text-text-secondary">horas antes da aula</span>
-              </div>
-              <div className="rounded-xl bg-[#2A2A2A] p-3 space-y-1">
-                <p className="font-body text-xs text-text-secondary">
-                  • Se cancelar dentro deste prazo → <span className="text-success">crédito devolvido</span>
-                </p>
-                <p className="font-body text-xs text-text-secondary">
-                  • Se cancelar depois → <span className="text-error">crédito não devolvido</span>
-                </p>
-              </div>
-            </div>
-
-            <div className="h-px bg-foreground/10 my-6" />
-
-            {/* Threshold de alertas */}
-            <div className="mb-6">
-              <p className="font-heading text-base font-bold text-foreground mb-2">Threshold de alertas</p>
-              <p className="font-body text-sm text-text-secondary mb-4">
-                Mostrar alerta de baixa ocupação quando a sessão tiver menos de
-              </p>
-              <div className="flex items-center gap-3">
-                <input
-                  type="number"
-                  min={1}
-                  max={100}
-                  value={settings.low_occupancy_threshold}
-                  onChange={(e) => setSettings((prev) => ({ ...prev, low_occupancy_threshold: Number(e.target.value) }))}
-                  className="w-20 rounded-xl bg-[#2A2A2A] px-4 py-3 text-center text-foreground outline-none focus:outline-2 focus:outline-accent [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                />
-                <span className="font-body text-sm text-text-secondary">% de capacidade</span>
-              </div>
-            </div>
-
-            <div className="h-px bg-foreground/10 my-6" />
-
-            {/* Notificações */}
-            <div className="mb-6">
-              <p className="font-heading text-base font-bold text-foreground mb-4">Notificações</p>
-              <div className="space-y-4">
-                {[
-                  { key: "notify_email_confirmation" as const, label: "Email de confirmação de reserva" },
-                  { key: "notify_reminder_24h" as const, label: "Lembrete 24h antes da aula" },
-                  { key: "notify_sms_cancellation" as const, label: "SMS de cancelamento" },
-                  { key: "notify_new_schedule" as const, label: "Novos horários aos alunos" },
-                ].map((item) => (
-                  <label key={item.key} className="flex items-center justify-between py-1">
-                    <span className="font-body text-sm text-foreground">{item.label}</span>
-                    <button
-                      type="button"
-                      onClick={() => setSettings((prev) => ({ ...prev, [item.key]: !prev[item.key] }))}
-                      className={`relative h-6 w-11 rounded-full transition-colors ${settings[item.key] ? "bg-accent" : "bg-[#2A2A2A]"}`}
-                    >
-                      <span
-                        className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${settings[item.key] ? "translate-x-5" : ""}`}
-                      />
-                    </button>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowSettings(false)}
-                className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                disabled={settingsSaving}
-                onClick={async () => {
-                  if (!schoolId) return;
-                  setSettingsError("");
-                  setSettingsSaving(true);
-                  const res = await saveSchoolSettings(schoolId, settings);
-                  if (res.ok) {
-                    setShowSettings(false);
-                  } else {
-                    setSettingsError(res.error ?? "Erro ao guardar definições");
-                  }
-                  setSettingsSaving(false);
-                }}
-                className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95 disabled:opacity-50"
-              >
-                {settingsSaving ? "A guardar..." : "Guardar"}
-              </button>
-            </div>
+        <div>
+          <p className="font-heading text-base font-bold text-foreground mb-2">Threshold de alertas</p>
+          <p className="font-body text-sm text-text-secondary mb-4">
+            Mostrar alerta de baixa ocupação quando a sessão tiver menos de
+          </p>
+          <div className="flex items-center gap-3">
+            <input
+              type="number"
+              min={1}
+              max={100}
+              value={settings.low_occupancy_threshold}
+              onChange={(e) => setSettings((prev) => ({ ...prev, low_occupancy_threshold: Number(e.target.value) }))}
+              className="w-20 rounded-xl bg-[#2A2A2A] px-4 py-3 text-center text-foreground outline-none focus:outline-2 focus:outline-accent [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            />
+            <span className="font-body text-sm text-text-secondary">% de capacidade</span>
           </div>
         </div>
-      )}
 
-      {/* Instrutor Modal */}
-      {showInstructors && (
-        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 md:hidden" onClick={() => setShowInstructors(false)}>
-          <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-24 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted" />
+        <div className="h-px bg-foreground/10" />
 
-            <h3 className="font-heading text-2xl font-bold text-foreground mb-6">{editingInstrutorId !== null ? "Editar Instrutor" : "Adicionar Instrutor"}</h3>
+        <div>
+          <p className="font-heading text-base font-bold text-foreground mb-4">Notificações</p>
+          <div className="space-y-4">
+            {[
+              { key: "notify_email_confirmation" as const, label: "Email de confirmação de reserva" },
+              { key: "notify_reminder_24h" as const, label: "Lembrete 24h antes da aula" },
+              { key: "notify_sms_cancellation" as const, label: "SMS de cancelamento" },
+              { key: "notify_new_schedule" as const, label: "Novos horários aos alunos" },
+            ].map((item) => (
+              <label key={item.key} className="flex items-center justify-between py-1">
+                <span className="font-body text-sm text-foreground">{item.label}</span>
+                <button
+                  type="button"
+                  onClick={() => setSettings((prev) => ({ ...prev, [item.key]: !prev[item.key] }))}
+                  className={`relative h-6 w-11 rounded-full transition-colors ${settings[item.key] ? "bg-accent" : "bg-[#2A2A2A]"}`}
+                >
+                  <span
+                    className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${settings[item.key] ? "translate-x-5" : ""}`}
+                  />
+                </button>
+              </label>
+            ))}
+          </div>
+        </div>
+      </BottomSheet>
 
-            {/* Avatar upload circle — centered */}
-            <div className="mb-8 flex justify-center">
-              <button
-                type="button"
-                onClick={() => instrutorFileRef.current?.click()}
-                className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-2 border-dashed border-text-muted bg-[#2A2A2A] transition-colors hover:border-accent hover:bg-accent/10"
-              >
-                {instrutorFotoPreview ? (
-                  <img src={instrutorFotoPreview} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8 text-text-muted">
-                    <line x1="12" x2="12" y1="5" y2="19" />
-                    <line x1="5" x2="19" y1="12" y2="12" />
-                  </svg>
-                )}
-              </button>
-              <input
-                ref={instrutorFileRef}
-                type="file"
-                accept="image/png,image/webp,image/jpeg"
-                className="hidden"
-                 onChange={(e) => {
-                  setInstrutorError("");
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  if (!["image/png", "image/webp", "image/jpeg"].includes(file.type)) { setInstrutorError("Formato não permitido. Usa PNG, WebP ou JPEG"); return; }
-                  if (file.size > 1024 * 1024) { setInstrutorError(`Foto demasiado grande. Máximo ${(1024 * 1024) / (1024 * 1024)}MB`); return; }
-                  setInstrutorFotoFile(file);
-                  const reader = new FileReader();
-                  reader.onloadend = () => setInstrutorFotoPreview(reader.result as string);
-                  reader.readAsDataURL(file);
-                }}
-              />
-            </div>
-
-            {/* Inputs below */}
-            <div className="space-y-4">
-              {instrutorError && <p className="font-body text-sm text-error">{instrutorError}</p>}
-              <div>
-                <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
-                  Nome do instrutor <span className="text-error">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={instrutorNome}
-                  onChange={(e) => setInstrutorNome(e.target.value)}
-                  placeholder="Ex: João Silva"
-                  className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
-                />
-              </div>
-              <div>
-                <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
-                  Nível do instrutor
-                </label>
-                <input
-                  type="text"
-                  value={instrutorNivel}
-                  onChange={(e) => setInstrutorNivel(e.target.value)}
-                  placeholder="Ex: Instrutor sénior"
-                  className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
-                />
-              </div>
-            </div>
-
-            {/* Instrutores list */}
-            {instrutores.length > 0 && (
-              <div className="mt-6 space-y-2">
-                {instrutores.map((inst, i) => (
-                  <div key={inst.id} className="flex items-center gap-3 rounded-xl bg-[#2A2A2A] px-4 py-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-background text-sm font-bold text-accent">
-                      {inst.avatar_url ? (
-                        <img src={inst.avatar_url} alt="" className="h-full w-full object-cover" />
-                      ) : (
-                        inst.name.split(" ").map(p => p[0]).join("").substring(0, 2).toUpperCase()
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-body text-sm font-semibold text-foreground truncate">{inst.name}</p>
-                      <p className="font-body text-xs text-text-secondary">Nível {inst.level || "—"}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingInstrutorId(inst.id);
-                        setInstrutorNome(inst.name);
-                        setInstrutorNivel(inst.level);
-                        setInstrutorFotoPreview(null);
-                        setInstrutorFotoFile(null);
-                      }}
-                      className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:text-accent"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                        <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                      </svg>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        if (!schoolId) return;
-                        const res = await deleteInstructor(schoolId, inst.id);
-                        if (res.ok) loadInstructors();
-                      }}
-                      className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:text-error"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                        <path d="M3 6h18" />
-                        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                      </svg>
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="flex gap-3 pt-6">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowInstructors(false);
+      <BottomSheet
+        isOpen={showInstructors}
+        onClose={() => { setShowInstructors(false); setInstrutorNome(""); setInstrutorNivel(""); setInstrutorFotoFile(null); setInstrutorFotoPreview(null); setEditingInstrutorId(null); }}
+        title={editingInstrutorId !== null ? "Editar Instrutor" : "Adicionar Instrutor"}
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                setShowInstructors(false);
+                setInstrutorNome("");
+                setInstrutorNivel("");
+                setInstrutorFotoFile(null);
+                setInstrutorFotoPreview(null);
+                setEditingInstrutorId(null);
+              }}
+              className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
+            >
+              Fechar
+            </button>
+            <button
+              type="button"
+              disabled={instrutorSaving}
+              onClick={async () => {
+                setInstrutorError("");
+                if (!instrutorNome.trim()) { setInstrutorError("O nome é obrigatório"); return; }
+                if (!schoolId) return;
+                setInstrutorSaving(true);
+                const fd = new FormData();
+                if (editingInstrutorId) fd.set("id", editingInstrutorId);
+                fd.set("name", instrutorNome.trim());
+                fd.set("level", instrutorNivel.trim());
+                if (instrutorFotoFile) fd.set("avatar", instrutorFotoFile);
+                const res = await saveInstructor(schoolId, null, fd);
+                if (res.ok) {
                   setInstrutorNome("");
                   setInstrutorNivel("");
                   setInstrutorFotoFile(null);
                   setInstrutorFotoPreview(null);
                   setEditingInstrutorId(null);
-                }}
-                className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
-              >
-                Fechar
-              </button>
-              <button
-                type="button"
-                disabled={instrutorSaving}
-                onClick={async () => {
                   setInstrutorError("");
-                  if (!instrutorNome.trim()) { setInstrutorError("O nome é obrigatório"); return; }
-                  if (!schoolId) return;
-                  setInstrutorSaving(true);
-                  const fd = new FormData();
-                  if (editingInstrutorId) fd.set("id", editingInstrutorId);
-                  fd.set("name", instrutorNome.trim());
-                  fd.set("level", instrutorNivel.trim());
-                  if (instrutorFotoFile) fd.set("avatar", instrutorFotoFile);
-                  const res = await saveInstructor(schoolId, null, fd);
-                  if (res.ok) {
-                    setInstrutorNome("");
-                    setInstrutorNivel("");
-                    setInstrutorFotoFile(null);
-                    setInstrutorFotoPreview(null);
-                    setEditingInstrutorId(null);
-                    setInstrutorError("");
-                    loadInstructors();
-                  } else {
-                    setInstrutorError(res.error ?? "Erro ao guardar");
-                  }
-                  setInstrutorSaving(false);
-                }}
-                className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95 disabled:opacity-50"
-              >
-                {instrutorSaving ? "A guardar..." : editingInstrutorId !== null ? "Guardar" : "Adicionar"}
-              </button>
-            </div>
-          </div>
+                  loadInstructors();
+                } else {
+                  setInstrutorError(res.error ?? "Erro ao guardar");
+                }
+                setInstrutorSaving(false);
+              }}
+              className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95 disabled:opacity-50"
+            >
+              {instrutorSaving ? "A guardar..." : editingInstrutorId !== null ? "Guardar" : "Adicionar"}
+            </button>
+          </>
+        }
+      >
+        <div className="flex justify-center mb-6">
+          <button
+            type="button"
+            onClick={() => instrutorFileRef.current?.click()}
+            className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-2 border-dashed border-text-muted bg-[#2A2A2A] transition-colors hover:border-accent hover:bg-accent/10"
+          >
+            {instrutorFotoPreview ? (
+              <img src={instrutorFotoPreview} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8 text-text-muted">
+                <line x1="12" x2="12" y1="5" y2="19" />
+                <line x1="5" x2="19" y1="12" y2="12" />
+              </svg>
+            )}
+          </button>
+          <input
+            ref={instrutorFileRef}
+            type="file"
+            accept="image/png,image/webp,image/jpeg"
+            className="hidden"
+            onChange={(e) => {
+              setInstrutorError("");
+              const file = e.target.files?.[0];
+              if (!file) return;
+              if (!["image/png", "image/webp", "image/jpeg"].includes(file.type)) { setInstrutorError("Formato não permitido. Usa PNG, WebP ou JPEG"); return; }
+              if (file.size > 1024 * 1024) { setInstrutorError(`Foto demasiado grande. Máximo ${(1024 * 1024) / (1024 * 1024)}MB`); return; }
+              setInstrutorFotoFile(file);
+              const reader = new FileReader();
+              reader.onloadend = () => setInstrutorFotoPreview(reader.result as string);
+              reader.readAsDataURL(file);
+            }}
+          />
         </div>
-      )}
 
-      {/* Waiver Modal */}
-      {showWaivers && (
-        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 md:hidden" onClick={() => setShowWaivers(false)}>
-          <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-24 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted" />
+        {instrutorError && <p className="font-body text-sm text-error">{instrutorError}</p>}
+        <div>
+          <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+            Nome do instrutor <span className="text-error">*</span>
+          </label>
+          <input
+            type="text"
+            value={instrutorNome}
+            onChange={(e) => setInstrutorNome(e.target.value)}
+            placeholder="Ex: João Silva"
+            className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+          />
+        </div>
+        <div>
+          <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
+            Nível do instrutor
+          </label>
+          <input
+            type="text"
+            value={instrutorNivel}
+            onChange={(e) => setInstrutorNivel(e.target.value)}
+            placeholder="Ex: Instrutor sénior"
+            className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+          />
+        </div>
 
-            <h3 className="font-heading text-2xl font-bold text-foreground mb-6">Waivers</h3>
-
-            <div className="space-y-4">
-              <div>
-                <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">Título do waiver</label>
-                <input
-                  type="text"
-                  value={waiverTitle}
-                  onChange={(e) => setWaiverTitle(e.target.value)}
-                  placeholder="Ex: Termos de responsabilidade"
-                  maxLength={150}
-                  className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
-                />
-              </div>
-              <div>
-                <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">Texto do waiver</label>
-                <textarea
-                  value={waiverBody}
-                  onChange={(e) => setWaiverBody(e.target.value)}
-                  placeholder="Escreve aqui os termos que os alunos devem aceitar..."
-                  rows={6}
-                  maxLength={20000}
-                  className="w-full resize-none rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
-                />
-              </div>
-
-              {waiverError && <p className="font-body text-sm text-error">{waiverError}</p>}
-
-              {/* Versions list on mobile */}
-              {waiverVersions.length > 0 && (
-                <div className="pt-4 border-t border-foreground/10">
-                  <p className="font-heading text-base font-bold text-foreground mb-3">Histórico</p>
-                  <div className="space-y-2">
-                    {waiverVersions.map((v) => (
-                      <div key={v.id} className="flex items-center justify-between rounded-xl bg-[#2A2A2A] px-4 py-3">
-                        <div className="min-w-0 flex-1">
-                          <p className="font-body text-sm font-semibold text-foreground truncate">
-                            v{v.version} {v.is_active && <span className="text-xs text-success">(Ativo)</span>}
-                          </p>
-                          <p className="font-body text-xs text-text-secondary">{v.acceptance_count} aceitação(ões)</p>
-                        </div>
-                        {v.acceptance_count > 0 && (
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              if (!schoolId) return;
-                              const rows = await getWaiverAcceptances(schoolId, v.id);
-                              setWaiverAcceptances(rows);
-                              setShowWaiverAcceptances(v.id);
-                            }}
-                            className="shrink-0 rounded-lg bg-accent/20 px-3 py-1.5 font-body text-xs font-semibold text-accent"
-                          >
-                            Ver
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+        {instrutores.length > 0 && (
+          <div className="space-y-2">
+            {instrutores.map((inst) => (
+              <div key={inst.id} className="flex items-center gap-3 rounded-xl bg-[#2A2A2A] px-4 py-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-background text-sm font-bold text-accent">
+                  {inst.avatar_url ? (
+                    <img src={inst.avatar_url} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    inst.name.split(" ").map(p => p[0]).join("").substring(0, 2).toUpperCase()
+                  )}
                 </div>
-              )}
-
-              <div className="flex gap-3 pt-2">
+                <div className="flex-1 min-w-0">
+                  <p className="font-body text-sm font-semibold text-foreground truncate">{inst.name}</p>
+                  <p className="font-body text-xs text-text-secondary">Nível {inst.level || "—"}</p>
+                </div>
                 <button
                   type="button"
-                  onClick={() => { setShowWaivers(false); setWaiverError(""); }}
-                  className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
+                  onClick={() => {
+                    setEditingInstrutorId(inst.id);
+                    setInstrutorNome(inst.name);
+                    setInstrutorNivel(inst.level);
+                    setInstrutorFotoPreview(null);
+                    setInstrutorFotoFile(null);
+                  }}
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:text-accent"
                 >
-                  Cancelar
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                  </svg>
                 </button>
                 <button
                   type="button"
-                  disabled={waiverSaving}
                   onClick={async () => {
                     if (!schoolId) return;
-                    setWaiverError("");
-                    if (!waiverTitle.trim()) { setWaiverError("O título é obrigatório"); return; }
-                    if (!waiverBody.trim()) { setWaiverError("O texto é obrigatório"); return; }
-                    setWaiverSaving(true);
-                    const res = await saveWaiverVersion(schoolId, { title: waiverTitle.trim(), body: waiverBody.trim() });
-                    setWaiverSaving(false);
-                    if (!res.ok) { setWaiverError(res.error ?? "Erro ao guardar"); return; }
-                    setShowWaivers(false);
+                    const res = await deleteInstructor(schoolId, inst.id);
+                    if (res.ok) loadInstructors();
                   }}
-                  className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95 disabled:opacity-50"
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:text-error"
                 >
-                  {waiverSaving ? "A guardar..." : "Publicar nova versão"}
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                    <path d="M3 6h18" />
+                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                  </svg>
                 </button>
               </div>
+            ))}
+          </div>
+        )}
+      </BottomSheet>
+
+      <BottomSheet
+        isOpen={showWaivers}
+        onClose={() => { setShowWaivers(false); setWaiverError(""); }}
+        title="Waivers"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => { setShowWaivers(false); setWaiverError(""); }}
+              className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              disabled={waiverSaving}
+              onClick={async () => {
+                if (!schoolId) return;
+                setWaiverError("");
+                if (!waiverTitle.trim()) { setWaiverError("O título é obrigatório"); return; }
+                if (!waiverBody.trim()) { setWaiverError("O texto é obrigatório"); return; }
+                setWaiverSaving(true);
+                const res = await saveWaiverVersion(schoolId, { title: waiverTitle.trim(), body: waiverBody.trim() });
+                setWaiverSaving(false);
+                if (!res.ok) { setWaiverError(res.error ?? "Erro ao guardar"); return; }
+                setShowWaivers(false);
+              }}
+              className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95 disabled:opacity-50"
+            >
+              {waiverSaving ? "A guardar..." : "Publicar nova versão"}
+            </button>
+          </>
+        }
+      >
+        <div>
+          <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">Título do waiver</label>
+          <input
+            type="text"
+            value={waiverTitle}
+            onChange={(e) => setWaiverTitle(e.target.value)}
+            placeholder="Ex: Termos de responsabilidade"
+            maxLength={150}
+            className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+          />
+        </div>
+        <div>
+          <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">Texto do waiver</label>
+          <textarea
+            value={waiverBody}
+            onChange={(e) => setWaiverBody(e.target.value)}
+            placeholder="Escreve aqui os termos que os alunos devem aceitar..."
+            rows={6}
+            maxLength={20000}
+            className="w-full resize-none rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+          />
+        </div>
+
+        {waiverError && <p className="font-body text-sm text-error">{waiverError}</p>}
+
+        {waiverVersions.length > 0 && (
+          <div className="pt-4 border-t border-foreground/10">
+            <p className="font-heading text-base font-bold text-foreground mb-3">Histórico</p>
+            <div className="space-y-2">
+              {waiverVersions.map((v) => (
+                <div key={v.id} className="flex items-center justify-between rounded-xl bg-[#2A2A2A] px-4 py-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-body text-sm font-semibold text-foreground truncate">
+                      v{v.version} {v.is_active && <span className="text-xs text-success">(Ativo)</span>}
+                    </p>
+                    <p className="font-body text-xs text-text-secondary">{v.acceptance_count} aceitação(ões)</p>
+                  </div>
+                  {v.acceptance_count > 0 && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!schoolId) return;
+                        const rows = await getWaiverAcceptances(schoolId, v.id);
+                        setWaiverAcceptances(rows);
+                        setShowWaiverAcceptances(v.id);
+                      }}
+                      className="shrink-0 rounded-lg bg-accent/20 px-3 py-1.5 font-body text-xs font-semibold text-accent"
+                    >
+                      Ver
+                    </button>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </BottomSheet>
 
       {/* Waiver Acceptances Dialog */}
       {showWaiverAcceptances && (

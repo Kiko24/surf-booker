@@ -50,6 +50,7 @@ export function EscolaView({ data }: Props) {
   const [packQuantity, setPackQuantity] = useState(1);
   const [showPackSuccess, setShowPackSuccess] = useState(false);
   const [packLoading, setPackLoading] = useState(false);
+  const [selectedRentalVariantId, setSelectedRentalVariantId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!showServicePicker) return;
@@ -313,7 +314,14 @@ export function EscolaView({ data }: Props) {
 
                   <div className="space-y-3">
                     {filteredServices.slice(0, INITIAL_LIMIT).map((svc) => (
-                      <ServiceCard key={svc.id} svc={svc} onClick={() => setSelectedService(svc)} onReservarClick={() => { setSelectedServiceId(svc.id); setShowServicePicker(true); }} />
+                      <ServiceCard
+                        key={svc.id}
+                        svc={svc}
+                        onClick={() => setSelectedService(svc)}
+                        onReservarClick={() => { setSelectedServiceId(svc.id); setShowServicePicker(true); }}
+                        rentalVariantId={svc.rental_options?.length ? (selectedRentalVariantId ?? svc.rental_options[0].id) : undefined}
+                        onRentalVariantChange={svc.rental_options?.length ? setSelectedRentalVariantId : undefined}
+                      />
                     ))}
                     {filteredServices.length > INITIAL_LIMIT && (
                       <button
@@ -331,38 +339,7 @@ export function EscolaView({ data }: Props) {
                 </div>
               )}
 
-              {instructors.length > 0 && (
-                <div>
-                  <h2 className="font-heading text-2xl font-bold text-gray-900 mb-4">
-                    Instrutores
-                  </h2>
-                  <div className="flex flex-wrap gap-6">
-                    {instructors.map((inst) => (
-                      <div key={inst.name} className="flex flex-col items-center text-center w-[calc(50%-12px)] sm:w-[calc(25%-18px)]">
-                        <div className="h-16 w-16 overflow-hidden rounded-full bg-gray-200">
-                          {inst.avatar_url ? (
-                            <img
-                              src={inst.avatar_url}
-                              alt={inst.name}
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center text-lg font-bold text-gray-500">
-                              {inst.name.charAt(0)}
-                            </div>
-                          )}
-                        </div>
-                        <p className="mt-2 text-sm font-semibold text-gray-900 text-center leading-tight">
-                          {inst.name}
-                        </p>
-                        <p className="text-xs text-gray-500 text-center leading-tight">
-                          {inst.level}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+
             </div>
 
             {/* Coluna direita: 2 fotos + info card */}
@@ -450,6 +427,38 @@ export function EscolaView({ data }: Props) {
                   </div>
                 )}
               </div>
+              {instructors.length > 0 && (
+                <div className="mt-6 rounded-xl bg-white p-5 shadow-sm">
+                  <h2 className="font-heading text-xl font-bold text-gray-900 mb-4">
+                    Instrutores
+                  </h2>
+                  <div className="grid grid-cols-3 gap-6">
+                    {instructors.map((inst) => (
+                      <div key={inst.name} className="flex flex-col items-center text-center">
+                        <div className="h-16 w-16 overflow-hidden rounded-full bg-gray-200">
+                          {inst.avatar_url ? (
+                            <img
+                              src={inst.avatar_url}
+                              alt={inst.name}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-lg font-bold text-gray-500">
+                              {inst.name.charAt(0)}
+                            </div>
+                          )}
+                        </div>
+                        <p className="mt-2 text-sm font-semibold text-gray-900 text-center leading-tight">
+                          {inst.name}
+                        </p>
+                        <p className="text-xs text-gray-500 text-center leading-tight">
+                          {inst.level}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -495,6 +504,8 @@ export function EscolaView({ data }: Props) {
                     svc={svc}
                     onClick={() => { setShowAllModal(false); setSelectedService(svc); }}
                     onReservarClick={() => { setShowAllModal(false); setSelectedServiceId(svc.id); setShowServicePicker(true); }}
+                    rentalVariantId={svc.rental_options?.length ? (selectedRentalVariantId ?? svc.rental_options[0].id) : undefined}
+                    onRentalVariantChange={svc.rental_options?.length ? setSelectedRentalVariantId : undefined}
                   />
                 ))}
                 {displayCount < filteredServices.length && (
@@ -526,9 +537,34 @@ export function EscolaView({ data }: Props) {
                 <h3 className="font-heading text-xl font-bold text-gray-900">
                   {selectedService.name}
                 </h3>
-                <p className="mt-1 text-sm text-gray-500">
-                  {selectedService.duration_minutes} min
-                </p>
+                {selectedService.rental_options && selectedService.rental_options.length > 1 ? (
+                  <div className="mt-2">
+                    <p className="text-sm text-gray-500 mb-2">Duração:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedService.rental_options.map((opt) => {
+                        const isActive = (selectedRentalVariantId ?? selectedService.rental_options![0].id) === opt.id;
+                        return (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setSelectedRentalVariantId(opt.id); }}
+                            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                              isActive
+                                ? "bg-accent text-white"
+                                : "bg-gray-100 text-gray-600 border border-gray-200 hover:border-accent"
+                            }`}
+                          >
+                            {formatDurationLabel(opt.duration_minutes)} · {(opt.price_cents / 100).toFixed(2).replace(".", ",")}€
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="mt-1 text-sm text-gray-500">
+                    {formatDurationLabel(selectedService.duration_minutes)}
+                  </p>
+                )}
                 {selectedService.description && (
                   <p className="mt-2 text-sm text-gray-600 leading-relaxed">
                     {selectedService.description}
@@ -719,6 +755,33 @@ export function EscolaView({ data }: Props) {
                     }
                     return (
                       <div className="space-y-3">
+                        {rightSvc.rental_options && rightSvc.rental_options.length > 1 && (
+                          <div>
+                            <label className="block text-sm text-gray-700 mb-1">Duração</label>
+                            <div className="flex flex-wrap gap-2">
+                              {rightSvc.rental_options.map((opt) => {
+                                const isActive = (selectedRentalVariantId ?? rightSvc.rental_options![0].id) === opt.id;
+                                return (
+                                  <button
+                                    key={opt.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedRentalVariantId(opt.id);
+                                      setSelectedSession(null);
+                                    }}
+                                    className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                                      isActive
+                                        ? "bg-accent text-white"
+                                        : "bg-white text-gray-600 border border-gray-200 hover:border-accent"
+                                    }`}
+                                  >
+                                    {formatDurationLabel(opt.duration_minutes)} · {(opt.price_cents / 100).toFixed(2).replace(".", ",")}€
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                         <div>
                           <label className="block text-sm text-gray-700 mb-1">Nome</label>
                           <input
@@ -790,9 +853,11 @@ export function EscolaView({ data }: Props) {
               if (!selectedServiceId || !selSvc) return null;
               const isAula = selSvc.category === "aula";
               const isPack = selSvc.category === "pack" || selSvc.category === "aluguer";
+              const variantInfo = selSvc.rental_options?.find(o => o.id === selectedRentalVariantId);
+              const effectivePriceCents = variantInfo?.price_cents ?? (selectedSession ? selectedSession.price_cents : selSvc.price_cents);
+              const effectiveDuration = variantInfo?.duration_minutes ?? selSvc.duration_minutes;
               const qty = isPack ? packQuantity : 1;
-              const priceCents = selectedSession ? selectedSession.price_cents : selSvc.price_cents;
-              const displayPrice = isPack ? priceCents * qty : priceCents;
+              const displayPrice = isPack ? effectivePriceCents * qty : effectivePriceCents;
               const itemName = selectedSession ? selectedSession.class_type_name : selSvc.name;
               const sessionTime = selectedSession
                 ? (() => {
@@ -818,9 +883,10 @@ export function EscolaView({ data }: Props) {
                   if (phone.length < 6) { setPackFormError("Telemóvel deve ter pelo menos 6 dígitos."); return; }
                   setPackFormError(null);
                   setPackLoading(true);
+                  const classTypeId = selectedRentalVariantId || selSvc.id;
                   const result = await comprarPackPublico(
                     school.id,
-                    selSvc.id,
+                    classTypeId,
                     packQuantity,
                     { name, email: email.toLowerCase(), phone }
                   );
@@ -834,6 +900,9 @@ export function EscolaView({ data }: Props) {
                 <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
                   <p className="text-sm text-gray-900">
                     <span>{qty > 1 ? `${qty}x ` : ""}{itemName}</span>
+                    {isPack && variantInfo && (
+                      <span className="mx-1 text-xs text-gray-400">({formatDurationLabel(effectiveDuration)})</span>
+                    )}
                     <span className="mx-1.5">=</span>
                     <span className="font-semibold">{(displayPrice / 100).toFixed(2).replace(".", ",")} €</span>
                     {sessionTime && <span className="mx-1.5">·</span>}
@@ -936,7 +1005,27 @@ export function EscolaView({ data }: Props) {
   );
 }
 
-function ServiceCard({ svc, onClick, onReservarClick }: { svc: PublicSchoolData["services"][number]; onClick: () => void; onReservarClick: () => void }) {
+function formatDurationLabel(minutes: number): string {
+  if (minutes % 1440 === 0) {
+    const d = minutes / 1440;
+    return d === 1 ? "1 dia" : `${d} dias`;
+  }
+  return `${minutes / 60}h`;
+}
+
+function ServiceCard({ svc, onClick, onReservarClick, rentalVariantId, onRentalVariantChange }: {
+  svc: PublicSchoolData["services"][number];
+  onClick: () => void;
+  onReservarClick: () => void;
+  rentalVariantId?: string;
+  onRentalVariantChange?: (id: string) => void;
+}) {
+  const hasOptions = !!(svc.rental_options && svc.rental_options.length > 1);
+  const currentVariantId = rentalVariantId ?? svc.rental_options?.[0]?.id;
+  const currentOption = svc.rental_options?.find(o => o.id === currentVariantId);
+  const effectivePrice = currentOption?.price_cents ?? svc.price_cents;
+  const effectiveDuration = currentOption?.duration_minutes ?? svc.duration_minutes;
+
   return (
     <div
       onClick={onClick}
@@ -957,7 +1046,10 @@ function ServiceCard({ svc, onClick, onReservarClick }: { svc: PublicSchoolData[
               {svc.description}
             </p>
           )}
-          <p className="mt-1 text-sm text-gray-500">{svc.duration_minutes} min · {(svc.price_cents / 100).toFixed(2).replace(".", ",")} €</p>
+          <p className="mt-1 text-sm text-gray-500">
+            {formatDurationLabel(effectiveDuration)} · {(effectivePrice / 100).toFixed(2).replace(".", ",")} €
+            {hasOptions && <span className="ml-1 text-xs text-gray-400">(a partir de {(svc.price_cents / 100).toFixed(2).replace(".", ",")} €)</span>}
+          </p>
         </div>
         <span
           role="button"
@@ -969,6 +1061,27 @@ function ServiceCard({ svc, onClick, onReservarClick }: { svc: PublicSchoolData[
           +
         </span>
       </div>
+      {hasOptions && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {svc.rental_options!.map((opt) => {
+            const isActive = (currentVariantId ?? svc.rental_options![0].id) === opt.id;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onRentalVariantChange?.(opt.id); }}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                  isActive
+                    ? "bg-accent text-white"
+                    : "bg-gray-100 text-gray-600 border border-gray-200 hover:border-accent"
+                }`}
+              >
+                {formatDurationLabel(opt.duration_minutes)} · {(opt.price_cents / 100).toFixed(2).replace(".", ",")}€
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

@@ -18,6 +18,7 @@ import {
   type AvulsoServico,
   type StudentProfilePack,
 } from "../actions";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   PlusIcon,
   ChevronLeftIcon,
@@ -653,45 +654,21 @@ className="inline-flex items-center gap-1 rounded-full bg-accent/10 px-2.5 py-1 
       >
         <PlusIcon className="h-6 w-6" />
       </button>
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-5">
-          <div className="w-full max-w-sm rounded-2xl bg-surface p-6 text-center">
-            <p className="font-heading text-xl font-bold text-foreground mb-2">
-              Cancelar aula
-            </p>
-            <p className="font-body text-sm text-text-secondary mb-6">
-              Esta aula será removida e todos os alunos inscritos receberão um
-              email de notificação.
-            </p>
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
-              >
-                Voltar
-              </button>
-              <button
-                type="button"
-                onClick={async () => {
-                  if (
-                    deletingSession === null ||
-                    !daySessions[deletingSession]
-                  )
-                    return;
-                  await cancelSession(daySessions[deletingSession].id);
-                  setShowDeleteConfirm(false);
-                  setDeletingSession(null);
-                  fetchSessions(year, month);
-                }}
-                className="flex-1 rounded-xl bg-error py-3 font-body text-sm font-semibold text-error-foreground transition-transform active:scale-95"
-              >
-                Sim, cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={async () => {
+          if (deletingSession === null || !daySessions[deletingSession]) return;
+          await cancelSession(daySessions[deletingSession].id);
+          setDeletingSession(null);
+          fetchSessions(year, month);
+        }}
+        title="Cancelar aula"
+        message="Esta aula será removida e todos os alunos inscritos receberão um email de notificação."
+        confirmLabel="Sim, cancelar"
+        cancelLabel="Voltar"
+        variant="danger"
+      />
 
       {/* Guest modal */}
       {showGuestModal && (

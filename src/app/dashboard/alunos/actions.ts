@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { rateLimitByUser } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
+import { sendStudentInvite } from "@/lib/email";
 import { buyPack } from "../calendario/actions";
 
 export type StudentPack = {
@@ -242,6 +243,43 @@ export async function createStudent(
     .from("school_students")
     .insert({ school_id: schoolId, student_id: student.id });
   if (ssErr) return { ok: false, error: ssErr.message };
+
+  if (email) {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
+      type: "invite",
+      email: normalizedEmail,
+      options: {
+        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/perfil`,
+      },
+    });
+
+    if (!linkError && linkData?.user) {
+      await admin.from("students").update({
+        auth_user_id: linkData.user.id,
+        is_guest: false,
+      }).eq("id", student.id);
+
+      if (linkData.properties?.action_link) {
+        await sendStudentInvite({
+          email: normalizedEmail,
+          studentName: trimmedName,
+          schoolName: school.name,
+          inviteLink: linkData.properties.action_link,
+        });
+      }
+    } else if (linkError) {
+      const { data: authUsers } = await admin.auth.admin.listUsers();
+      const existingUser = authUsers?.users?.find((u: { email: string }) => u.email === normalizedEmail);
+      if (existingUser) {
+        await admin.from("students").update({
+          auth_user_id: existingUser.id,
+          is_guest: false,
+        }).eq("id", student.id);
+      }
+    }
+  }
 
   if (packId) {
     let remaining: number | undefined;

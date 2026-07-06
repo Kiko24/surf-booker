@@ -16,6 +16,12 @@ export type PublicInstructor = {
   avatar_url: string | null;
 };
 
+export type RentalOption = {
+  id: string;
+  duration_minutes: number;
+  price_cents: number;
+};
+
 export type PublicService = {
   id: string;
   name: string;
@@ -24,6 +30,7 @@ export type PublicService = {
   price_cents: number;
   category: string | null;
   modality: string;
+  rental_options?: RentalOption[];
 };
 
 export type PublicSession = {
@@ -142,7 +149,7 @@ export async function getPublicSchoolData(
       public_url: admin.storage.from(IMAGE_BUCKET).getPublicUrl(img.file_path).data.publicUrl,
     }));
 
-    services = (servicesRes.data ?? []).map((svc) => ({
+    const rawServices = (servicesRes.data ?? []).map((svc) => ({
       id: svc.id,
       name: svc.name,
       description: svc.description ?? null,
@@ -151,6 +158,37 @@ export async function getPublicSchoolData(
       category: svc.category ?? null,
       modality: svc.modality ?? "",
     }));
+
+    const rentalGroups = new Map<string, typeof rawServices>();
+    const deduped: typeof rawServices = [];
+    for (const svc of rawServices) {
+      if (svc.category === "aluguer") {
+        const g = rentalGroups.get(svc.name);
+        if (g) { g.push(svc); } else { rentalGroups.set(svc.name, [svc]); }
+      } else {
+        deduped.push(svc);
+      }
+    }
+    for (const [, group] of rentalGroups) {
+      if (group.length > 1) {
+        const first: PublicService = {
+          ...group[0],
+          rental_options: group
+            .map((o) => ({
+              id: o.id,
+              duration_minutes: o.duration_minutes,
+              price_cents: o.price_cents,
+            }))
+            .sort((a, b) => a.duration_minutes - b.duration_minutes),
+          price_cents: Math.min(...group.map((o) => o.price_cents)),
+          duration_minutes: Math.min(...group.map((o) => o.duration_minutes)),
+        };
+        deduped.push(first);
+      } else {
+        deduped.push(group[0]);
+      }
+    }
+    services = deduped;
 
     instructors = (instructorsRes.data ?? []).map((inst) => ({
       name: inst.name,

@@ -63,9 +63,9 @@ export function DashboardLayout({ children }: Props) {
               </span>
             )}
           </div>
-          <h1 className="font-heading text-base font-bold text-foreground/90 uppercase tracking-widest truncate">
-            {schoolName}
-          </h1>
+<h1 className="font-heading text-base font-bold text-foreground/90 uppercase tracking-widest line-clamp-2 leading-tight">
+  {schoolName}
+</h1>
         </div>
 
         <nav className="flex flex-1 flex-col justify-center gap-8">

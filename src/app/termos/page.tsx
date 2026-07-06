@@ -23,7 +23,7 @@ export default function TermosPage() {
           <p>Podes cancelar a tua subscrição em qualquer momento. Os dados serão mantidos durante o período de faturação ativo.</p>
           <h2 className="font-heading text-lg font-bold text-gray-900">5. Contacto</h2>
           <p>Para questões relacionadas com estes termos, contacta-nos através do formulário na página inicial.</p>
-          <p className="text-gray-500 pt-4">Este documento serve como placeholder. Consulta um advogado para versão final.</p>
+
         </div>
       </div>
     </main>
