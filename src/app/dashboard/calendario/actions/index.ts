@@ -1,5 +1,6 @@
 export {
   getSessionsForMonth,
+  getSessionsForRange,
   getAvulsoServicos,
   createSession,
   deleteSession,
@@ -7,6 +8,7 @@ export {
   markAttendance,
   closeSession,
   updateSession,
+  updateSessionDate,
   getInstructorsForSchool,
 } from "./sessions";
 
@@ -22,6 +24,7 @@ export {
   addGroupBooking,
   togglePaymentStatus,
   cancelBooking,
+  cancelBookingsBulk,
   notifyOwnerBooking,
 } from "./bookings";
 

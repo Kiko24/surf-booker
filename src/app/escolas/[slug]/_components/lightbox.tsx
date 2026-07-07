@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState, useEffect, useCallback } from "react";
 
 type Props = {
@@ -36,6 +37,7 @@ export function Lightbox({ images, initialIndex = 0, onClose }: Props) {
     >
       <button
         type="button"
+        aria-label="Fechar"
         onClick={onClose}
         className="absolute right-4 top-4 z-10 text-white/70 hover:text-white"
       >
@@ -48,6 +50,7 @@ export function Lightbox({ images, initialIndex = 0, onClose }: Props) {
         <>
           <button
             type="button"
+            aria-label="Anterior"
             onClick={(e) => { e.stopPropagation(); prev(); }}
             className="absolute left-4 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/10 p-2 text-white/70 backdrop-blur transition-all hover:bg-white/20 hover:text-white"
           >
@@ -57,6 +60,7 @@ export function Lightbox({ images, initialIndex = 0, onClose }: Props) {
           </button>
           <button
             type="button"
+            aria-label="Seguinte"
             onClick={(e) => { e.stopPropagation(); next(); }}
             className="absolute right-4 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/10 p-2 text-white/70 backdrop-blur transition-all hover:bg-white/20 hover:text-white"
           >
@@ -70,12 +74,15 @@ export function Lightbox({ images, initialIndex = 0, onClose }: Props) {
         </>
       )}
 
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
+      <Image
         src={images[index].public_url}
         alt=""
-        className="max-h-[85vh] max-w-[90vw] rounded-xl object-contain"
+        width={0}
+        height={0}
+        unoptimized
+        className="max-h-[85vh] max-w-[90vw] rounded-xl object-contain !h-auto !w-auto"
         onClick={(e) => e.stopPropagation()}
+        sizes="(max-width: 768px) 100vw, 90vw"
       />
     </div>
   );

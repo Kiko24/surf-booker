@@ -14,6 +14,7 @@ export type SessionAluno = {
   name: string;
   paymentStatus: string;
   attendanceStatus: "confirmed" | "attended" | "no_show";
+  groupSize?: number;
 };
 
 export type SessionData = {
@@ -62,9 +63,16 @@ export async function getSessionsForMonth(
 
   const { data: allBookings } = await supabase
     .from("bookings")
-    .select("id, session_id, student_id, payment_status, status")
+    .select("id, session_id, student_id, payment_status, status, booking_group_id")
     .in("session_id", sessionIds)
     .in("status", ["confirmed", "attended", "no_show"]);
+
+  const groupIds = [...new Set((allBookings ?? []).map((b) => b.booking_group_id).filter(Boolean))];
+  const { data: groups } = await supabase
+    .from("booking_groups")
+    .select("id, group_size")
+    .in("id", groupIds);
+  const groupSizeMap = new Map((groups ?? []).map((g) => [g.id, g.group_size]));
 
   const studentIds = [...new Set((allBookings ?? []).map((b) => b.student_id))];
 
@@ -78,7 +86,8 @@ export async function getSessionsForMonth(
   const bookingMap: Record<string, { count: number; alunos: SessionAluno[] }> = {};
   for (const b of allBookings ?? []) {
     if (!bookingMap[b.session_id]) bookingMap[b.session_id] = { count: 0, alunos: [] };
-    if (b.status !== "no_show") bookingMap[b.session_id].count++;
+    const gs = b.booking_group_id ? groupSizeMap.get(b.booking_group_id) ?? 1 : 1;
+    if (b.status !== "no_show") bookingMap[b.session_id].count += gs;
     const name = studentNameMap.get(b.student_id);
     if (name) bookingMap[b.session_id].alunos.push({
       id: b.student_id,
@@ -86,6 +95,7 @@ export async function getSessionsForMonth(
       name,
       paymentStatus: b.payment_status,
       attendanceStatus: b.status as "confirmed" | "attended" | "no_show",
+      groupSize: gs > 1 ? gs : undefined,
     });
   }
 
@@ -101,6 +111,93 @@ export async function getSessionsForMonth(
 
     const instructor = s.instructors as unknown as InstructorName | null;
     result[day].push({
+      id: s.id,
+      nome: (s.class_types as unknown as ClassTypeName | null)?.name ?? "Aula",
+      time: `${hours}:${minutes}`,
+      capacidade: s.capacity ?? 0,
+      alunos: bData.count,
+      alunosList: bData.alunos,
+      class_type_id: s.class_type_id,
+      instructor_id: s.instructor_id,
+      instructorName: instructor?.name ?? null,
+      starts_at: s.starts_at,
+    });
+  }
+
+  return result;
+}
+
+export async function getSessionsForRange(
+  fromISO: string,
+  toISO: string,
+  schoolId: string
+): Promise<Record<string, SessionData[]>> {
+  const supabase = await createClient();
+
+  const { data: sessions } = await supabase
+    .from("sessions")
+    .select("id, starts_at, duration_minutes, capacity, class_type_id, instructor_id, class_types(name), instructors(name), status")
+    .eq("school_id", schoolId)
+    .eq("status", "scheduled")
+    .gte("starts_at", fromISO)
+    .lt("starts_at", toISO)
+    .order("starts_at", { ascending: true });
+
+  if (!sessions) return {};
+
+  const result: Record<string, SessionData[]> = {};
+
+  const sessionIds = sessions.map((s) => s.id);
+
+  const { data: allBookings } = await supabase
+    .from("bookings")
+    .select("id, session_id, student_id, payment_status, status, booking_group_id")
+    .in("session_id", sessionIds)
+    .in("status", ["confirmed", "attended", "no_show"]);
+
+  const groupIds = [...new Set((allBookings ?? []).map((b) => b.booking_group_id).filter(Boolean))];
+  const { data: groups } = await supabase
+    .from("booking_groups")
+    .select("id, group_size")
+    .in("id", groupIds);
+  const groupSizeMap = new Map((groups ?? []).map((g) => [g.id, g.group_size]));
+
+  const studentIds = [...new Set((allBookings ?? []).map((b) => b.student_id))];
+
+  const { data: students } = await supabase
+    .from("students")
+    .select("id, full_name")
+    .in("id", studentIds);
+
+  const studentNameMap = new Map((students ?? []).map((s) => [s.id, s.full_name]));
+
+  const bookingMap: Record<string, { count: number; alunos: SessionAluno[] }> = {};
+  for (const b of allBookings ?? []) {
+    if (!bookingMap[b.session_id]) bookingMap[b.session_id] = { count: 0, alunos: [] };
+    const gs = b.booking_group_id ? groupSizeMap.get(b.booking_group_id) ?? 1 : 1;
+    if (b.status !== "no_show") bookingMap[b.session_id].count += gs;
+    const name = studentNameMap.get(b.student_id);
+    if (name) bookingMap[b.session_id].alunos.push({
+      id: b.student_id,
+      bookingId: b.id,
+      name,
+      paymentStatus: b.payment_status,
+      attendanceStatus: b.status as "confirmed" | "attended" | "no_show",
+      groupSize: gs > 1 ? gs : undefined,
+    });
+  }
+
+  for (const s of sessions) {
+    const d = new Date(s.starts_at);
+    const dateKey = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+    const hours = d.getUTCHours().toString().padStart(2, "0");
+    const minutes = d.getUTCMinutes().toString().padStart(2, "0");
+
+    if (!result[dateKey]) result[dateKey] = [];
+
+    const bData = bookingMap[s.id] ?? { count: 0, alunos: [] as SessionAluno[] };
+    const instructor = s.instructors as unknown as InstructorName | null;
+    result[dateKey].push({
       id: s.id,
       nome: (s.class_types as unknown as ClassTypeName | null)?.name ?? "Aula",
       time: `${hours}:${minutes}`,
@@ -446,6 +543,37 @@ export async function updateSession(
     entityType: "session",
     entityId: sessionId,
     metadata: { class_type_id: formData.class_type_id, data: formData.data, horario: formData.horario },
+  });
+
+  return { ok: true };
+}
+
+export async function updateSessionDate(
+  sessionId: string,
+  newStartsAt: string,
+  schoolId: string
+): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Não autenticado" };
+
+  const rl = await rateLimitByUser(user.id, "updateSessionDate");
+  if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
+
+  const { error } = await supabase
+    .from("sessions")
+    .update({ starts_at: newStartsAt })
+    .eq("id", sessionId);
+
+  if (error) return { ok: false, error: error.message };
+
+  logAudit({
+    schoolId,
+    userId: user.id,
+    action: "update_session",
+    entityType: "session",
+    entityId: sessionId,
+    metadata: { drag_drop: true, new_starts_at: newStartsAt },
   });
 
   return { ok: true };

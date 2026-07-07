@@ -35,7 +35,6 @@ export function ContactoSection({ onOpenCalendar }: { onOpenCalendar: () => void
       return;
     }
     setErrors({});
-    console.log("Contact data:", parsed.data);
   }
 
   return (

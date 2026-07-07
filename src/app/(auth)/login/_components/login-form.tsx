@@ -170,7 +170,6 @@ export function LoginForm({ nextPath }: Props) {
       <div className="mt-4">
         <SocialButtons
           onProviderClick={(p) => {
-            console.log("provider:", p);
           }}
         />
       </div>

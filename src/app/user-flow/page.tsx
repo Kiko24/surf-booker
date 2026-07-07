@@ -14,11 +14,6 @@ const options: Option[] = [
     description: "Gere o teu negócio mais facilmente",
     href: "/signup-owner",
   },
-  {
-    title: "Surfa para clientes",
-    description: "Reserva as tuas aulas perto de ti",
-    href: "/signup-client",
-  },
 ];
 
 export default async function UserFlowPage() {

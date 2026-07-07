@@ -586,7 +586,7 @@ export function MaisView({ schoolId }: Props) {
                             <button type="button" onClick={() => setLightboxImage(img.public_url)} className="h-full w-full">
                               <img src={img.public_url} alt="" className="h-full w-full object-cover" />
                             </button>
-                            <button type="button" onClick={async () => { if (schoolId) { await deleteImage(img.id); const data = await getImages(schoolId); setImages(data); } }} className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-error text-white shadow transition-transform active:scale-90">
+                            <button type="button" aria-label="Eliminar imagem" onClick={async () => { if (schoolId) { await deleteImage(img.id); const data = await getImages(schoolId); setImages(data); } }} className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-error text-white shadow transition-transform active:scale-90">
                               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
                             </button>
                           </div>
@@ -666,10 +666,10 @@ export function MaisView({ schoolId }: Props) {
                           <p className="font-body text-sm font-semibold text-foreground truncate">{inst.name}</p>
                           <p className="font-body text-xs text-text-secondary">Nível {inst.level || "—"}</p>
                         </div>
-                        <button type="button" onClick={() => { setEditingInstrutorId(inst.id); setInstrutorNome(inst.name); setInstrutorNivel(inst.level); setInstrutorFotoPreview(null); setInstrutorFotoFile(null); }} className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:text-accent">
+                        <button type="button" aria-label="Editar instrutor" onClick={() => { setEditingInstrutorId(inst.id); setInstrutorNome(inst.name); setInstrutorNivel(inst.level); setInstrutorFotoPreview(null); setInstrutorFotoFile(null); }} className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:text-accent">
                           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /></svg>
                         </button>
-                        <button type="button" onClick={async () => { if (!schoolId) return; const res = await deleteInstructor(schoolId, inst.id); if (res.ok) loadInstructors(); }} className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:text-error">
+                        <button type="button" aria-label="Eliminar instrutor" onClick={async () => { if (!schoolId) return; const res = await deleteInstructor(schoolId, inst.id); if (res.ok) loadInstructors(); }} className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:text-error">
                           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /></svg>
                         </button>
                       </div>

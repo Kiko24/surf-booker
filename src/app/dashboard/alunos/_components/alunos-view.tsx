@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 
-import { deleteStudent, toggleWaiver, createStudent, getStudentProfile, cancelPackPurchase, updatePackRemaining, type StudentRecord, type StudentProfileData } from "../actions";
+import { deleteStudent, deleteStudentsBulk, toggleWaiver, createStudent, getStudentProfile, cancelPackPurchase, updatePackRemaining, type StudentRecord, type StudentProfileData } from "../actions";
 import { getAvailablePacks, buyPack, type AvailablePack } from "../../calendario/actions";
 import { DotsIcon, TrashIcon } from "../../_components/icons";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
@@ -94,6 +94,9 @@ export function AlunosView({ schoolId }: Props) {
   const [editPackError, setEditPackError] = useState("");
   const [showDeletePackConfirm, setShowDeletePackConfirm] = useState(false);
   const [deletingPack, setDeletingPack] = useState(false);
+  const [selecting, setSelecting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [displayCount, setDisplayCount] = useState(20);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -242,26 +245,48 @@ export function AlunosView({ schoolId }: Props) {
           )}
         </section>
 
-        <nav className="shrink-0 flex gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden">
-          {FILTERS.map((f) => (
+        <div className="flex items-center gap-2 flex-nowrap">
+          <nav className="shrink-0 flex gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden min-w-0">
+            {FILTERS.map((f) => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setActiveFilter(f)}
+                aria-pressed={f === activeFilter}
+                className={
+                  f === activeFilter
+                     ? "whitespace-nowrap rounded-full bg-accent px-4 py-1.5 font-body text-sm font-semibold text-primary-foreground"
+                    : "whitespace-nowrap rounded-full bg-surface px-4 py-1.5 font-body text-sm font-semibold text-text-secondary"
+                }
+              >
+                {f}
+              </button>
+            ))}
+          </nav>
+          <div className="flex items-center gap-2 ml-auto shrink-0">
             <button
-              key={f}
               type="button"
-              onClick={() => setActiveFilter(f)}
-              aria-pressed={f === activeFilter}
-              className={
-                f === activeFilter
-                   ? "whitespace-nowrap rounded-full bg-accent px-4 py-1.5 font-body text-sm font-semibold text-primary-foreground"
-                  : "whitespace-nowrap rounded-full bg-surface px-4 py-1.5 font-body text-sm font-semibold text-text-secondary"
-              }
+              onClick={() => { setSelecting((prev) => !prev); setSelectedIds(new Set()); }}
+              className={`whitespace-nowrap rounded-full px-3 py-1.5 font-body text-xs lg:text-sm font-semibold transition-colors ${
+                selecting ? "bg-error/20 text-error" : "bg-surface text-text-secondary hover:text-foreground"
+              }`}
             >
-              {f}
+              {selecting ? "Sair" : "Selecionar"}
             </button>
-          ))}
-        </nav>
+            {selecting && selectedIds.size > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowBulkDeleteConfirm(true)}
+                className="whitespace-nowrap rounded-full bg-error/20 px-3 py-1.5 font-body text-xs lg:text-sm font-semibold text-error transition-colors hover:bg-error/30"
+              >
+                Remover ({selectedIds.size})
+              </button>
+            )}
+          </div>
+        </div>
 
         {/* Mobile View: List */}
-        <div className="md:hidden mt-6 w-full rounded-2xl bg-surface text-foreground overflow-hidden flex flex-col flex-1 min-h-0">
+        <div className="md:hidden mt-4 w-full rounded-2xl bg-surface text-foreground overflow-hidden flex flex-col flex-1 min-h-0">
           <div className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden px-5 pt-2 pb-4">
             <div className="divide-y divide-foreground/10">
               {loadingStudents ? (
@@ -272,6 +297,23 @@ export function AlunosView({ schoolId }: Props) {
                 <div className="py-12 text-center text-text-secondary">Nenhum aluno encontrado</div>
               ) : displayed.map((s) => (
                 <div key={s.id} className="flex items-center gap-4 py-3">
+                  {selecting && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedIds((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(s.id)) next.delete(s.id); else next.add(s.id);
+                          return next;
+                        });
+                      }}
+                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border text-[10px] font-bold transition-colors ${
+                        selectedIds.has(s.id) ? "border-error bg-error text-white" : "border-text-muted"
+                      }`}
+                    >
+                      {selectedIds.has(s.id) && "✓"}
+                    </button>
+                  )}
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-background text-lg font-bold text-accent">
                     {getInitials(s.name)}
                   </div>
@@ -313,6 +355,7 @@ export function AlunosView({ schoolId }: Props) {
           <table className="w-full text-left border-collapse">
             <thead className="bg-surface/50 border-b border-white/5">
               <tr>
+                {selecting && <th className="px-5 py-3 w-10"></th>}
                 <th className="px-5 py-3 font-body text-[10px] text-text-secondary uppercase tracking-widest text-center">Nome do Aluno</th>
                 <th className="px-5 py-3 font-body text-[10px] text-text-secondary uppercase tracking-widest text-center">Status do Pack</th>
                 <th className="px-5 py-3 font-body text-[10px] text-text-secondary uppercase tracking-widest text-center">Total Aulas</th>
@@ -323,13 +366,32 @@ export function AlunosView({ schoolId }: Props) {
             </thead>
             <tbody className="divide-y divide-white/5">
               {loadingStudents ? (
-                <tr><td colSpan={6} className="py-12 text-center text-text-secondary">
+                <tr><td colSpan={selecting ? 7 : 6} className="py-12 text-center text-text-secondary">
                   <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-accent border-t-transparent" />
                 </td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={6} className="py-12 text-center text-text-secondary">Nenhum aluno encontrado</td></tr>
+                <tr><td colSpan={selecting ? 7 : 6} className="py-12 text-center text-text-secondary">Nenhum aluno encontrado</td></tr>
               ) : filtered.map((s) => (
                 <tr key={s.id} className="hover:bg-white/5 transition-colors">
+                  {selecting && (
+                    <td className="px-5 py-3 align-middle text-center">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedIds((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(s.id)) next.delete(s.id); else next.add(s.id);
+                            return next;
+                          });
+                        }}
+                        className={`mx-auto flex h-5 w-5 items-center justify-center rounded border text-[10px] font-bold transition-colors ${
+                          selectedIds.has(s.id) ? "border-error bg-error text-white" : "border-text-muted"
+                        }`}
+                      >
+                        {selectedIds.has(s.id) && "✓"}
+                      </button>
+                    </td>
+                  )}
                   <td className="px-5 py-3 align-middle text-center">
                     <div className="flex items-center justify-center gap-3">
                       <div className="flex h-8 w-8 items-center justify-center rounded-full bg-background text-[10px] font-bold text-accent">
@@ -426,6 +488,12 @@ export function AlunosView({ schoolId }: Props) {
                   <p className="font-body text-xs text-text-secondary">Total de Aulas</p>
                   <p className="font-body text-sm text-foreground">{selectedStudent.totalClasses}</p>
                 </div>
+                {(!profileLoading && studentProfile?.stats.groupSize) ? (
+                  <div className="rounded-xl bg-accent/10 px-4 py-3">
+                    <p className="font-body text-xs text-text-secondary">Pessoas no grupo</p>
+                    <p className="font-body text-sm font-semibold text-accent">{studentProfile.stats.groupSize}</p>
+                  </div>
+                ) : null}
               </div>
 
               {/* Stats + Packs + Booking History (from profile async fetch) */}
@@ -529,6 +597,7 @@ export function AlunosView({ schoolId }: Props) {
                                 </p>
                                 <p className="font-body text-xs text-text-muted truncate">
                                   {b.classTypeName ?? "—"}
+                                  {b.groupSize ? ` · ${b.groupSize} pessoas` : ""}
                                   {b.instructorName ? ` · ${b.instructorName}` : ""}
                                 </p>
                               </div>
@@ -899,6 +968,28 @@ export function AlunosView({ schoolId }: Props) {
           <p className="font-body text-xs text-error">{editPackError}</p>
         )}
       </BottomSheet>
+
+      <ConfirmDialog
+        isOpen={showBulkDeleteConfirm}
+        onClose={() => { setShowBulkDeleteConfirm(false); }}
+        onConfirm={async () => {
+          const ids = Array.from(selectedIds);
+          if (ids.length === 0) return;
+          setLocalStudents((prev) => prev.filter((s) => !ids.includes(s.id)));
+          setSelecting(false);
+          setSelectedIds(new Set());
+          setShowBulkDeleteConfirm(false);
+          const res = await deleteStudentsBulk(ids);
+          if (!res.ok) {
+            router.refresh();
+          }
+        }}
+        title="Remover alunos"
+        message={`Tens a certeza que queres remover ${selectedIds.size} ${selectedIds.size === 1 ? "aluno" : "alunos"}? Esta ação remove os alunos de todas as aulas e não pode ser desfeita.`}
+        confirmLabel="Sim, remover"
+        cancelLabel="Cancelar"
+        variant="danger"
+      />
 
       <ConfirmDialog
         isOpen={showDeletePackConfirm && !!studentProfile?.activePack}

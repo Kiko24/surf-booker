@@ -488,6 +488,7 @@ export function EscolaView({ data }: Props) {
               </h3>
               <button
                 type="button"
+                aria-label="Fechar"
                 onClick={() => setShowAllModal(false)}
                 className="rounded-full bg-gray-100 p-2 text-gray-500 transition-colors hover:bg-gray-200"
               >
@@ -607,6 +608,7 @@ export function EscolaView({ data }: Props) {
               </h3>
               <button
                 type="button"
+                aria-label="Fechar"
                 onClick={() => setShowServicePicker(false)}
                 className="rounded-full bg-gray-100 p-2 text-gray-500 transition-colors hover:bg-gray-200"
               >

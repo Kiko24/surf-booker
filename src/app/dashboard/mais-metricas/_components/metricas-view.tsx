@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, useEffect, useCallback } from "react";
 import { getMetricas, type MetricasData } from "../actions";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
 
 type FilterKey = "esta_semana" | "este_mes" | "epoca_alta" | "personalizado";
 
@@ -301,41 +302,39 @@ export function MetricasView() {
         )}
       </main>
 
-          {showCustom && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-t-2xl md:rounded-2xl bg-surface p-6 pb-10 md:pb-6">
-            <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted md:hidden" />
-            <h3 className="font-heading text-2xl font-bold text-foreground mb-6">Filtro personalizado</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">Nome do filtro <span className="text-error">*</span></label>
-                <input type="text" value={customLabel} onChange={e => setCustomLabel(e.target.value)} placeholder="Ex: Últimos 3 meses"
-                  className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent" />
-              </div>
-              <div>
-                <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">Últimos <span className="text-error">*</span></label>
-                <div className="flex gap-3">
-                  <input type="number" min="1" value={customAmount} onChange={e => setCustomAmount(Number(e.target.value))}
-                    className="w-24 rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground outline-none focus:outline-2 focus:outline-accent" />
-                  <div className="relative flex-1">
-                    <select value={customUnit} onChange={e => setCustomUnit(e.target.value as SavedFilter["unit"])}
-                      className="w-full appearance-none rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground outline-none focus:outline-2 focus:outline-accent">
-                      {UNIT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                    </select>
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted"><path d="m6 9 6 6 6-6" /></svg>
-                  </div>
-                </div>
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setShowCustom(false)}
-                  className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground">Cancelar</button>
-                <button type="button" onClick={() => { if (!customLabel.trim() || !customAmount) return; saveFilters([...savedFilters, { label: customLabel.trim(), amount: customAmount, unit: customUnit }]); setActiveFilter("personalizado"); setShowCustom(false); }}
-                  className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95">Guardar</button>
-              </div>
+          <BottomSheet
+        isOpen={showCustom}
+        onClose={() => setShowCustom(false)}
+        title="Filtro personalizado"
+        footer={
+          <>
+            <button type="button" onClick={() => setShowCustom(false)}
+              className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground">Cancelar</button>
+            <button type="button" onClick={() => { if (!customLabel.trim() || !customAmount) return; saveFilters([...savedFilters, { label: customLabel.trim(), amount: customAmount, unit: customUnit }]); setActiveFilter("personalizado"); setShowCustom(false); }}
+              className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95">Guardar</button>
+          </>
+        }
+      >
+        <div>
+          <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">Nome do filtro <span className="text-error">*</span></label>
+          <input type="text" value={customLabel} onChange={e => setCustomLabel(e.target.value)} placeholder="Ex: Últimos 3 meses"
+            className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent" />
+        </div>
+        <div>
+          <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">Últimos <span className="text-error">*</span></label>
+          <div className="flex gap-3">
+            <input type="number" min="1" value={customAmount} onChange={e => setCustomAmount(Number(e.target.value))}
+              className="w-24 rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground outline-none focus:outline-2 focus:outline-accent" />
+            <div className="relative flex-1">
+              <select value={customUnit} onChange={e => setCustomUnit(e.target.value as SavedFilter["unit"])}
+                className="w-full appearance-none rounded-xl bg-[#2A2A2A] px-4 py-3 text-foreground outline-none focus:outline-2 focus:outline-accent">
+                {UNIT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted"><path d="m6 9 6 6 6-6" /></svg>
             </div>
           </div>
         </div>
-      )}
+      </BottomSheet>
     </>
   );
 }

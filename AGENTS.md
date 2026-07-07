@@ -609,12 +609,19 @@ SELECT id, full_name FROM students WHERE id IN (...);
 | CSS | `react-datepicker` + `fadeSlideDown` dead CSS removido de `global.css` |
 | Zod | `cancelledAtRefinement()` extraído para `helpers.ts`, aplicado em 4 schemas de bookings |
 
-### Pendentes (MEDIUM)
-- ErrorBoundary partilhado (não existe atualmente)
-- Extrair padrão bottom-sheet modal para componente reutilizável (14+ instâncias)
-- Extrair `ConfirmDialog` (4 instâncias de delete confirmation)
+### COMPLETO
+| Item | O quê |
+|------|-------|
+| BottomSheet | Componente partilhado criado e aplicado em alunos(3), servicos(2), mais(5), metricas(1) — 11 instâncias |
+| ConfirmDialog | Componente partilhado criado e aplicado em alunos(2), calendario(1), servicos(1) — 4 instâncias |
+| ErrorBoundary | Componente partilhado criado |
+| `school.name` fix | `select("id")` → `select("id, name")` em `alunos/actions.ts` |
+| `.find()` type fix | Tipo `{ email: string }` removido do callback em `alunos/actions.ts` |
 
-### Pendentes (HIGH — após MEDIUM)
+### Mantido como está
+- `dashboard-view.tsx` modais (Sessões + Alertas) — usam header `border-b` com "Fechar", sem handle, sem footer — não alinha com BottomSheet atual
+
+### Pendentes (HIGH)
 - `console.log` em produção
 - Botões sem `type` explícito
 - `step-email` duplicado

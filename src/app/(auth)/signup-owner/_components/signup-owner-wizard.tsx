@@ -45,11 +45,8 @@ export function SignupOwnerWizard() {
           <StepEmail
             defaultEmail={email}
             onSubmit={(value) => {
-              console.log("[Wizard] received email:", value);
               setEmail(value);
-              console.log("[Wizard] calling goTo personal");
               goTo("personal");
-              console.log("[Wizard] step should be personal now");
             }}
           />
         )}

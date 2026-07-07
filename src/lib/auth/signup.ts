@@ -76,7 +76,7 @@ export async function signupUser(
   const supabase = await createClient();
   const emailRedirectTo = getEmailRedirectTo(redirectPath);
 
-  console.log(`[${logPrefix}] start`, { email });
+  console.info(`[${logPrefix}] start`, { email });
 
   const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
     email,
@@ -84,7 +84,7 @@ export async function signupUser(
     ...(emailRedirectTo ? { options: { emailRedirectTo } } : {}),
   });
 
-  console.log(`[${logPrefix}] signUp result`, {
+  console.info(`[${logPrefix}] signUp result`, {
     hasUser: !!signUpData.user,
     userId: signUpData.user?.id,
     identitiesCount: signUpData.user?.identities?.length ?? 0,
@@ -112,7 +112,7 @@ export async function signupUser(
   const admin = createAdminClient();
   const acceptedAt = new Date().toISOString();
 
-  console.log(`[${logPrefix}] inserting profile`, { userId, role });
+  console.info(`[${logPrefix}] inserting profile`, { userId, role });
 
   const { error: profileError } = await admin.from("profiles").insert({
     user_id: userId,
@@ -144,7 +144,7 @@ export async function signupUser(
     return { ok: false, error: "Erro ao criar perfil. Tenta novamente." };
   }
 
-  console.log(`[${logPrefix}] success`, { userId });
+  console.info(`[${logPrefix}] success`, { userId });
   return { ok: true };
 }
 
@@ -162,7 +162,7 @@ export async function resendEmail(
   const supabase = await createClient();
   const emailRedirectTo = getEmailRedirectTo(redirectPath);
 
-  console.log(`[${logPrefix}] start`, { email: normalizedEmail });
+  console.info(`[${logPrefix}] start`, { email: normalizedEmail });
 
   const { error } = await supabase.auth.resend({
     type: "signup",
@@ -176,6 +176,6 @@ export async function resendEmail(
     return { ok: false, error: normalized.error };
   }
 
-  console.log(`[${logPrefix}] success`, { email: normalizedEmail });
+  console.info(`[${logPrefix}] success`, { email: normalizedEmail });
   return { ok: true };
 }

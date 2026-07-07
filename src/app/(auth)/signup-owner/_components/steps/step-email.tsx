@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -93,20 +92,10 @@ export function StepEmail({ defaultEmail = "", onSubmit }: Props) {
       <div className="mt-6 flex flex-col gap-6">
         <SocialButtons
           onProviderClick={(p) => {
-            console.log("provider:", p);
           }}
         />
       </div>
 
-      <div className="mt-6 text-center text-sm">
-        <p className="text-text-secondary">É um cliente?</p>
-        <Link
-          href="/signup-client"
-          className="mt-2 inline-block text-accent hover:underline"
-        >
-          Clique aqui!
-        </Link>
-      </div>
     </div>
   );
 }

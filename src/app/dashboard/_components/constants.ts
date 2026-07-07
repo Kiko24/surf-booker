@@ -15,6 +15,7 @@ export const NAV_ITEMS = [
 ];
 
 export const WEEKDAYS = ["D", "S", "T", "Q", "Q", "S", "S"];
+export const WEEKDAYS_MON = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
 
 export const MONTHS = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",

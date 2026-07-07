@@ -194,6 +194,63 @@ export async function deleteStudent(studentId: string): Promise<{ ok: boolean; e
   return { ok: true };
 }
 
+export async function deleteStudentsBulk(studentIds: string[]): Promise<{ ok: boolean; error?: string }> {
+  if (studentIds.length === 0) return { ok: false, error: "Nenhum aluno selecionado" };
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Não autenticado" };
+
+  const rl = await rateLimitByUser(user.id, "deleteStudentsBulk");
+  if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
+
+  const admin = createAdminClient();
+
+  // verify ownership using the first student's school
+  const { data: link } = await admin
+    .from("school_students")
+    .select("school_id")
+    .eq("student_id", studentIds[0])
+    .maybeSingle();
+  if (!link) return { ok: false, error: "Aluno não encontrado" };
+
+  const { data: school } = await supabase
+    .from("schools")
+    .select("id")
+    .eq("id", link.school_id)
+    .eq("owner_user_id", user.id)
+    .maybeSingle();
+  if (!school) return { ok: false, error: "Sem permissão" };
+
+  const { error: bErr } = await admin.from("bookings").delete().in("student_id", studentIds);
+  if (bErr) return { ok: false, error: bErr.message };
+
+  const { error: bgErr } = await admin.from("booking_groups").delete().in("booked_by_student_id", studentIds);
+  if (bgErr) return { ok: false, error: bgErr.message };
+
+  const { error: ppErr } = await admin.from("pack_purchases").delete().in("student_id", studentIds);
+  if (ppErr) return { ok: false, error: ppErr.message };
+
+  const { error: ssErr } = await admin.from("school_students").delete().in("student_id", studentIds);
+  if (ssErr) return { ok: false, error: ssErr.message };
+
+  const { error: sErr } = await admin.from("students").delete().in("id", studentIds);
+  if (sErr) return { ok: false, error: sErr.message };
+
+  for (const studentId of studentIds) {
+    logAudit({
+      schoolId: link.school_id,
+      userId: user.id,
+      action: "delete_student",
+      entityType: "student",
+      entityId: studentId,
+      metadata: { studentName: null },
+    });
+  }
+
+  return { ok: true };
+}
+
 export async function createStudent(
   name: string,
   phone: string | undefined,
@@ -211,7 +268,7 @@ export async function createStudent(
 
   const { data: school } = await supabase
     .from("schools")
-    .select("id")
+    .select("id, name")
     .eq("id", schoolId)
     .eq("owner_user_id", user.id)
     .maybeSingle();
@@ -271,7 +328,7 @@ export async function createStudent(
       }
     } else if (linkError) {
       const { data: authUsers } = await admin.auth.admin.listUsers();
-      const existingUser = authUsers?.users?.find((u: { email: string }) => u.email === normalizedEmail);
+      const existingUser = authUsers?.users?.find((u) => u.email === normalizedEmail);
       if (existingUser) {
         await admin.from("students").update({
           auth_user_id: existingUser.id,
@@ -310,12 +367,13 @@ export type BookingHistoryItem = {
   classTypeName: string | null;
   instructorName: string | null;
   status: string;
+  groupSize?: number;
 };
 
 export type StudentProfileData = {
   bookings: BookingHistoryItem[];
   activePack: { id: string; name: string; remaining: number; total: number } | null;
-  stats: { totalClasses: number; attendanceRate: number | null };
+  stats: { totalClasses: number; attendanceRate: number | null; groupSize?: number };
 };
 
 export async function getStudentProfile(
@@ -330,6 +388,7 @@ export async function getStudentProfile(
     .select(`
       id,
       status,
+      booking_group_id,
       session:sessions!inner(
         starts_at,
         instructor_id,
@@ -339,6 +398,21 @@ export async function getStudentProfile(
     `)
     .eq("student_id", studentId)
     .order("created_at", { ascending: false });
+
+  // fetch group_size from booking_groups via admin client
+  // (avoids PostgREST composite FK embedding ambiguity)
+  const bgIds = [
+    ...new Set((bookingRows ?? []).map((r) => r.booking_group_id as string).filter(Boolean)),
+  ] as string[];
+  let groupSizeMap = new Map<string, number>();
+  if (bgIds.length > 0) {
+    const adminClient = createAdminClient();
+    const { data: bgRows } = await adminClient
+      .from("booking_groups")
+      .select("id, group_size")
+      .in("id", bgIds);
+    groupSizeMap = new Map((bgRows ?? []).map((g) => [g.id, g.group_size]));
+  }
 
   let bookingItems: BookingHistoryItem[] = [];
   let attendedCount = 0;
@@ -357,6 +431,7 @@ export async function getStudentProfile(
       if (!sess) continue;
 
       const bookingStatus = b.status as string;
+      const gs = groupSizeMap.get(b.booking_group_id as string) ?? 1;
 
       bookingItems.push({
         id: b.id as string,
@@ -364,6 +439,7 @@ export async function getStudentProfile(
         classTypeName: sess.class_types?.name ?? null,
         instructorName: null, // will resolve below
         status: bookingStatus,
+        groupSize: gs > 1 ? gs : undefined,
       });
 
       if (bookingStatus === "attended") attendedCount++;
@@ -432,6 +508,7 @@ export async function getStudentProfile(
         attendedCount + noShowCount > 0
           ? Math.round((attendedCount / (attendedCount + noShowCount)) * 100)
           : null,
+      groupSize: bookingItems.find((b) => b.groupSize)?.groupSize,
     },
   };
 }

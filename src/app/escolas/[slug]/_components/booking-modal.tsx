@@ -60,6 +60,7 @@ export function BookingModal({ sessionId, schoolId, onClose }: Props) {
       >
         <button
           type="button"
+          aria-label="Fechar"
           onClick={onClose}
           className="float-right text-gray-400 hover:text-gray-600"
         >
