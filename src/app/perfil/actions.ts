@@ -2,6 +2,9 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { assertValidOrigin } from "@/lib/csrf";
+import { passwordSchema } from "@/lib/validation/signup-owner";
+import { redirect } from "next/navigation";
 
 export type StudentProfile = {
   id: string;
@@ -248,6 +251,8 @@ export async function updateProfile(data: { fullName: string; email: string; pho
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { success: false, error: "Não autenticado" };
 
+  try { await assertValidOrigin(); } catch { return { success: false, error: "Origem inválida" }; }
+
   const updates: Record<string, string | null> = {
     full_name: data.fullName,
     phone: data.phone || null,
@@ -269,7 +274,12 @@ export async function updatePassword(data: { currentPassword: string; newPasswor
   const { data: { user } } = await supabase.auth.getUser();
   if (!user?.email) return { success: false, error: "Não autenticado" };
 
-  if (data.newPassword.length < 6) return { success: false, error: "A nova password deve ter pelo menos 6 caracteres" };
+  try { await assertValidOrigin(); } catch { return { success: false, error: "Origem inválida" }; }
+
+  const parsed = passwordSchema.safeParse(data.newPassword);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.message ?? "Password inválida" };
+  }
 
   const { error: signInError } = await supabase.auth.signInWithPassword({
     email: user.email,
@@ -283,7 +293,9 @@ export async function updatePassword(data: { currentPassword: string; newPasswor
   });
 
   if (updateError) return { success: false, error: updateError.message };
-  return { success: true };
+
+  await supabase.auth.signOut();
+  redirect("/login");
 }
 
 export async function getBookingHistory(): Promise<BookingHistoryItem[]> {

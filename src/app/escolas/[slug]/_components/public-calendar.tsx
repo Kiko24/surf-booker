@@ -5,24 +5,24 @@ import { getPublicSessionsForMonth, type PublicSession } from "../actions";
 
 type Props = {
   schoolId: string;
-  classTypeFilter?: string | null;
-  onSelectSession: (session: PublicSession | null) => void;
+  classTypeId?: string | null;
+  selectedSessionIds: Set<string>;
+  onToggleSession: (session: PublicSession) => void;
 };
 
 const WEEKDAY_HEADERS = ["D", "S", "T", "Q", "Q", "S", "S"];
 
-export function PublicCalendar({ schoolId, classTypeFilter, onSelectSession }: Props) {
-  const onSelectSessionRef = useRef(onSelectSession);
+export function PublicCalendar({ schoolId, classTypeId, selectedSessionIds, onToggleSession }: Props) {
+  const onToggleSessionRef = useRef(onToggleSession);
   useEffect(() => {
-    onSelectSessionRef.current = onSelectSession;
-  }, [onSelectSession]);
+    onToggleSessionRef.current = onToggleSession;
+  }, [onToggleSession]);
 
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [sessionsByDay, setSessionsByDay] = useState<Record<number, PublicSession[]>>({});
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
-  const [selectedSession, setSelectedSession] = useState<PublicSession | null>(null);
   const [loading, setLoading] = useState(false);
 
   const fetchSessions = useCallback(async () => {
@@ -31,8 +31,6 @@ export function PublicCalendar({ schoolId, classTypeFilter, onSelectSession }: P
     setSessionsByDay(data);
     setLoading(false);
     setSelectedDay(null);
-    setSelectedSession(null);
-    onSelectSessionRef.current(null);
   }, [schoolId, year, month]);
 
   useEffect(() => {
@@ -82,23 +80,21 @@ export function PublicCalendar({ schoolId, classTypeFilter, onSelectSession }: P
   }
 
   const filteredByDay = useMemo(() => {
-    if (!classTypeFilter) return sessionsByDay;
+    if (!classTypeId) return sessionsByDay;
     const result: Record<number, PublicSession[]> = {};
     for (const [dayStr, sessions] of Object.entries(sessionsByDay)) {
-      const filtered = sessions.filter((s) => s.class_type_name === classTypeFilter);
+      const filtered = sessions.filter((s) => s.class_type_id === classTypeId);
       if (filtered.length > 0) result[Number(dayStr)] = filtered;
     }
     return result;
-  }, [sessionsByDay, classTypeFilter]);
+  }, [sessionsByDay, classTypeId]);
 
   useEffect(() => {
     const id = requestAnimationFrame(() => {
       setSelectedDay(null);
-      setSelectedSession(null);
-      onSelectSessionRef.current(null);
     });
     return () => cancelAnimationFrame(id);
-  }, [classTypeFilter]);
+  }, [classTypeId]);
 
   const selectedDaySessions = selectedDay ? filteredByDay[selectedDay] ?? [] : [];
 
@@ -164,8 +160,6 @@ export function PublicCalendar({ schoolId, classTypeFilter, onSelectSession }: P
               disabled={blocked}
               onClick={() => {
                 setSelectedDay(day);
-                setSelectedSession(null);
-                onSelectSessionRef.current(null);
               }}
               className={`min-h-[40px] rounded-lg text-sm transition-colors ${
                 selected
@@ -201,9 +195,10 @@ export function PublicCalendar({ schoolId, classTypeFilter, onSelectSession }: P
             selectedDaySessions.map((session) => {
               const date = new Date(session.starts_at);
               const time = `${date.getHours().toString().padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}`;
+              const unlimited = session.capacity >= 999999;
               const vagas = session.capacity - session.booked;
-              const isFull = vagas <= 0;
-              const isSelected = selectedSession?.id === session.id;
+              const isFull = !unlimited && vagas <= 0;
+              const isInCart = selectedSessionIds.has(session.id);
 
               return (
                 <div
@@ -211,8 +206,8 @@ export function PublicCalendar({ schoolId, classTypeFilter, onSelectSession }: P
                   className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5 transition-all ${
                     isFull
                       ? "opacity-50 border-gray-100 bg-gray-50"
-                      : isSelected
-                        ? "bg-accent/5 ring-1 ring-accent border-accent/20"
+                      : isInCart
+                        ? "bg-accent/10 ring-1 ring-accent border-accent"
                         : "border-gray-100 bg-gray-50 hover:bg-gray-100"
                   }`}
                 >
@@ -221,30 +216,26 @@ export function PublicCalendar({ schoolId, classTypeFilter, onSelectSession }: P
                       {session.class_type_name}
                     </p>
                     <p className="text-xs text-gray-500">
-                      {time} · {isFull ? "Completo" : `${vagas} ${vagas === 1 ? "vaga" : "vagas"}`}
+                      {time} · {isFull ? "Completo" : unlimited ? "Sem limite de vagas" : `${vagas} ${vagas === 1 ? "vaga" : "vagas"}`}
                     </p>
                   </div>
                   {!isFull && (
                     <span
                       role="button"
                       tabIndex={0}
-                      onClick={() => {
-                        setSelectedSession(session);
-                        onSelectSessionRef.current(session);
-                      }}
+                      onClick={() => onToggleSessionRef.current(session)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
-                          setSelectedSession(session);
-                          onSelectSessionRef.current(session);
+                          onToggleSessionRef.current(session);
                         }
                       }}
                       className={`shrink-0 flex h-7 w-7 items-center justify-center rounded-full border-2 text-base transition-transform hover:scale-110 cursor-pointer ${
-                        isSelected
+                        isInCart
                           ? "border-accent bg-accent text-white"
                           : "border-accent text-accent hover:bg-accent hover:text-white"
                       }`}
                     >
-                      +
+                      {isInCart ? "✓" : "+"}
                     </span>
                   )}
                 </div>

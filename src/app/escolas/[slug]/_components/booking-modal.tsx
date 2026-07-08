@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { criarReservaPublica, buscarPackAtivo } from "../actions";
+import { useTurnstile } from "./turnstile-widget";
 
 type Props = {
   sessionId: string;
@@ -20,6 +21,8 @@ export function BookingModal({ sessionId, schoolId, onClose }: Props) {
   const [activePack, setActivePack] = useState<{ packPurchaseId: string; remaining: number; name: string } | null>(null);
   const [packLoading, setPackLoading] = useState(false);
 
+  const { containerRef, execute } = useTurnstile();
+
   useEffect(() => {
     const timer = setTimeout(async () => {
       if (!email.includes("@")) { setActivePack(null); setPackLoading(false); return; }
@@ -35,11 +38,14 @@ export function BookingModal({ sessionId, schoolId, onClose }: Props) {
     e.preventDefault();
     setError("");
     setPending(true);
+
+    const token = await execute();
     const result = await criarReservaPublica(
       schoolId,
       sessionId,
       { name, email, phone },
-      activePack?.packPurchaseId ?? undefined
+      activePack?.packPurchaseId ?? undefined,
+      token ?? undefined
     );
     setPending(false);
     if (!result.ok) {
@@ -115,6 +121,7 @@ export function BookingModal({ sessionId, schoolId, onClose }: Props) {
               </div>
             )}
 
+            <div ref={containerRef} className="hidden" />
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-800 mb-1">

@@ -18,7 +18,7 @@ export const SUPPORTED_COUNTRIES = [
 
 export type CountryCode = (typeof SUPPORTED_COUNTRIES)[number]["code"];
 
-const passwordSchema = z
+export const passwordSchema = z
   .string()
   .min(8, "Mínimo 8 caracteres")
   .regex(/[A-Z]/, "Pelo menos 1 letra maiúscula")

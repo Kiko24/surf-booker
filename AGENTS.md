@@ -183,6 +183,19 @@ This version has breaking changes — APIs, conventions, and file structure may 
 | Rate limiting via Redis (Upstash) em todas as ações críticas | ✅ |
 | Audit logging em todas as operações destrutivas/mutações | ✅ |
 | Input validation via check constraints na BD | ✅ |
+| Proteção CSRF (origin vs host) em todas as 24 server actions mutáveis | ✅ |
+| Password policy consistente (min 8, maiúscula, número) em signup + perfil | ✅ |
+| Invalidação de sessão após alteração de password (força re-login) | ✅ |
+
+## Security Files
+
+| Ficheiro | Função |
+|----------|--------|
+| `src/lib/csrf.ts` | `assertValidOrigin()` — valida `origin` vs `host`, dev-safe com bypass localhost, fallback para `ALLOWED_ORIGINS` env var |
+| `src/lib/rate-limit.ts` | `rateLimitPublic()` e `rateLimitByUser()` via Upstash Redis |
+| `src/lib/audit.ts` | `logAudit()` — registo de operações destrutivas/mutações |
+| `src/lib/school.ts` | `requireOwner()` — verifica `schools.owner_user_id = auth.uid()` |
+| `src/lib/validation/signup-owner.ts` | `passwordSchema` — validação Zod partilhada (min 8, maiúscula, número) |
 
 ## RLS Policies
 
@@ -323,6 +336,34 @@ src/
     │   └── 0022_fix_rls_recursion.sql
     │   └── 0023_allow_duplicate_rental_names.sql
 ```
+
+## Server Actions com Proteção CSRF
+
+Todas as 24 server actions mutáveis chamam `await assertValidOrigin()` após verificação de auth. A proteção CSRF verifica que o header `origin` corresponde ao `host` (ou está listado em `ALLOWED_ORIGINS`), prevenindo ataques de cross-site request forgery. Em desenvolvimento, localhost é automaticamente permitido.
+
+| Ficheiro | Ações protegidas |
+|----------|---------------|
+| `dashboard/calendario/actions/sessions.ts` | createSession, deleteSession, cancelSession, markAttendance, closeSession, updateSession, updateSessionDate |
+| `dashboard/calendario/actions/bookings.ts` | createBooking, addGuestToSession, addGroupBooking, togglePaymentStatus, cancelBooking, cancelBookingsBulk |
+| `dashboard/alunos/actions.ts` | toggleWaiver, deleteStudent, deleteStudentsBulk, createStudent, cancelPackPurchase, updatePackRemaining |
+| `perfil/actions.ts` | updateProfile, updatePassword |
+| `dashboard/mais/actions/profile.ts` | saveProfile |
+| `(auth)/login/actions.ts` | signIn, resendConfirmationFromLogin |
+| `(auth)/reset-password/actions.ts` | updatePassword |
+
+## Invalidação de Sessão pós-Password
+
+Após alteração de password (via `updateUser()`), as actions chamam `supabase.auth.signOut()` + `redirect("/login")`, forçando re-autenticação e prevenindo uso de tokens antigos:
+
+| Fiche | Função |
+|-------|--------|
+| `perfil/actions.ts` | `updatePassword()` |
+| `(auth)/reset-password/actions.ts` | `updatePassword()` |
+| `dashboard/mais/actions/profile.ts` | `saveProfile()` (quando password é alterada) |
+
+## Password Policy
+
+Todas as validações de password usam o mesmo `passwordSchema` exportado de `signup-owner.ts`: mínimo 8 caracteres, pelo menos 1 maiúscula, pelo menos 1 número. Aplicado em signup, perfil e dashboard.
 
 ## Supabase Client Usage
 
@@ -579,6 +620,9 @@ SELECT id, full_name FROM students WHERE id IN (...);
 - Dropdown mobile: animação fade + slide (300ms, `opacity-100 translate-y-0` ↔ `opacity-0 -translate-y-2`)
 - "Como funciona" secção: mobile `flex-col` texto centrado; md `flex-row` texto left-aligned; gap `16/24/80` conforme breakpoint
 - Bullet descriptions: `clamp(0.8125rem,1vw,0.875rem)` (min 13px em tablet)
+
+### A5 — Notificações Fire-and-Forget
+Emails de notificação ao owner (`notifyOwnerBooking()`) usam `.catch()` em vez de `await` na reserva pública (`escolas/[slug]/actions.ts`), garantindo que a resposta ao utilizador não depende da entrega do email.
 
 ## Before Making Changes
 1. Read this file first

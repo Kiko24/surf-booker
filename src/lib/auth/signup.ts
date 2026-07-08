@@ -29,7 +29,7 @@ function normalizeAuthError(message?: string) {
     msg.includes("already exists") ||
     msg.includes("user already registered")
   ) {
-    return { error: "Já existe uma conta com este email", field: "email" as const };
+    return { error: "Não foi possível concluir o pedido. Tenta novamente." };
   }
 
   if (msg.includes("rate limit") || msg.includes("too many requests")) {
@@ -76,43 +76,31 @@ export async function signupUser(
   const supabase = await createClient();
   const emailRedirectTo = getEmailRedirectTo(redirectPath);
 
-  console.info(`[${logPrefix}] start`, { email });
-
   const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
     email,
     password,
     ...(emailRedirectTo ? { options: { emailRedirectTo } } : {}),
   });
 
-  console.info(`[${logPrefix}] signUp result`, {
-    hasUser: !!signUpData.user,
-    userId: signUpData.user?.id,
-    identitiesCount: signUpData.user?.identities?.length ?? 0,
-    error: signUpError?.message,
-  });
-
   if (signUpError) {
     const normalized = normalizeAuthError(signUpError.message);
-    return { ok: false, error: normalized.error, field: normalized.field };
+    return { ok: false, error: normalized.error };
   }
 
   const identities = signUpData.user?.identities ?? [];
   if (identities.length === 0) {
-    console.warn(`[${logPrefix}] email already registered (masked by Supabase)`, { email });
-    return { ok: false, error: "Já existe uma conta com este email", field: "email" };
+    return { ok: false, error: "Não foi possível concluir o pedido. Tenta novamente.", field: "email" };
   }
 
   const userId = signUpData.user?.id;
 
   if (!userId) {
-    console.error(`[${logPrefix}] missing user id after signUp`, { email });
+    console.error(`[${logPrefix}] missing user id after signUp`);
     return { ok: false, error: "Erro inesperado ao criar conta" };
   }
 
   const admin = createAdminClient();
   const acceptedAt = new Date().toISOString();
-
-  console.info(`[${logPrefix}] inserting profile`, { userId, role });
 
   const { error: profileError } = await admin.from("profiles").insert({
     user_id: userId,
@@ -144,7 +132,6 @@ export async function signupUser(
     return { ok: false, error: "Erro ao criar perfil. Tenta novamente." };
   }
 
-  console.info(`[${logPrefix}] success`, { userId });
   return { ok: true };
 }
 
@@ -162,8 +149,6 @@ export async function resendEmail(
   const supabase = await createClient();
   const emailRedirectTo = getEmailRedirectTo(redirectPath);
 
-  console.info(`[${logPrefix}] start`, { email: normalizedEmail });
-
   const { error } = await supabase.auth.resend({
     type: "signup",
     email: normalizedEmail,
@@ -171,11 +156,10 @@ export async function resendEmail(
   });
 
   if (error) {
-    console.error(`[${logPrefix}] failed`, { email: normalizedEmail, error: error.message });
+    console.error(`[${logPrefix}] resend failed`);
     const normalized = normalizeAuthError(error.message);
     return { ok: false, error: normalized.error };
   }
 
-  console.info(`[${logPrefix}] success`, { email: normalizedEmail });
   return { ok: true };
 }

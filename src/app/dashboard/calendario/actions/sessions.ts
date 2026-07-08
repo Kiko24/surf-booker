@@ -3,6 +3,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { rateLimitByUser } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
+import { requireOwner } from "@/lib/school";
+import { assertValidOrigin } from "@/lib/csrf";
 
 type ClassTypeName = { name: string };
 type InstructorName = { name: string };
@@ -239,8 +241,16 @@ export async function createSession(formData: {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Não autenticado" };
 
+  try { await assertValidOrigin(); } catch { return { ok: false, error: "Origem inválida" }; }
+
   const rl = await rateLimitByUser(user.id, "createSession");
   if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
+
+  try {
+    await requireOwner(formData.schoolId);
+  } catch {
+    return { ok: false, error: "Sem permissão" };
+  }
 
   const startsAt = new Date(`${formData.data}T${formData.horario}:00Z`);
 
@@ -286,6 +296,8 @@ export async function deleteSession(sessionId: string): Promise<{ ok: boolean; e
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Não autenticado" };
 
+  try { await assertValidOrigin(); } catch { return { ok: false, error: "Origem inválida" }; }
+
   const rl = await rateLimitByUser(user.id, "deleteSession");
   if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
 
@@ -294,6 +306,13 @@ export async function deleteSession(sessionId: string): Promise<{ ok: boolean; e
     .select("school_id")
     .eq("id", sessionId)
     .single();
+  if (!session) return { ok: false, error: "Sessão não encontrada" };
+
+  try {
+    await requireOwner(session.school_id);
+  } catch {
+    return { ok: false, error: "Sem permissão" };
+  }
 
   const { error } = await supabase
     .from("sessions")
@@ -320,6 +339,8 @@ export async function cancelSession(sessionId: string): Promise<{ ok: boolean; e
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Não autenticado" };
 
+  try { await assertValidOrigin(); } catch { return { ok: false, error: "Origem inválida" }; }
+
   const rl = await rateLimitByUser(user.id, "cancelSession");
   if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
 
@@ -329,6 +350,12 @@ export async function cancelSession(sessionId: string): Promise<{ ok: boolean; e
     .eq("id", sessionId)
     .single();
   if (!session) return { ok: false, error: "Sessão não encontrada" };
+
+  try {
+    await requireOwner(session.school_id);
+  } catch {
+    return { ok: false, error: "Sem permissão" };
+  }
 
   const [schoolRes, classTypeRes, bookingsRes] = await Promise.all([
     supabase.from("schools").select("name").eq("id", session.school_id).single(),
@@ -396,6 +423,8 @@ export async function markAttendance(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Não autenticado" };
 
+  try { await assertValidOrigin(); } catch { return { ok: false, error: "Origem inválida" }; }
+
   const rl = await rateLimitByUser(user.id, "markAttendance");
   if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
 
@@ -405,6 +434,12 @@ export async function markAttendance(
     .eq("id", sessionId)
     .single();
   if (!session) return { ok: false, error: "Sessão não encontrada" };
+
+  try {
+    await requireOwner(session.school_id);
+  } catch {
+    return { ok: false, error: "Sem permissão" };
+  }
 
   const { data: booking } = await supabase
     .from("bookings")
@@ -452,6 +487,8 @@ export async function closeSession(sessionId: string): Promise<{ ok: boolean; er
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Não autenticado" };
 
+  try { await assertValidOrigin(); } catch { return { ok: false, error: "Origem inválida" }; }
+
   const rl = await rateLimitByUser(user.id, "closeSession");
   if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
 
@@ -461,6 +498,12 @@ export async function closeSession(sessionId: string): Promise<{ ok: boolean; er
     .eq("id", sessionId)
     .single();
   if (!session) return { ok: false, error: "Sessão não encontrada" };
+
+  try {
+    await requireOwner(session.school_id);
+  } catch {
+    return { ok: false, error: "Sem permissão" };
+  }
 
   const { data: bookings } = await supabase
     .from("bookings")
@@ -512,8 +555,16 @@ export async function updateSession(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Não autenticado" };
 
+  try { await assertValidOrigin(); } catch { return { ok: false, error: "Origem inválida" }; }
+
   const rl = await rateLimitByUser(user.id, "updateSession");
   if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
+
+  try {
+    await requireOwner(formData.schoolId);
+  } catch {
+    return { ok: false, error: "Sem permissão" };
+  }
 
   const startsAt = new Date(`${formData.data}T${formData.horario}:00Z`);
 
@@ -557,8 +608,16 @@ export async function updateSessionDate(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Não autenticado" };
 
+  try { await assertValidOrigin(); } catch { return { ok: false, error: "Origem inválida" }; }
+
   const rl = await rateLimitByUser(user.id, "updateSessionDate");
   if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
+
+  try {
+    await requireOwner(schoolId);
+  } catch {
+    return { ok: false, error: "Sem permissão" };
+  }
 
   const { error } = await supabase
     .from("sessions")

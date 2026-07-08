@@ -3,6 +3,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { rateLimitPublic } from "@/lib/rate-limit";
+import { verifyTurnstileToken } from "@/lib/turnstile";
 import { notifyOwnerBooking } from "@/app/dashboard/calendario/actions";
 
 export type PublicSchoolImage = {
@@ -37,6 +38,7 @@ export type PublicSession = {
   id: string;
   starts_at: string;
   duration_minutes: number;
+  class_type_id: string | null;
   class_type_name: string;
   price_cents: number;
   capacity: number;
@@ -205,9 +207,10 @@ export async function getPublicSchoolData(
       id: s.id,
       starts_at: s.starts_at,
       duration_minutes: s.duration_minutes,
+      class_type_id: s.class_type_id,
       class_type_name: s.class_types?.[0]?.name ?? "",
       price_cents: s.price_cents,
-      capacity: s.capacity ?? 0,
+      capacity: s.capacity ?? 999999,
       booked: 0,
     }));
 
@@ -261,20 +264,24 @@ export async function getPublicSessionsForMonth(
 
   const admin = createAdminClient();
 
-  const startDate = new Date(year, month - 1, 1).toISOString().split("T")[0];
-  const endDate = new Date(year, month, 0).toISOString().split("T")[0];
+  const startDate = new Date(Date.UTC(year, month - 1, 1)).toISOString();
+  const endDate = new Date(Date.UTC(year, month, 0, 23, 59, 59)).toISOString();
 
-    const { data: rawSessions, error } = await admin
+  const { data: rawSessions, error } = await admin
     .from("sessions")
     .select("id, starts_at, duration_minutes, price_cents, capacity, class_type_id, class_types(name)")
     .eq("school_id", schoolId)
     .eq("status", "scheduled")
     .gte("starts_at", startDate)
-    .lte("starts_at", `${endDate}T23:59:59`)
+    .lte("starts_at", endDate)
     .order("starts_at", { ascending: true });
 
-  if (error || !rawSessions) {
-    console.error("[getPublicSessionsForMonth] error:", error);
+  if (error) {
+    console.error("[getPublicSessionsForMonth] query error:", error);
+    return {};
+  }
+
+  if (!rawSessions || rawSessions.length === 0) {
     return {};
   }
 
@@ -304,8 +311,9 @@ export async function getPublicSessionsForMonth(
       id: s.id,
       starts_at: s.starts_at,
       duration_minutes: s.duration_minutes,
+      class_type_id: s.class_type_id,
       price_cents: s.price_cents,
-      capacity: s.capacity ?? 0,
+      capacity: s.capacity ?? 999999,
       booked: countMap[s.id] ?? 0,
       class_type_name: s.class_types?.[0]?.name ?? "",
     });
@@ -374,10 +382,16 @@ export async function comprarPackPublico(
   schoolId: string,
   classTypeId: string,
   quantity: number,
-  data: { name: string; email: string; phone: string }
+  data: { name: string; email: string; phone: string },
+  turnstileToken?: string
 ): Promise<{ ok: true; packPurchaseId: string } | { ok: false; error: string }> {
   const rl = await rateLimitPublic("comprarPackPublico", 5, "60 s");
   if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
+
+  if (turnstileToken) {
+    const valid = await verifyTurnstileToken(turnstileToken);
+    if (!valid) return { ok: false, error: "Verificação de segurança falhou. Tenta novamente." };
+  }
 
   const admin = createAdminClient();
 
@@ -485,10 +499,16 @@ export async function criarReservaPublica(
   schoolId: string,
   sessionId: string,
   data: { name: string; email: string; phone: string },
-  packPurchaseId?: string
+  packPurchaseId?: string,
+  turnstileToken?: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const rl = await rateLimitPublic("criarReservaPublica", 5, "60 s");
   if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
+
+  if (turnstileToken) {
+    const valid = await verifyTurnstileToken(turnstileToken);
+    if (!valid) return { ok: false, error: "Verificação de segurança falhou. Tenta novamente." };
+  }
 
   const admin = createAdminClient();
 
@@ -559,7 +579,9 @@ export async function criarReservaPublica(
     }
   }
 
-  await notifyOwnerBooking(schoolId, sessionId, data.name.trim());
+  notifyOwnerBooking(schoolId, sessionId, data.name.trim()).catch((err) => {
+    console.error("Erro ao notificar dono", err);
+  });
 
   return { ok: true };
 }

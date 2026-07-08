@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { rateLimitByUser } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
+import { requireOwner } from "@/lib/school";
+import { assertValidOrigin } from "@/lib/csrf";
 import { sendStudentInvite } from "@/lib/email";
 import { buyPack } from "../calendario/actions";
 
@@ -29,6 +31,16 @@ export type StudentRecord = {
 };
 
 export async function getStudents(schoolId: string): Promise<StudentRecord[]> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  try {
+    await requireOwner(schoolId);
+  } catch {
+    return [];
+  }
+
   const admin = createAdminClient();
 
   const { data: rows, error: ssErr } = await admin
@@ -113,6 +125,8 @@ export async function toggleWaiver(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Não autenticado" };
 
+  try { await assertValidOrigin(); } catch { return { ok: false, error: "Origem inválida" }; }
+
   const rl = await rateLimitByUser(user.id, "toggleWaiver");
   if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
 
@@ -146,6 +160,8 @@ export async function deleteStudent(studentId: string): Promise<{ ok: boolean; e
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Não autenticado" };
+
+  try { await assertValidOrigin(); } catch { return { ok: false, error: "Origem inválida" }; }
 
   const rl = await rateLimitByUser(user.id, "deleteStudent");
   if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
@@ -200,6 +216,8 @@ export async function deleteStudentsBulk(studentIds: string[]): Promise<{ ok: bo
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Não autenticado" };
+
+  try { await assertValidOrigin(); } catch { return { ok: false, error: "Origem inválida" }; }
 
   const rl = await rateLimitByUser(user.id, "deleteStudentsBulk");
   if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
@@ -262,6 +280,8 @@ export async function createStudent(
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Não autenticado" };
+
+  try { await assertValidOrigin(); } catch { return { ok: false, error: "Origem inválida" }; }
 
   const rl = await rateLimitByUser(user.id, "createStudent");
   if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
@@ -381,6 +401,15 @@ export async function getStudentProfile(
   schoolId: string
 ): Promise<StudentProfileData> {
   const supabase = await createClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { bookings: [], activePack: null, stats: { totalClasses: 0, attendanceRate: null } };
+
+  try {
+    await requireOwner(schoolId);
+  } catch {
+    return { bookings: [], activePack: null, stats: { totalClasses: 0, attendanceRate: null } };
+  }
 
   // fetch bookings with session, class_type, instructor details
   const { data: bookingRows } = await supabase
@@ -521,8 +550,16 @@ export async function cancelPackPurchase(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Não autenticado" };
 
+  try { await assertValidOrigin(); } catch { return { ok: false, error: "Origem inválida" }; }
+
   const rl = await rateLimitByUser(user.id, "cancelPack");
   if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
+
+  try {
+    await requireOwner(schoolId);
+  } catch {
+    return { ok: false, error: "Sem permissão" };
+  }
 
   const { error } = await supabase
     .from("pack_purchases")
@@ -556,8 +593,16 @@ export async function updatePackRemaining(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Não autenticado" };
 
+  try { await assertValidOrigin(); } catch { return { ok: false, error: "Origem inválida" }; }
+
   const rl = await rateLimitByUser(user.id, "updatePack");
   if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
+
+  try {
+    await requireOwner(schoolId);
+  } catch {
+    return { ok: false, error: "Sem permissão" };
+  }
 
   const { error } = await supabase
     .from("pack_purchases")

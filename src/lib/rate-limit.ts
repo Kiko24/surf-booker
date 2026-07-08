@@ -33,11 +33,12 @@ export async function rateLimitByUser(userId: string, action: string) {
 async function getClientIp(): Promise<string> {
   try {
     const headersList = await headers();
-    return (
-      headersList.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-      headersList.get("x-real-ip") ??
-      "unknown"
-    );
+    const xff = headersList.get("x-forwarded-for");
+    if (xff) {
+      const ips = xff.split(",").map((s) => s.trim()).filter(Boolean);
+      return ips[ips.length - 1] ?? "unknown";
+    }
+    return headersList.get("x-real-ip") ?? "unknown";
   } catch (err) {
     console.error("Failed to get client IP:", err);
     return "unknown";

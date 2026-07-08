@@ -4,8 +4,8 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import type { PublicSchoolData } from "../actions";
 import { toggleFavorite, comprarPackPublico } from "../actions";
+import { useTurnstile } from "./turnstile-widget";
 import { Lightbox } from "./lightbox";
-import { BookingModal } from "./booking-modal";
 import { PublicCalendar } from "./public-calendar";
 import { PublicNavbar } from "@/app/_components/public-navbar";
 import { createClient } from "@/lib/supabase/client";
@@ -18,7 +18,6 @@ export function EscolaView({ data }: Props) {
   const { school, images, services, instructors } = data;
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [selectedService, setSelectedService] = useState<PublicSchoolData["services"][number] | null>(null);
-  const [bookingSession, setBookingSession] = useState<PublicSchoolData["upcomingSessions"][number] | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedModality, setSelectedModality] = useState<string | null>(null);
 
@@ -33,8 +32,7 @@ export function EscolaView({ data }: Props) {
   const [showAllModal, setShowAllModal] = useState(false);
   const [showServicePicker, setShowServicePicker] = useState(false);
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
-  const [selectedSession, setSelectedSession] = useState<PublicSchoolData["upcomingSessions"][number] | null>(null);
-  const [showBookingForm, setShowBookingForm] = useState(false);
+  const [selectedSessions, setSelectedSessions] = useState<PublicSchoolData["upcomingSessions"]>([]);
   const [displayCount, setDisplayCount] = useState(10);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const [galleryIndex, setGalleryIndex] = useState(0);
@@ -51,10 +49,16 @@ export function EscolaView({ data }: Props) {
   const [showPackSuccess, setShowPackSuccess] = useState(false);
   const [packLoading, setPackLoading] = useState(false);
   const [selectedRentalVariantId, setSelectedRentalVariantId] = useState<string | null>(null);
+  const { containerRef: turnstileRef, execute: turnstileExecute } = useTurnstile();
+  const [bookingStep, setBookingStep] = useState<1 | 2>(1);
+  const [participantsBySession, setParticipantsBySession] = useState<Record<string, { name: string; age: string }[]>>({});
 
   useEffect(() => {
     if (!showServicePicker) return;
     const id = requestAnimationFrame(() => {
+      setSelectedSessions([]);
+      setBookingStep(1);
+      setParticipantsBySession({});
       setPackQuantity(1);
       setPackFormError(null);
       setShowPackSuccess(false);
@@ -599,12 +603,13 @@ export function EscolaView({ data }: Props) {
           onClick={() => setShowServicePicker(false)}
         >
           <div
-            className="w-full max-w-5xl rounded-2xl bg-white p-6 shadow-xl max-h-[85vh] overflow-y-auto"
+            className="w-full max-w-5xl rounded-2xl bg-white p-6 shadow-xl h-[85vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
+            <div className="flex-1 overflow-y-auto">
             <div className="flex items-center justify-between mb-4 shrink-0">
               <h3 className="font-heading text-lg font-bold text-gray-900">
-                Reservar aula
+                {bookingStep === 1 ? "Reservar aula" : "Informações Adicionais"}
               </h3>
               <button
                 type="button"
@@ -618,218 +623,279 @@ export function EscolaView({ data }: Props) {
               </button>
             </div>
 
-            {/* Filters */}
-            <div className="flex flex-wrap items-center gap-2 mb-4">
-              <button
-                type="button"
-                onClick={() => setSelectedCategory(null)}
-                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                  selectedCategory === null
-                    ? "bg-accent text-white"
-                    : "bg-white text-gray-600 border border-gray-200 hover:border-accent"
-                }`}
-              >
-                Todas
-              </button>
-              {["aula", "pack", "aluguer"].map((cat) => (
+            {bookingStep === 1 && (
+              <div className="flex flex-wrap items-center gap-2 mb-4">
                 <button
-                  key={cat}
                   type="button"
-                  onClick={() => setSelectedCategory(cat)}
-                  className={`rounded-full px-4 py-1.5 text-sm font-medium capitalize transition-colors ${
-                    selectedCategory === cat
+                  onClick={() => setSelectedCategory(null)}
+                  className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                    selectedCategory === null
                       ? "bg-accent text-white"
                       : "bg-white text-gray-600 border border-gray-200 hover:border-accent"
                   }`}
                 >
-                  {cat === "aula" ? "Aulas" : cat === "pack" ? "Packs de Aulas" : "Alugueres"}
+                  Todas
                 </button>
-              ))}
-              {allModalities.length > 0 && (
-                <div className="relative ml-auto">
-                  <select
-                    value={selectedModality ?? ""}
-                    onChange={(e) => setSelectedModality(e.target.value || null)}
-                    className="appearance-none rounded-full border border-gray-200 bg-white px-4 py-1.5 pr-8 text-sm text-gray-600 outline-none focus:border-accent"
+                {["aula", "pack", "aluguer"].map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`rounded-full px-4 py-1.5 text-sm font-medium capitalize transition-colors ${
+                      selectedCategory === cat
+                        ? "bg-accent text-white"
+                        : "bg-white text-gray-600 border border-gray-200 hover:border-accent"
+                    }`}
                   >
-                    <option value="">Todas as modalidades</option>
-                    {allModalities.map((mod) => (
-                      <option key={mod} value={mod}>{mod}</option>
-                    ))}
-                  </select>
-                  <svg className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-              )}
-            </div>
-
-            {/* Services + Calendar */}
-            <div className="flex flex-row gap-6">
-              {/* Services list */}
-              <div className="flex-1 overflow-y-auto">
-                <div className="space-y-2">
-                  {filteredServices.map((svc) => {
-                    const isSelected = selectedServiceId === svc.id;
-                    const ctaLabel =
-                      svc.category === "pack" ? "Comprar"
-                      : svc.category === "aluguer" ? "Alugar"
-                      : "Reservar";
-                    const showCalendar = svc.category === "aula";
-
-                    return (
-                      <div
-                        key={svc.id}
-                        className={`flex items-center justify-between gap-4 rounded-2xl bg-white p-4 shadow-sm border transition-colors ${
-                          isSelected ? "border-accent" : "border-gray-100"
-                        }`}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-heading text-gray-900 text-sm">
-                            {svc.name}
-                          </h4>
-                          <p className="text-xs text-gray-500">
-                            {svc.duration_minutes} min · {(svc.price_cents / 100).toFixed(2).replace(".", ",")} €
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (isSelected) {
-                              setSelectedServiceId(null);
-                            } else {
-                              setSelectedServiceId(svc.id);
-                              if (!showCalendar) {
-                                setSelectedSession(null);
-                              }
-                            }
-                          }}
-                          className={`shrink-0 rounded-full border-2 px-4 py-1.5 text-sm transition-all hover:scale-105 ${
-                            isSelected
-                              ? "border-accent bg-accent text-white"
-                              : "border-accent text-black hover:bg-accent hover:text-white"
-                          }`}
-                        >
-                          {ctaLabel}
-                        </button>
-                      </div>
-                    );
-                  })}
-                  {filteredServices.length === 0 && (
-                    <p className="py-8 text-center text-sm text-gray-400">
-                      Nenhum serviço disponível para esta categoria.
-                    </p>
-                  )}
-                </div>
+                    {cat === "aula" ? "Aulas" : cat === "pack" ? "Packs de Aulas" : "Alugueres"}
+                  </button>
+                ))}
+                {allModalities.length > 0 && (
+                  <div className="relative ml-auto">
+                    <select
+                      value={selectedModality ?? ""}
+                      onChange={(e) => setSelectedModality(e.target.value || null)}
+                      className="appearance-none rounded-full border border-gray-200 bg-white px-4 py-1.5 pr-8 text-sm text-gray-600 outline-none focus:border-accent"
+                    >
+                      <option value="">Todas as modalidades</option>
+                      {allModalities.map((mod) => (
+                        <option key={mod} value={mod}>{mod}</option>
+                      ))}
+                    </select>
+                    <svg className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                )}
               </div>
+            )}
 
-              {/* Right column — calendar for aulas, form for packs/aluguer */}
-              <div className="w-[320px] shrink-0">
-                {(() => {
-                  const rightSvc = services.find(s => s.id === selectedServiceId);
-                  if (!rightSvc) return <div />;
-                  if (rightSvc.category === "aula") {
-                    return (
-                      <PublicCalendar
-                        schoolId={school.id}
-                        classTypeFilter={rightSvc.name}
-                        onSelectSession={(session) => setSelectedSession(session)}
-                      />
-                    );
-                  }
-                  if (rightSvc.category === "pack" || rightSvc.category === "aluguer") {
-                    if (showPackSuccess) {
-                      return (
-                        <div className="text-center py-8">
-                          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
-                            <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                            </svg>
-                          </div>
-                          <h3 className="font-heading text-lg font-bold text-gray-900">
-                            Pedido confirmado!
-                          </h3>
-                          <p className="mt-2 text-sm text-gray-600">
-                            O seu pedido foi confirmado, entraremos em contacto.
-                          </p>
-                        </div>
-                      );
-                    }
-                    return (
-                      <div className="space-y-3">
-                        {rightSvc.rental_options && rightSvc.rental_options.length > 1 && (
-                          <div>
-                            <label className="block text-sm text-gray-700 mb-1">Duração</label>
-                            <div className="flex flex-wrap gap-2">
-                              {rightSvc.rental_options.map((opt) => {
-                                const isActive = (selectedRentalVariantId ?? rightSvc.rental_options![0].id) === opt.id;
-                                return (
-                                  <button
-                                    key={opt.id}
-                                    type="button"
-                                    onClick={() => {
-                                      setSelectedRentalVariantId(opt.id);
-                                      setSelectedSession(null);
-                                    }}
-                                    className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                                      isActive
-                                        ? "bg-accent text-white"
-                                        : "bg-white text-gray-600 border border-gray-200 hover:border-accent"
-                                    }`}
-                                  >
-                                    {formatDurationLabel(opt.duration_minutes)} · {(opt.price_cents / 100).toFixed(2).replace(".", ",")}€
-                                  </button>
-                                );
-                              })}
+            {/* Services + Calendar (Step 1) OR Participant forms (Step 2) */}
+            <div className="flex flex-row gap-6">
+              {bookingStep === 1 ? (
+                <>
+                  {/* Services list */}
+                  <div className="flex-1 overflow-y-auto">
+                    <div className="space-y-2">
+                      {filteredServices.map((svc) => {
+                        const isSelected = selectedServiceId === svc.id;
+                        const ctaLabel =
+                          svc.category === "pack" ? "Comprar"
+                          : svc.category === "aluguer" ? "Alugar"
+                          : "Reservar";
+
+                        return (
+                          <div
+                            key={svc.id}
+                            className={`flex items-center justify-between gap-4 rounded-2xl bg-white p-4 shadow-sm border transition-colors ${
+                              isSelected ? "border-accent" : "border-gray-100"
+                            }`}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-heading text-gray-900 text-sm">
+                                {svc.name}
+                              </h4>
+                              <p className="text-xs text-gray-500">
+                                {svc.duration_minutes} min · {(svc.price_cents / 100).toFixed(2).replace(".", ",")} €
+                              </p>
                             </div>
-                          </div>
-                        )}
-                        <div>
-                          <label className="block text-sm text-gray-700 mb-1">Nome</label>
-                          <input
-                            type="text"
-                            value={packName}
-                            onChange={(e) => { setPackFormError(null); setPackName(sanitizeName(e.target.value)); }}
-                            className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-accent"
-                            placeholder="O teu nome"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm text-gray-700 mb-1">Email</label>
-                          <input
-                            type="email"
-                            value={packEmail}
-                            onChange={(e) => { setPackFormError(null); setPackEmail(sanitizeEmail(e.target.value)); }}
-                            className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-accent"
-                            placeholder="O teu email"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm text-gray-700 mb-1">Telemóvel</label>
-                          <input
-                            type="tel"
-                            value={packPhone}
-                            onChange={(e) => { setPackFormError(null); setPackPhone(sanitizePhone(e.target.value)); }}
-                            className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-accent"
-                            placeholder="O teu telemóvel"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm text-gray-700 mb-1">Quantidade</label>
-                          <div className="flex items-center gap-3">
                             <button
                               type="button"
-                              onClick={() => setPackQuantity(Math.max(1, packQuantity - 1))}
+                              onClick={() => {
+                                if (isSelected) {
+                                  setSelectedServiceId(null);
+                                } else {
+                                  setSelectedServiceId(svc.id);
+                                }
+                              }}
+                              className={`shrink-0 rounded-full border-2 px-4 py-1.5 text-sm transition-all hover:scale-105 ${
+                                isSelected
+                                  ? "border-accent bg-accent text-white"
+                                  : "border-accent text-black hover:bg-accent hover:text-white"
+                              }`}
+                            >
+                              {ctaLabel}
+                            </button>
+                          </div>
+                        );
+                      })}
+                      {filteredServices.length === 0 && (
+                        <p className="py-8 text-center text-sm text-gray-400">
+                          Nenhum serviço disponível para esta categoria.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right column — calendar for aulas, form for packs/aluguer */}
+                  <div className="w-[320px] shrink-0">
+                    {(() => {
+                      const rightSvc = services.find(s => s.id === selectedServiceId);
+                      if (!rightSvc) return <div />;
+                      if (rightSvc.category === "aula") {
+                        return (
+                          <PublicCalendar
+                            schoolId={school.id}
+                            classTypeId={selectedServiceId}
+                            selectedSessionIds={new Set(selectedSessions.map(s => s.id))}
+                            onToggleSession={(session) => {
+                              setSelectedSessions(prev => {
+                                const exists = prev.find(s => s.id === session.id);
+                                if (exists) return prev.filter(s => s.id !== session.id);
+                                return [...prev, session];
+                              });
+                            }}
+                          />
+                        );
+                      }
+                      if (rightSvc.category === "pack" || rightSvc.category === "aluguer") {
+                        if (showPackSuccess) {
+                          return (
+                            <div className="text-center py-8">
+                              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
+                                <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                              </div>
+                              <h3 className="font-heading text-lg font-bold text-gray-900">
+                                Pedido confirmado!
+                              </h3>
+                              <p className="mt-2 text-sm text-gray-600">
+                                O seu pedido foi confirmado, entraremos em contacto.
+                              </p>
+                            </div>
+                          );
+                        }
+                        return (
+                          <div className="space-y-3">
+                            {rightSvc.rental_options && rightSvc.rental_options.length > 1 && (
+                              <div>
+                                <label className="block text-sm text-gray-700 mb-1">Duração</label>
+                                <div className="flex flex-wrap gap-2">
+                                  {rightSvc.rental_options.map((opt) => {
+                                    const isActive = (selectedRentalVariantId ?? rightSvc.rental_options![0].id) === opt.id;
+                                    return (
+                                      <button
+                                        key={opt.id}
+                                        type="button"
+                                        onClick={() => {
+                                          setSelectedRentalVariantId(opt.id);
+                                        }}
+                                        className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                                          isActive
+                                            ? "bg-accent text-white"
+                                            : "bg-white text-gray-600 border border-gray-200 hover:border-accent"
+                                        }`}
+                                      >
+                                        {formatDurationLabel(opt.duration_minutes)} · {(opt.price_cents / 100).toFixed(2).replace(".", ",")}€
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                            <div>
+                              <label className="block text-sm text-gray-700 mb-1">Nome</label>
+                              <input
+                                type="text"
+                                value={packName}
+                                onChange={(e) => { setPackFormError(null); setPackName(sanitizeName(e.target.value)); }}
+                                className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-accent"
+                                placeholder="O teu nome"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm text-gray-700 mb-1">Email</label>
+                              <input
+                                type="email"
+                                value={packEmail}
+                                onChange={(e) => { setPackFormError(null); setPackEmail(sanitizeEmail(e.target.value)); }}
+                                className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-accent"
+                                placeholder="O teu email"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm text-gray-700 mb-1">Telemóvel</label>
+                              <input
+                                type="tel"
+                                value={packPhone}
+                                onChange={(e) => { setPackFormError(null); setPackPhone(sanitizePhone(e.target.value)); }}
+                                className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-accent"
+                                placeholder="O teu telemóvel"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm text-gray-700 mb-1">Quantidade</label>
+                              <div className="flex items-center gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() => setPackQuantity(Math.max(1, packQuantity - 1))}
+                                  className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 text-gray-600 transition-colors hover:border-accent hover:text-accent"
+                                >
+                                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M20 12H4" />
+                                  </svg>
+                                </button>
+                                <span className="w-8 text-center text-sm font-semibold text-gray-900">{packQuantity}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setPackQuantity(Math.min(99, packQuantity + 1))}
+                                  className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 text-gray-600 transition-colors hover:border-accent hover:text-accent"
+                                >
+                                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </div>
+                            {packFormError && (
+                              <p className="text-xs text-red-500">{packFormError}</p>
+                            )}
+                          </div>
+                        );
+                      }
+                      return <div />;
+                    })()}
+                  </div>
+                </>
+              ) : (
+                /* Step 2 — left: participant forms, right: session summary */
+                <div className="flex flex-row gap-6 w-full">
+                  <div className="flex-1 space-y-6">
+                    {[...selectedSessions].sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime()).map((sess) => {
+                      const participants = participantsBySession[sess.id] ?? [{ name: "", age: "" }];
+                      return (
+                        <div key={sess.id} className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+                          <p className="font-heading text-sm font-bold text-gray-900 mb-4">
+                            {new Date(sess.starts_at).toLocaleDateString("pt-PT", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" })}, {new Date(sess.starts_at).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })}
+                          </p>
+                          <div className="mb-3 flex items-center gap-3">
+                            <span className="text-sm text-gray-600">Participantes nesta sessão:</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setParticipantsBySession(prev => {
+                                  const arr = [...(prev[sess.id] ?? [{ name: "", age: "" }])];
+                                  if (arr.length > 1) arr.pop();
+                                  return { ...prev, [sess.id]: arr };
+                                });
+                              }}
                               className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 text-gray-600 transition-colors hover:border-accent hover:text-accent"
                             >
                               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M20 12H4" />
                               </svg>
                             </button>
-                            <span className="w-8 text-center text-sm font-semibold text-gray-900">{packQuantity}</span>
+                            <span className="w-6 text-center text-sm font-semibold text-gray-900">{participants.length}</span>
                             <button
                               type="button"
-                              onClick={() => setPackQuantity(Math.min(99, packQuantity + 1))}
+                              onClick={() => {
+                                setParticipantsBySession(prev => {
+                                  const arr = [...(prev[sess.id] ?? [{ name: "", age: "" }])];
+                                  if (arr.length < 20) arr.push({ name: "", age: "" });
+                                  return { ...prev, [sess.id]: arr };
+                                });
+                              }}
                               className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 text-gray-600 transition-colors hover:border-accent hover:text-accent"
                             >
                               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -837,45 +903,129 @@ export function EscolaView({ data }: Props) {
                               </svg>
                             </button>
                           </div>
+                          <div className="space-y-2">
+                            {participants.map((p, idx) => (
+                              <div key={idx} className="flex gap-3 items-start">
+                                <span className="mt-3 text-xs text-gray-400 w-5 shrink-0">{idx + 1}.</span>
+                                <div className="flex-1">
+                                  <input
+                                    type="text"
+                                    value={p.name}
+                                  onChange={(e) => {
+                                    const val = e.target.value.replace(/[^a-zA-ZÀ-ÿ\s'-]/g, "").slice(0, 80);
+                                      setParticipantsBySession(prev => {
+                                        const arr = [...(prev[sess.id] ?? [])];
+                                        arr[idx] = { ...arr[idx], name: val };
+                                        return { ...prev, [sess.id]: arr };
+                                      });
+                                    }}
+                                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 outline-none focus:border-accent"
+                                    placeholder={`Nome do participante ${idx + 1}`}
+                                  />
+                                </div>
+                                <div className="w-20 shrink-0">
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    max={120}
+                                    value={p.age}
+                                    onChange={(e) => {
+                                      const val = e.target.value.replace(/\D/g, "").slice(0, 3);
+                                      setParticipantsBySession(prev => {
+                                        const arr = [...(prev[sess.id] ?? [])];
+                                        arr[idx] = { ...arr[idx], age: val };
+                                        return { ...prev, [sess.id]: arr };
+                                      });
+                                    }}
+                                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 outline-none focus:border-accent"
+                                    placeholder="Idade"
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                        {packFormError && (
-                          <p className="text-xs text-red-500">{packFormError}</p>
-                        )}
+                      );
+                    })}
+                  </div>
+
+                  {(() => {
+                    const rightSvc = services.find(s => s.id === selectedServiceId);
+                    if (!rightSvc) return null;
+                    const vInfo = rightSvc.rental_options?.find(o => o.id === selectedRentalVariantId);
+                    const effPriceCents = vInfo?.price_cents ?? rightSvc.price_cents;
+                    const totParticipants = selectedSessions.reduce((sum, s) => sum + (participantsBySession[s.id]?.length ?? 1), 0);
+                    const totPrice = effPriceCents * totParticipants;
+                    return (
+                      <div className="w-[320px] shrink-0">
+                        <div className="sticky top-0 space-y-4">
+                          <h4 className="font-heading text-sm font-bold text-gray-900">Sessões selecionadas</h4>
+                          {[...selectedSessions].sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime()).map((sess) => {
+                            const d = new Date(sess.starts_at);
+                            const day = d.getDate().toString().padStart(2, "0");
+                            const month = (d.getMonth() + 1).toString().padStart(2, "0");
+                            const year = d.getFullYear();
+                            const time = d.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
+                            const ps = participantsBySession[sess.id]?.length ?? 1;
+                            const sessionPrice = effPriceCents * ps;
+                            return (
+                              <div key={sess.id} className="flex items-center justify-between border-b border-gray-100 pb-3">
+                                <div>
+                                  <p className="text-sm font-medium text-gray-900">{day}/{month}/{year}, {time}</p>
+                                  <p className="text-xs text-gray-500">{ps} participante{ps !== 1 ? "s" : ""}</p>
+                                </div>
+                                <p className="text-sm font-semibold text-gray-900">{(sessionPrice / 100).toFixed(2).replace(".", ",")} €</p>
+                              </div>
+                            );
+                          })}
+                          <div className="flex items-center justify-between pt-2">
+                            <p className="text-sm font-bold text-gray-900">Total</p>
+                            <p className="text-sm font-bold text-accent">{(totPrice / 100).toFixed(2).replace(".", ",")} €</p>
+                          </div>
+                        </div>
                       </div>
                     );
-                  }
-                  return <div />;
-                })()}
-              </div>
+                  })()}
+                </div>
+              )}
             </div>
 
-            {/* Bottom bar: selected service info + Continuar */}
+            </div>
+
+            {/* Bottom bar */}
             {(() => {
               const selSvc = services.find(s => s.id === selectedServiceId);
               if (!selectedServiceId || !selSvc) return null;
               const isAula = selSvc.category === "aula";
               const isPack = selSvc.category === "pack" || selSvc.category === "aluguer";
               const variantInfo = selSvc.rental_options?.find(o => o.id === selectedRentalVariantId);
-              const effectivePriceCents = variantInfo?.price_cents ?? (selectedSession ? selectedSession.price_cents : selSvc.price_cents);
+              const effectivePriceCents = variantInfo?.price_cents ?? selSvc.price_cents;
               const effectiveDuration = variantInfo?.duration_minutes ?? selSvc.duration_minutes;
-              const qty = isPack ? packQuantity : 1;
-              const displayPrice = isPack ? effectivePriceCents * qty : effectivePriceCents;
-              const itemName = selectedSession ? selectedSession.class_type_name : selSvc.name;
-              const sessionTime = selectedSession
-                ? (() => {
-                    const d = new Date(selectedSession.starts_at);
-                    const day = d.getDate().toString().padStart(2, "0");
-                    const month = (d.getMonth() + 1).toString().padStart(2, "0");
-                    const year = d.getFullYear();
-                    const time = d.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
-                    return `${day}/${month}/${year}, ${time}`;
-                  })()
-                : null;
-              const canContinue = isAula ? !!selectedSession : (packName.trim().length >= 2 && packEmail.trim().includes("@") && packPhone.trim().length >= 6);
+              const totalParticipants = selectedSessions.reduce((sum, s) => sum + (participantsBySession[s.id]?.length ?? 1), 0);
+              const qty = isPack ? packQuantity : (bookingStep === 2 ? totalParticipants : selectedSessions.length);
+              const displayPrice = isPack
+                ? effectivePriceCents * qty
+                : effectivePriceCents * qty;
+              const itemName = qty === 1
+                ? (selectedSessions[0]?.class_type_name ?? selSvc.name)
+                : selSvc.name;
+              const allParticipantsValid = selectedSessions.every(s => {
+                const ps = participantsBySession[s.id] ?? [{ name: "", age: "" }];
+                return ps.every(p => p.name.trim().length >= 2 && p.age.trim().length > 0 && parseInt(p.age) >= 1 && parseInt(p.age) <= 120);
+              });
+              const canContinue = isAula
+                ? (bookingStep === 1 ? selectedSessions.length > 0 : allParticipantsValid)
+                : (packName.trim().length >= 2 && packEmail.trim().includes("@") && packPhone.trim().length >= 6);
 
               const handleContinue = async () => {
-                if (isAula && selectedSession) {
-                  setShowBookingForm(true);
+                if (isAula && bookingStep === 1 && selectedSessions.length > 0) {
+                  setBookingStep(2);
+                  const init: Record<string, { name: string; age: string }[]> = {};
+                  const sorted = [...selectedSessions].sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime());
+                  sorted.forEach(s => { init[s.id] = [{ name: "", age: "" }]; });
+                  setParticipantsBySession(init);
+                } else if (isAula && bookingStep === 2 && allParticipantsValid) {
+                  // TODO: avançar para Step 3 (dados do pagador)
                 } else if (isPack) {
                   const name = packName.trim();
                   const email = packEmail.trim();
@@ -885,12 +1035,14 @@ export function EscolaView({ data }: Props) {
                   if (phone.length < 6) { setPackFormError("Telemóvel deve ter pelo menos 6 dígitos."); return; }
                   setPackFormError(null);
                   setPackLoading(true);
+                  const turnstileToken = await turnstileExecute();
                   const classTypeId = selectedRentalVariantId || selSvc.id;
                   const result = await comprarPackPublico(
                     school.id,
                     classTypeId,
                     packQuantity,
-                    { name, email: email.toLowerCase(), phone }
+                    { name, email: email.toLowerCase(), phone },
+                    turnstileToken ?? undefined
                   );
                   setPackLoading(false);
                   if (!result.ok) { setPackFormError(result.error); return; }
@@ -900,16 +1052,46 @@ export function EscolaView({ data }: Props) {
 
               return (
                 <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
-                  <p className="text-sm text-gray-900">
-                    <span>{qty > 1 ? `${qty}x ` : ""}{itemName}</span>
-                    {isPack && variantInfo && (
-                      <span className="mx-1 text-xs text-gray-400">({formatDurationLabel(effectiveDuration)})</span>
-                    )}
-                    <span className="mx-1.5">=</span>
-                    <span className="font-semibold">{(displayPrice / 100).toFixed(2).replace(".", ",")} €</span>
-                    {sessionTime && <span className="mx-1.5">·</span>}
-                    {sessionTime && <span>{sessionTime}</span>}
-                  </p>
+                  {isAula && bookingStep === 2 ? (
+                    <button
+                      type="button"
+                      onClick={() => setBookingStep(1)}
+                      className="text-sm text-gray-600 hover:text-accent"
+                    >
+                      ← Voltar
+                    </button>
+                  ) : (
+                    <p className="text-sm text-gray-900">
+                      {isAula && bookingStep === 1 && selectedSessions.length > 0 ? (
+                        <span className="text-xs leading-relaxed">
+                          <span className="font-medium text-foreground">Sessões selecionadas: </span>
+                          {selectedSessions.sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime()).map((s, i) => {
+                            const d = new Date(s.starts_at);
+                            const day = d.getDate().toString().padStart(2, "0");
+                            const month = (d.getMonth() + 1).toString().padStart(2, "0");
+                            const time = d.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
+                            return (
+                              <span key={s.id}>
+                                {i > 0 && <span className="mx-1 text-text-muted">·</span>}
+                                {day}/{month} {time}
+                              </span>
+                            );
+                          })}
+                        </span>
+                      ) : isPack ? (
+                        <>
+                          <span>{qty > 1 ? `${qty}x ` : ""}{itemName}</span>
+                          {variantInfo && (
+                            <span className="mx-1 text-xs text-gray-400">({formatDurationLabel(effectiveDuration)})</span>
+                          )}
+                          <span className="mx-1.5">=</span>
+                          <span className="font-semibold">{(displayPrice / 100).toFixed(2).replace(".", ",")} €</span>
+                        </>
+                      ) : (
+                        <span className="text-gray-400">Seleciona uma sessão</span>
+                      )}
+                    </p>
+                  )}
                   {showPackSuccess ? (
                     <button
                       type="button"
@@ -929,7 +1111,7 @@ export function EscolaView({ data }: Props) {
                           : "border-gray-200 text-gray-300"
                       }`}
                     >
-                      {packLoading ? "A processar..." : "Continuar"}
+                      {packLoading ? "A processar..." : bookingStep === 2 ? "Reservar" : "Continuar"}
                     </button>
                   )}
                 </div>
@@ -937,22 +1119,6 @@ export function EscolaView({ data }: Props) {
             })()}
           </div>
         </div>
-      )}
-
-      {showBookingForm && selectedSession && (
-        <BookingModal
-          sessionId={selectedSession.id}
-          schoolId={school.id}
-          onClose={() => { setShowBookingForm(false); setShowServicePicker(false); }}
-        />
-      )}
-
-      {bookingSession && (
-        <BookingModal
-          sessionId={bookingSession.id}
-          schoolId={school.id}
-          onClose={() => setBookingSession(null)}
-        />
       )}
 
       {/* Footer */}

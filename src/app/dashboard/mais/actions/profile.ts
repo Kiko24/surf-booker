@@ -1,9 +1,12 @@
 "use server";
 
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { rateLimitByUser } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
+import { assertValidOrigin } from "@/lib/csrf";
+import { passwordSchema } from "@/lib/validation/signup-owner";
 
 export async function saveProfile(data: {
   name: string;
@@ -14,6 +17,8 @@ export async function saveProfile(data: {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Não autenticado" };
+
+  try { await assertValidOrigin(); } catch { return { ok: false, error: "Origem inválida" }; }
 
   const rl = await rateLimitByUser(user.id, "saveProfile");
   if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
@@ -49,9 +54,16 @@ export async function saveProfile(data: {
   }
 
   if (data.password) {
-    if (data.password.length < 6) return { ok: false, error: "Palavra-passe deve ter pelo menos 6 caracteres" };
+    const parsed = passwordSchema.safeParse(data.password);
+    if (!parsed.success) {
+      return { ok: false, error: parsed.error.message ?? "Password inválida" };
+    }
     const { error: pwdErr } = await admin.auth.admin.updateUserById(user.id, { password: data.password });
     if (pwdErr) return { ok: false, error: "Erro ao atualizar palavra-passe: " + pwdErr.message };
+
+    const clientSupabase = await createClient();
+    await clientSupabase.auth.signOut();
+    redirect("/login");
   }
 
   logAudit({

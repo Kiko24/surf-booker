@@ -1,7 +1,9 @@
 "use server";
 
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { resetPasswordSchema } from "@/lib/validation/auth";
+import { assertValidOrigin } from "@/lib/csrf";
 
 export type ResetPasswordResult =
   | { ok: true }
@@ -58,6 +60,8 @@ export async function updatePassword(input: {
     };
   }
 
+  try { await assertValidOrigin(); } catch { return { ok: false, error: "Origem inválida", code: "generic" }; }
+
   const supabase = await createClient();
 
   const {
@@ -86,5 +90,6 @@ export async function updatePassword(input: {
     };
   }
 
-  return { ok: true };
+  await supabase.auth.signOut();
+  redirect("/login");
 }

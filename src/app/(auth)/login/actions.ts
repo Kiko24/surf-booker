@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { loginSchema } from "@/lib/validation/auth";
 import { getRedirectByRole, isSafeNextPath } from "@/lib/auth/redirect-by-role";
+import { assertValidOrigin } from "@/lib/csrf";
+import { rateLimitPublic } from "@/lib/rate-limit";
 
 export type LoginResult =
   | { ok: true }
@@ -50,6 +52,11 @@ export async function signIn(input: {
   password: string;
   nextPath?: string;
 }): Promise<LoginResult> {
+  try { await assertValidOrigin(); } catch { return { ok: false, error: "Origem inválida", code: "generic" }; }
+
+  const rl = await rateLimitPublic("login", 5, "60 s");
+  if (!rl.ok) return { ok: false, error: "Muitas tentativas. Tenta novamente mais tarde.", code: "rate_limit" };
+
   const parsed = loginSchema.safeParse({
     email: input.email,
     password: input.password,
@@ -96,6 +103,8 @@ export async function signIn(input: {
 export async function resendConfirmationFromLogin(
   email: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  try { await assertValidOrigin(); } catch { return { ok: false, error: "Origem inválida" }; }
+
   const normalizedEmail = email.trim().toLowerCase();
 
   if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {

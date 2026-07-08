@@ -2,8 +2,10 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { rateLimitByUser } from "@/lib/rate-limit";
+import { rateLimitByUser, rateLimitPublic } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
+import { requireOwner } from "@/lib/school";
+import { assertValidOrigin } from "@/lib/csrf";
 
 type ClassTypeName = { name: string };
 
@@ -15,6 +17,12 @@ export async function notifyOwnerBooking(
   studentName: string,
 ): Promise<void> {
   try {
+    const rl = await rateLimitPublic("notifyOwner", 10, "60 s");
+    if (!rl.ok) {
+      console.warn("Rate limit exceeded for notifyOwnerBooking", { schoolId });
+      return;
+    }
+
     const admin = createAdminClient();
     const [sessionRes, schoolRes] = await Promise.all([
       admin.from("sessions").select("starts_at, class_types(name)").eq("id", sessionId).single(),
@@ -57,8 +65,16 @@ export async function createBooking(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Não autenticado" };
 
+  try { await assertValidOrigin(); } catch { return { ok: false, error: "Origem inválida" }; }
+
   const rl = await rateLimitByUser(user.id, "createBooking");
   if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
+
+  try {
+    await requireOwner(schoolId);
+  } catch {
+    return { ok: false, error: "Sem permissão" };
+  }
 
   const paymentMethod = options?.paymentMethod ?? "single";
   const packPurchaseId = options?.packPurchaseId;
@@ -142,6 +158,8 @@ export async function addGuestToSession(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Não autenticado" };
 
+  try { await assertValidOrigin(); } catch { return { ok: false, error: "Origem inválida" }; }
+
   const rl = await rateLimitByUser(user.id, "addGuestToSession");
   if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
 
@@ -215,6 +233,8 @@ export async function addGroupBooking(
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Não autenticado" };
+
+  try { await assertValidOrigin(); } catch { return { ok: false, error: "Origem inválida" }; }
 
   const rl = await rateLimitByUser(user.id, "addGroupBooking");
   if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
@@ -333,6 +353,14 @@ export async function togglePaymentStatus(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Não autenticado" };
 
+  try { await assertValidOrigin(); } catch { return { ok: false, error: "Origem inválida" }; }
+
+  try {
+    await requireOwner(schoolId);
+  } catch {
+    return { ok: false, error: "Sem permissão" };
+  }
+
   const { data: booking } = await supabase
     .from("bookings")
     .select("id, payment_status")
@@ -350,6 +378,15 @@ export async function togglePaymentStatus(
 
   if (error) return { ok: false, error: error.message };
 
+  logAudit({
+    schoolId,
+    userId: user.id,
+    action: "toggle_payment_status",
+    entityType: "booking",
+    entityId: booking.id,
+    metadata: { sessionId, studentId, previousStatus: booking.payment_status, newStatus },
+  });
+
   return { ok: true, newStatus };
 }
 
@@ -361,6 +398,8 @@ export async function cancelBooking(
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Não autenticado" };
+
+  try { await assertValidOrigin(); } catch { return { ok: false, error: "Origem inválida" }; }
 
   const { data: school } = await supabase
     .from("schools")
@@ -410,6 +449,8 @@ export async function cancelBookingsBulk(
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Não autenticado" };
+
+  try { await assertValidOrigin(); } catch { return { ok: false, error: "Origem inválida" }; }
 
   const { data: school } = await supabase
     .from("schools")

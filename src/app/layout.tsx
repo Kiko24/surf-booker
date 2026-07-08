@@ -38,6 +38,7 @@ export default function RootLayout({
   return (
     <html lang="pt-PT" suppressHydrationWarning className={`${oswald.variable} ${lato.variable}`}>
       <body className="bg-background text-foreground antialiased">
+        <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer />
         <script
           dangerouslySetInnerHTML={{
             __html: `
