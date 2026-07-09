@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { rateLimitByUser } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
+import { safeError } from "@/lib/safe-error";
 import { validateImageContent } from "@/lib/utils/validate-image";
 
 const BUCKET = "school-images";
@@ -138,7 +139,7 @@ export async function deleteImage(
     .delete()
     .eq("id", id);
 
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: safeError(error) };
 
   logAudit({
     schoolId: img.school_id,

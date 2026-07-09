@@ -45,7 +45,7 @@ export async function sendStudentInvite(opts: StudentInvite): Promise<void> {
       `,
     });
   } catch (err) {
-    console.error("Failed to send invite email:", err);
+    console.error("Failed to send invite email");
   }
 }
 
@@ -70,7 +70,7 @@ export async function sendBookingNotification(opts: BookingNotification): Promis
       `,
     });
   } catch (err) {
-    console.error("Failed to send email notification:", err);
+    console.error("Failed to send email notification");
   }
 }
 
@@ -106,6 +106,6 @@ export async function sendCancellationNotification(opts: CancellationNotificatio
       `,
     });
   } catch (err) {
-    console.error("Failed to send cancellation email:", err);
+    console.error("Failed to send cancellation email");
   }
 }

@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { rateLimitPublic } from "@/lib/rate-limit";
 import { verifyTurnstileToken } from "@/lib/turnstile";
+import { logAudit } from "@/lib/audit";
 import { notifyOwnerBooking } from "@/app/dashboard/calendario/actions";
 
 export type PublicSchoolImage = {
@@ -71,6 +72,7 @@ export type PublicSchoolData = {
     logo_url: string | null;
     phone: string | null;
     timezone: string;
+    terms_url: string | null;
   };
   images: PublicSchoolImage[];
   instructors: PublicInstructor[];
@@ -88,7 +90,7 @@ export async function getPublicSchoolData(
   try {
     admin = createAdminClient();
   } catch (e) {
-    console.error("[getPublicSchoolData] createAdminClient error:", e);
+    console.error("[getPublicSchoolData] createAdminClient error");
     return null;
   }
 
@@ -100,15 +102,27 @@ export async function getPublicSchoolData(
       .eq("slug", slug)
       .maybeSingle();
     school = res.data;
-    if (res.error) console.error("[getPublicSchoolData] schools query error:", res.error);
+    if (res.error) console.error("[getPublicSchoolData] schools query error");
   } catch (e) {
-    console.error("[getPublicSchoolData] schools query threw:", e);
+    console.error("[getPublicSchoolData] schools query threw");
     return null;
   }
 
   if (!school) {
     console.error("[getPublicSchoolData] school not found for slug:", slug);
     return null;
+  }
+
+  let terms_url: string | null = null;
+  try {
+    const { data: settings } = await admin
+      .from("school_settings")
+      .select("terms_url")
+      .eq("school_id", school.id)
+      .maybeSingle();
+    terms_url = settings?.terms_url ?? null;
+  } catch (e) {
+    console.error("[getPublicSchoolData] failed to fetch terms_url");
   }
 
   let images: PublicSchoolImage[] = [];
@@ -218,13 +232,16 @@ export async function getPublicSchoolData(
     if (sessionIds.length > 0) {
       const { data: bookings } = await admin
         .from("bookings")
-        .select("session_id")
+        .select("session_id, participants, student_id")
         .in("session_id", sessionIds)
         .eq("status", "confirmed");
 
       const countMap: Record<string, number> = {};
       for (const b of bookings ?? []) {
-        countMap[b.session_id] = (countMap[b.session_id] ?? 0) + 1;
+        const pc = b.participants
+          ? (Array.isArray(b.participants) ? b.participants.length : 0)
+          : (b.student_id ? 1 : 0);
+        countMap[b.session_id] = (countMap[b.session_id] ?? 0) + pc;
       }
       for (const s of realSessions) {
         s.booked = countMap[s.id] ?? 0;
@@ -233,7 +250,7 @@ export async function getPublicSchoolData(
 
     upcomingSessions = realSessions;
   } catch (err) {
-    console.error("[getPublicSchoolData] sub-queries error:", err);
+    console.error("[getPublicSchoolData] sub-queries error");
   }
 
   return {
@@ -246,6 +263,7 @@ export async function getPublicSchoolData(
       logo_url: school.logo_url || null,
       phone: school.phone ?? null,
       timezone: school.timezone || "Europe/Lisbon",
+      terms_url,
     },
     images,
     instructors,
@@ -277,7 +295,7 @@ export async function getPublicSessionsForMonth(
     .order("starts_at", { ascending: true });
 
   if (error) {
-    console.error("[getPublicSessionsForMonth] query error:", error);
+    console.error("[getPublicSessionsForMonth] query error");
     return {};
   }
 
@@ -293,12 +311,15 @@ export async function getPublicSessionsForMonth(
   if (sessionIds.length > 0) {
     const { data: bookings } = await admin
       .from("bookings")
-      .select("session_id")
+      .select("session_id, participants, student_id")
       .in("session_id", sessionIds)
       .eq("status", "confirmed");
 
     for (const b of bookings ?? []) {
-      countMap[b.session_id] = (countMap[b.session_id] ?? 0) + 1;
+      const pc = b.participants
+        ? (Array.isArray(b.participants) ? b.participants.length : 0)
+        : (b.student_id ? 1 : 0);
+      countMap[b.session_id] = (countMap[b.session_id] ?? 0) + pc;
     }
   }
 
@@ -454,6 +475,15 @@ export async function comprarPackPublico(
 
   if (ppErr || !purchase) return { ok: false, error: "Erro ao registar compra." };
 
+  logAudit({
+    schoolId,
+    userId: student.id,
+    action: "buy_pack",
+    entityType: "pack_purchase",
+    entityId: purchase.id,
+    metadata: { email: data.email, classTypeId },
+  });
+
   return { ok: true, packPurchaseId: purchase.id };
 }
 
@@ -495,13 +525,27 @@ export async function buscarPackAtivo(
   };
 }
 
+export type ParticipantInput = {
+  name: string;
+  age: number;
+  nota?: string;
+  parentalConsent: boolean;
+};
+
 export async function criarReservaPublica(
   schoolId: string,
-  sessionId: string,
-  data: { name: string; email: string; phone: string },
-  packPurchaseId?: string,
+  sessionIds: string[],
+  data: {
+    participants: ParticipantInput[];
+    contactName: string;
+    contactEmail: string;
+    contactPhone: string;
+    termsAccepted?: boolean;
+    termsUrl?: string | null;
+    packPurchaseId?: string;
+  },
   turnstileToken?: string
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true; bookingGroupIds: string[] } | { ok: false; error: string }> {
   const rl = await rateLimitPublic("criarReservaPublica", 5, "60 s");
   if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
 
@@ -510,86 +554,130 @@ export async function criarReservaPublica(
     if (!valid) return { ok: false, error: "Verificação de segurança falhou. Tenta novamente." };
   }
 
+  if (!sessionIds.length) return { ok: false, error: "Nenhuma sessão selecionada." };
+  if (!data.participants.length) return { ok: false, error: "Nenhum participante." };
+  if (data.contactName.trim().length < 2) return { ok: false, error: "Nome de contacto deve ter pelo menos 2 caracteres." };
+  if (!data.contactEmail.includes("@") || !data.contactEmail.includes(".")) return { ok: false, error: "Email inválido." };
+  if (data.contactPhone.replace(/\D/g, "").length < 6) return { ok: false, error: "Telemóvel deve ter pelo menos 6 dígitos." };
+
+  for (const p of data.participants) {
+    if (p.name.trim().length < 2) return { ok: false, error: `Nome do participante "${p.name}" é muito curto.` };
+    if (!p.age || p.age < 1 || p.age > 120) return { ok: false, error: `Idade inválida para "${p.name}".` };
+    if (p.age < 18 && !p.parentalConsent) return { ok: false, error: `Consentimento parental necessário para "${p.name}" (menor de 18).` };
+  }
+
+  if (data.termsUrl && !data.termsAccepted) return { ok: false, error: "Deves aceitar os termos de serviço." };
+
   const admin = createAdminClient();
 
-  const student = await findOrCreateStudent(admin, schoolId, data);
-  if (!student) return { ok: false, error: "Erro ao criar aluno." };
+  const participantsJson = data.participants.map((p) => ({
+    name: p.name.trim(),
+    age: p.age,
+    ...(p.nota?.trim() ? { nota: p.nota.trim() } : {}),
+    parentalConsent: p.parentalConsent,
+  }));
 
-  const { data: sessionData } = await admin
+  const { data: sessions } = await admin
     .from("sessions")
-    .select("price_cents")
-    .eq("id", sessionId)
-    .eq("school_id", schoolId)
-    .single();
+    .select("id, price_cents")
+    .in("id", sessionIds)
+    .eq("school_id", schoolId);
 
-  const priceCents = sessionData?.price_cents ?? 0;
+  const sessionPriceMap = new Map<string, number>();
+  for (const s of sessions ?? []) {
+    sessionPriceMap.set(s.id, s.price_cents ?? 0);
+  }
 
-  if (packPurchaseId) {
+  const bookingGroupIds: string[] = [];
+
+  let paymentMethod: "single" | "pack" = "single";
+  if (data.packPurchaseId) {
     const { data: pp } = await admin
       .from("pack_purchases")
-      .select("lessons_remaining")
-      .eq("id", packPurchaseId)
-      .eq("student_id", student.id)
-      .eq("school_id", schoolId)
+      .select("id, student_id")
+      .eq("id", data.packPurchaseId)
       .eq("status", "active")
+      .maybeSingle();
+    if (!pp) return { ok: false, error: "Pack sem aulas restantes." };
+
+    paymentMethod = "pack";
+  }
+
+  for (const sessionId of sessionIds) {
+    const priceCents = (sessionPriceMap.get(sessionId) ?? 0) * data.participants.length;
+
+    const { data: bookingGroup, error: bgErr } = await admin
+      .from("booking_groups")
+      .insert({
+        school_id: schoolId,
+        session_id: sessionId,
+        booked_by_student_id: null,
+        contact_name: data.contactName.trim(),
+        contact_email: data.contactEmail.trim().toLowerCase(),
+        contact_phone: data.contactPhone.trim(),
+        source: "guest",
+      })
+      .select("id")
       .single();
 
-    if (!pp || pp.lessons_remaining < 1) {
-      return { ok: false, error: "Pack sem créditos disponíveis." };
-    }
-  }
+    if (bgErr || !bookingGroup) return { ok: false, error: "Erro ao criar reserva." };
 
-  const { data: bookingGroup, error: bgErr } = await admin
-    .from("booking_groups")
-    .insert({
-      school_id: schoolId,
+    const bookingInsert: Record<string, unknown> = {
+      booking_group_id: bookingGroup.id,
       session_id: sessionId,
-      booked_by_student_id: student.id,
-      contact_name: data.name.trim(),
-      contact_email: data.email.trim().toLowerCase(),
-      contact_phone: data.phone.trim(),
-      source: "guest",
-    })
-    .select("id")
-    .single();
-
-  if (bgErr || !bookingGroup) return { ok: false, error: "Erro ao criar reserva." };
-
-  const isPack = !!packPurchaseId;
-
-  const { error: bErr } = await admin.from("bookings").insert({
-    booking_group_id: bookingGroup.id,
-    session_id: sessionId,
-    student_id: student.id,
-    payment_method: isPack ? "pack" : "single",
-    payment_status: isPack ? "paid_offline" : "unpaid",
-    price_cents: isPack ? 0 : priceCents,
-    ...(isPack ? { pack_purchase_id: packPurchaseId } : {}),
-  });
-
-  if (bErr) return { ok: false, error: "Erro ao confirmar reserva." };
-
-  if (isPack && packPurchaseId) {
-    const { data: decremented } = await admin.rpc("decrement_pack_credit", {
-      p_purchase_id: packPurchaseId,
-    });
-
-    if (!decremented) {
-      return { ok: false, error: "Falha ao debitar pack. Tente novamente." };
+      student_id: null,
+      participants: participantsJson,
+      payment_method: paymentMethod,
+      payment_status: "unpaid",
+      price_cents: priceCents,
+    };
+    if (paymentMethod === "pack" && data.packPurchaseId) {
+      bookingInsert.pack_purchase_id = data.packPurchaseId;
     }
+
+    const { error: bErr } = await admin.from("bookings").insert(bookingInsert);
+
+    if (bErr) return { ok: false, error: "Erro ao confirmar reserva." };
+
+    bookingGroupIds.push(bookingGroup.id);
   }
 
-  notifyOwnerBooking(schoolId, sessionId, data.name.trim()).catch((err) => {
-    console.error("Erro ao notificar dono", err);
+  if (data.packPurchaseId) {
+    const { data: ok, error: rpcErr } = await admin.rpc("decrement_pack_credit", {
+      p_purchase_id: data.packPurchaseId,
+    });
+    if (rpcErr || !ok) return { ok: false, error: "Erro ao usar pack." };
+  }
+
+  logAudit({
+    schoolId,
+    userId: null,
+    action: "create_booking",
+    entityType: "booking_group",
+    entityId: bookingGroupIds[0],
+    metadata: {
+      email: data.contactEmail,
+      sessionIds,
+      participantCount: data.participants.length,
+    },
   });
 
-  return { ok: true };
+  for (const sessionId of sessionIds) {
+    notifyOwnerBooking(schoolId, sessionId, data.contactName.trim()).catch(() => {
+      console.error("Erro ao notificar dono");
+    });
+  }
+
+  return { ok: true, bookingGroupIds };
 }
 
 export async function toggleFavorite(
   schoolId: string,
   action: "add" | "remove"
 ): Promise<{ ok: true; favorited: boolean } | { ok: false; error: string }> {
+  const rl = await rateLimitPublic("toggleFavorite", 10, "60 s");
+  if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
+
   const supabase = await createClient();
   const { data: { user }, error: authErr } = await supabase.auth.getUser();
 
@@ -610,6 +698,14 @@ export async function toggleFavorite(
       return { ok: false, error: "Erro ao adicionar favorito." };
     }
 
+    logAudit({
+      schoolId,
+      userId: user.id,
+      action: "add_favorite",
+      entityType: "favorite",
+      entityId: schoolId,
+    });
+
     return { ok: true, favorited: true };
   }
 
@@ -622,6 +718,14 @@ export async function toggleFavorite(
   if (error) {
     return { ok: false, error: "Erro ao remover favorito." };
   }
+
+  logAudit({
+    schoolId,
+    userId: user.id,
+    action: "remove_favorite",
+    entityType: "favorite",
+    entityId: schoolId,
+  });
 
   return { ok: true, favorited: false };
 }

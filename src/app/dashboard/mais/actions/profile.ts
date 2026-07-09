@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { rateLimitByUser } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
+import { safeError } from "@/lib/safe-error";
 import { assertValidOrigin } from "@/lib/csrf";
 import { passwordSchema } from "@/lib/validation/signup-owner";
 
@@ -50,16 +51,16 @@ export async function saveProfile(data: {
 
   if (emailTrimmed !== user.email) {
     const { error: emailErr } = await admin.auth.admin.updateUserById(user.id, { email: emailTrimmed });
-    if (emailErr) return { ok: false, error: "Erro ao atualizar email: " + emailErr.message };
+    if (emailErr) return { ok: false, error: "Erro ao atualizar email: " + safeError(emailErr) };
   }
 
   if (data.password) {
     const parsed = passwordSchema.safeParse(data.password);
     if (!parsed.success) {
-      return { ok: false, error: parsed.error.message ?? "Password inválida" };
+      return { ok: false, error: safeError(parsed.error) ?? "Password inválida" };
     }
     const { error: pwdErr } = await admin.auth.admin.updateUserById(user.id, { password: data.password });
-    if (pwdErr) return { ok: false, error: "Erro ao atualizar palavra-passe: " + pwdErr.message };
+    if (pwdErr) return { ok: false, error: "Erro ao atualizar palavra-passe: " + safeError(pwdErr) };
 
     const clientSupabase = await createClient();
     await clientSupabase.auth.signOut();

@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { rateLimitByUser } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
+import { safeError } from "@/lib/safe-error";
 import { requireOwner } from "@/lib/school";
 import { assertValidOrigin } from "@/lib/csrf";
 
@@ -65,7 +66,7 @@ export async function getSessionsForMonth(
 
   const { data: allBookings } = await supabase
     .from("bookings")
-    .select("id, session_id, student_id, payment_status, status, booking_group_id")
+    .select("id, session_id, student_id, payment_status, status, booking_group_id, participants")
     .in("session_id", sessionIds)
     .in("status", ["confirmed", "attended", "no_show"]);
 
@@ -76,7 +77,7 @@ export async function getSessionsForMonth(
     .in("id", groupIds);
   const groupSizeMap = new Map((groups ?? []).map((g) => [g.id, g.group_size]));
 
-  const studentIds = [...new Set((allBookings ?? []).map((b) => b.student_id))];
+  const studentIds = [...new Set((allBookings ?? []).filter(b => b.student_id).map((b) => b.student_id))];
 
   const { data: students } = await supabase
     .from("students")
@@ -88,17 +89,32 @@ export async function getSessionsForMonth(
   const bookingMap: Record<string, { count: number; alunos: SessionAluno[] }> = {};
   for (const b of allBookings ?? []) {
     if (!bookingMap[b.session_id]) bookingMap[b.session_id] = { count: 0, alunos: [] };
-    const gs = b.booking_group_id ? groupSizeMap.get(b.booking_group_id) ?? 1 : 1;
-    if (b.status !== "no_show") bookingMap[b.session_id].count += gs;
-    const name = studentNameMap.get(b.student_id);
-    if (name) bookingMap[b.session_id].alunos.push({
-      id: b.student_id,
-      bookingId: b.id,
-      name,
-      paymentStatus: b.payment_status,
-      attendanceStatus: b.status as "confirmed" | "attended" | "no_show",
-      groupSize: gs > 1 ? gs : undefined,
-    });
+
+    if (b.participants && Array.isArray(b.participants) && b.participants.length > 0) {
+      const count = b.participants.length;
+      if (b.status !== "no_show") bookingMap[b.session_id].count += count;
+      (b.participants as Array<{ name: string; age?: number }>).forEach((p, idx) => {
+        bookingMap[b.session_id].alunos.push({
+          id: `p-${b.id}-${idx}`,
+          bookingId: b.id,
+          name: p.name,
+          paymentStatus: b.payment_status,
+          attendanceStatus: b.status as "confirmed" | "attended" | "no_show",
+        });
+      });
+    } else {
+      const gs = b.booking_group_id ? groupSizeMap.get(b.booking_group_id) ?? 1 : 1;
+      if (b.status !== "no_show") bookingMap[b.session_id].count += gs;
+      const name = studentNameMap.get(b.student_id);
+      if (name) bookingMap[b.session_id].alunos.push({
+        id: b.student_id,
+        bookingId: b.id,
+        name,
+        paymentStatus: b.payment_status,
+        attendanceStatus: b.status as "confirmed" | "attended" | "no_show",
+        groupSize: gs > 1 ? gs : undefined,
+      });
+    }
   }
 
   for (const s of sessions) {
@@ -153,7 +169,7 @@ export async function getSessionsForRange(
 
   const { data: allBookings } = await supabase
     .from("bookings")
-    .select("id, session_id, student_id, payment_status, status, booking_group_id")
+    .select("id, session_id, student_id, payment_status, status, booking_group_id, participants")
     .in("session_id", sessionIds)
     .in("status", ["confirmed", "attended", "no_show"]);
 
@@ -164,7 +180,7 @@ export async function getSessionsForRange(
     .in("id", groupIds);
   const groupSizeMap = new Map((groups ?? []).map((g) => [g.id, g.group_size]));
 
-  const studentIds = [...new Set((allBookings ?? []).map((b) => b.student_id))];
+  const studentIds = [...new Set((allBookings ?? []).filter(b => b.student_id).map((b) => b.student_id))];
 
   const { data: students } = await supabase
     .from("students")
@@ -176,17 +192,32 @@ export async function getSessionsForRange(
   const bookingMap: Record<string, { count: number; alunos: SessionAluno[] }> = {};
   for (const b of allBookings ?? []) {
     if (!bookingMap[b.session_id]) bookingMap[b.session_id] = { count: 0, alunos: [] };
-    const gs = b.booking_group_id ? groupSizeMap.get(b.booking_group_id) ?? 1 : 1;
-    if (b.status !== "no_show") bookingMap[b.session_id].count += gs;
-    const name = studentNameMap.get(b.student_id);
-    if (name) bookingMap[b.session_id].alunos.push({
-      id: b.student_id,
-      bookingId: b.id,
-      name,
-      paymentStatus: b.payment_status,
-      attendanceStatus: b.status as "confirmed" | "attended" | "no_show",
-      groupSize: gs > 1 ? gs : undefined,
-    });
+
+    if (b.participants && Array.isArray(b.participants) && b.participants.length > 0) {
+      const count = b.participants.length;
+      if (b.status !== "no_show") bookingMap[b.session_id].count += count;
+      (b.participants as Array<{ name: string; age?: number }>).forEach((p, idx) => {
+        bookingMap[b.session_id].alunos.push({
+          id: `p-${b.id}-${idx}`,
+          bookingId: b.id,
+          name: p.name,
+          paymentStatus: b.payment_status,
+          attendanceStatus: b.status as "confirmed" | "attended" | "no_show",
+        });
+      });
+    } else {
+      const gs = b.booking_group_id ? groupSizeMap.get(b.booking_group_id) ?? 1 : 1;
+      if (b.status !== "no_show") bookingMap[b.session_id].count += gs;
+      const name = studentNameMap.get(b.student_id);
+      if (name) bookingMap[b.session_id].alunos.push({
+        id: b.student_id,
+        bookingId: b.id,
+        name,
+        paymentStatus: b.payment_status,
+        attendanceStatus: b.status as "confirmed" | "attended" | "no_show",
+        groupSize: gs > 1 ? gs : undefined,
+      });
+    }
   }
 
   for (const s of sessions) {
@@ -277,7 +308,7 @@ export async function createSession(formData: {
     status: "scheduled",
   }).select("id").single();
 
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: safeError(error) };
 
   logAudit({
     schoolId: formData.schoolId,
@@ -319,7 +350,7 @@ export async function deleteSession(sessionId: string): Promise<{ ok: boolean; e
     .delete()
     .eq("id", sessionId);
 
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: safeError(error) };
 
   if (session) {
     logAudit({
@@ -391,7 +422,7 @@ export async function cancelSession(sessionId: string): Promise<{ ok: boolean; e
         date,
         time,
       }).catch((err) => {
-        console.error("Failed to send cancellation notification to", s.email, err);
+        console.error("Failed to send cancellation notification to", s.email);
       });
     }
   }
@@ -401,7 +432,7 @@ export async function cancelSession(sessionId: string): Promise<{ ok: boolean; e
     .delete()
     .eq("id", sessionId);
 
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: safeError(error) };
 
   logAudit({
     schoolId: session.school_id,
@@ -468,7 +499,7 @@ export async function markAttendance(
     .update(updates)
     .eq("id", booking.id);
 
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: safeError(error) };
 
   logAudit({
     schoolId: session.school_id,
@@ -526,7 +557,7 @@ export async function closeSession(sessionId: string): Promise<{ ok: boolean; er
     .update({ status: "completed" })
     .eq("id", sessionId);
 
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: safeError(error) };
 
   logAudit({
     schoolId: session.school_id,
@@ -585,7 +616,7 @@ export async function updateSession(
     })
     .eq("id", sessionId);
 
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: safeError(error) };
 
   logAudit({
     schoolId: formData.schoolId,
@@ -624,7 +655,7 @@ export async function updateSessionDate(
     .update({ starts_at: newStartsAt })
     .eq("id", sessionId);
 
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: safeError(error) };
 
   logAudit({
     schoolId,

@@ -2,6 +2,25 @@
 
 import { useEffect, useRef } from "react";
 
+declare global {
+  interface Window {
+    turnstile: {
+      render: (container: HTMLElement, opts: {
+        sitekey: string;
+        callback: (token: string) => void;
+        "expired-callback"?: () => void;
+        "error-callback"?: () => void;
+      }) => string;
+      execute: (widgetId: string, opts: {
+        callback: (token: string) => void;
+        "expired-callback"?: () => void;
+        "error-callback"?: () => void;
+      }) => void;
+      remove: (widgetId: string) => void;
+    };
+  }
+}
+
 export function useTurnstile() {
   const widgetId = useRef<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);

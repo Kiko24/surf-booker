@@ -149,7 +149,7 @@ export async function createSchool(
     try {
       validation = await validateImageContent(logoFile);
     } catch (err) {
-      console.error("[createSchool] validateImageContent threw", err);
+      console.error("[createSchool] validateImageContent threw");
       return { ok: false, error: "Erro ao validar a imagem.", field: "logo" };
     }
     if (!validation.ok) {
@@ -173,7 +173,7 @@ export async function createSchool(
       });
 
     if (uploadError) {
-      console.error("[createSchool] logo upload failed", uploadError);
+      console.error("[createSchool] logo upload failed");
       return { ok: false, error: "Erro ao carregar a imagem." };
     }
 
@@ -199,7 +199,7 @@ export async function createSchool(
   });
 
   if (insertError) {
-    console.error("[createSchool] insert failed", insertError);
+    console.error("[createSchool] insert failed");
 
     // Cleanup do logo se insert falhar
     if (logoUrl && logoExt) {

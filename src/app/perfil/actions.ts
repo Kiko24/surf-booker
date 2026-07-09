@@ -2,6 +2,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { safeError } from "@/lib/safe-error";
 import { assertValidOrigin } from "@/lib/csrf";
 import { passwordSchema } from "@/lib/validation/signup-owner";
 import { redirect } from "next/navigation";
@@ -265,7 +266,7 @@ export async function updateProfile(data: { fullName: string; email: string; pho
     .update(updates)
     .eq("auth_user_id", user.id);
 
-  if (error) return { success: false, error: error.message };
+  if (error) return { success: false, error: safeError(error) };
   return { success: true };
 }
 
@@ -278,7 +279,7 @@ export async function updatePassword(data: { currentPassword: string; newPasswor
 
   const parsed = passwordSchema.safeParse(data.newPassword);
   if (!parsed.success) {
-    return { success: false, error: parsed.error.message ?? "Password inválida" };
+    return { success: false, error: safeError(parsed.error) ?? "Password inválida" };
   }
 
   const { error: signInError } = await supabase.auth.signInWithPassword({

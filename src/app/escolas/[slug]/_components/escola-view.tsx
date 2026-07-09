@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import type { PublicSchoolData } from "../actions";
-import { toggleFavorite, comprarPackPublico } from "../actions";
+import { toggleFavorite, comprarPackPublico, criarReservaPublica } from "../actions";
+import type { ParticipantInput } from "../actions";
 import { useTurnstile } from "./turnstile-widget";
 import { Lightbox } from "./lightbox";
 import { PublicCalendar } from "./public-calendar";
@@ -50,8 +51,16 @@ export function EscolaView({ data }: Props) {
   const [packLoading, setPackLoading] = useState(false);
   const [selectedRentalVariantId, setSelectedRentalVariantId] = useState<string | null>(null);
   const { containerRef: turnstileRef, execute: turnstileExecute } = useTurnstile();
-  const [bookingStep, setBookingStep] = useState<1 | 2>(1);
-  const [participantsBySession, setParticipantsBySession] = useState<Record<string, { name: string; age: string }[]>>({});
+  const [bookingStep, setBookingStep] = useState<1 | 2 | 3>(1);
+  const [participantsBySession, setParticipantsBySession] = useState<Record<string, { name: string; age: string; nota: string; parentalConsent: boolean }[]>>({});
+  const [payerName, setPayerName] = useState("");
+  const [payerEmail, setPayerEmail] = useState("");
+  const [payerPhoneCode, setPayerPhoneCode] = useState("+351");
+  const [payerPhone, setPayerPhone] = useState("");
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [bookingSubmitting, setBookingSubmitting] = useState(false);
+  const [bookingError, setBookingError] = useState<string | null>(null);
+  const [bookingSuccess, setBookingSuccess] = useState(false);
 
   useEffect(() => {
     if (!showServicePicker) return;
@@ -62,9 +71,15 @@ export function EscolaView({ data }: Props) {
       setPackQuantity(1);
       setPackFormError(null);
       setShowPackSuccess(false);
+      setPayerName(userInfo?.name ?? "");
+      setPayerEmail(userInfo?.email ?? "");
+      setPayerPhone(userInfo?.phone ?? "");
+      setTermsAccepted(false);
+      setBookingError(null);
+      setBookingSuccess(false);
     });
     return () => cancelAnimationFrame(id);
-  }, [showServicePicker]);
+  }, [showServicePicker, userInfo]);
 
   useEffect(() => {
     const check = async () => {
@@ -597,19 +612,20 @@ export function EscolaView({ data }: Props) {
         </div>
       )}
 
+      <div ref={turnstileRef} className="hidden" />
       {showServicePicker && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
           onClick={() => setShowServicePicker(false)}
         >
           <div
-            className="w-full max-w-5xl rounded-2xl bg-white p-6 shadow-xl h-[85vh] flex flex-col"
+            className="w-full max-w-5xl rounded-2xl bg-white p-6 shadow-xl h-[85vh] flex flex-col relative"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex-1 overflow-y-auto">
             <div className="flex items-center justify-between mb-4 shrink-0">
               <h3 className="font-heading text-lg font-bold text-gray-900">
-                {bookingStep === 1 ? "Reservar aula" : "Informações Adicionais"}
+                {bookingStep === 1 ? "Reservar aula" : bookingStep === 3 ? "Confirmação" : "Participantes"}
               </h3>
               <button
                 type="button"
@@ -859,11 +875,72 @@ export function EscolaView({ data }: Props) {
                   </div>
                 </>
               ) : (
-                /* Step 2 — left: participant forms, right: session summary */
+                /* Step 2/3 — left: participant forms, right: summary or payer */
                 <div className="flex flex-row gap-6 w-full">
                   <div className="flex-1 space-y-6">
-                    {[...selectedSessions].sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime()).map((sess) => {
-                      const participants = participantsBySession[sess.id] ?? [{ name: "", age: "" }];
+                    {bookingStep === 3 ? (
+                      <div className="space-y-4">
+                        <h4 className="font-heading text-sm font-bold text-gray-900">Dados do pagador</h4>
+                        <div>
+                          <label className="block text-sm text-gray-700 mb-1">Nome</label>
+                          <input
+                            type="text"
+                            value={payerName}
+                            onChange={(e) => setPayerName(e.target.value.replace(/[^a-zA-ZÀ-ÿ\s'-]/g, "").slice(0, 80))}
+                            className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 outline-none"
+                            placeholder="O teu nome"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm text-gray-700 mb-1">Email</label>
+                          <input
+                            type="email"
+                            value={payerEmail}
+                            onChange={(e) => setPayerEmail(e.target.value.trim().toLowerCase().slice(0, 120))}
+                            className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 outline-none"
+                            placeholder="O teu email"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm text-gray-700 mb-1">Telemóvel</label>
+                          <div className="flex gap-2">
+                            <input
+                              type="tel"
+                              value={payerPhoneCode}
+                              onChange={(e) => setPayerPhoneCode(e.target.value.replace(/[^0-9+]/g, "").slice(0, 5))}
+                              className="w-24 shrink-0 rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-accent"
+                              placeholder="+351"
+                            />
+                            <input
+                              type="tel"
+                              value={payerPhone}
+                              onChange={(e) => setPayerPhone(e.target.value.replace(/\D/g, "").slice(0, 15))}
+                              className="flex-1 rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-accent"
+                              placeholder="O teu telemóvel"
+                            />
+                          </div>
+                        </div>
+                        {school.terms_url && (
+                          <>
+                            <hr className="border-gray-200" />
+                            <label className="flex items-start gap-2 text-sm text-gray-600 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={termsAccepted}
+                                onChange={(e) => setTermsAccepted(e.target.checked)}
+                                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-accent"
+                              />
+                              <span>Aceito os <a href={school.terms_url} target="_blank" rel="noopener noreferrer" className="text-accent underline">Termos de Serviço</a></span>
+                            </label>
+                          </>
+                        )}
+                        {bookingError && (
+                          <p className="text-xs text-red-500">{bookingError}</p>
+                        )}
+                      </div>
+                    ) : (
+                    [...selectedSessions].sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime()).map((sess) => {
+                      const participants = participantsBySession[sess.id] ?? [{ name: "", age: "", nota: "", parentalConsent: false }];
                       return (
                         <div key={sess.id} className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
                           <p className="font-heading text-sm font-bold text-gray-900 mb-4">
@@ -891,8 +968,8 @@ export function EscolaView({ data }: Props) {
                               type="button"
                               onClick={() => {
                                 setParticipantsBySession(prev => {
-                                  const arr = [...(prev[sess.id] ?? [{ name: "", age: "" }])];
-                                  if (arr.length < 20) arr.push({ name: "", age: "" });
+                                  const arr = [...(prev[sess.id] ?? [{ name: "", age: "", nota: "", parentalConsent: false }])];
+                                  if (arr.length < 20) arr.push({ name: "", age: "", nota: "", parentalConsent: false });
                                   return { ...prev, [sess.id]: arr };
                                 });
                               }}
@@ -903,50 +980,85 @@ export function EscolaView({ data }: Props) {
                               </svg>
                             </button>
                           </div>
-                          <div className="space-y-2">
+                          <div className="space-y-3">
                             {participants.map((p, idx) => (
-                              <div key={idx} className="flex gap-3 items-start">
-                                <span className="mt-3 text-xs text-gray-400 w-5 shrink-0">{idx + 1}.</span>
-                                <div className="flex-1">
-                                  <input
-                                    type="text"
-                                    value={p.name}
-                                  onChange={(e) => {
-                                    const val = e.target.value.replace(/[^a-zA-ZÀ-ÿ\s'-]/g, "").slice(0, 80);
-                                      setParticipantsBySession(prev => {
-                                        const arr = [...(prev[sess.id] ?? [])];
-                                        arr[idx] = { ...arr[idx], name: val };
-                                        return { ...prev, [sess.id]: arr };
-                                      });
-                                    }}
-                                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 outline-none focus:border-accent"
-                                    placeholder={`Nome do participante ${idx + 1}`}
-                                  />
+                              <div key={idx} className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                                <div className="flex gap-3 items-start mb-2">
+                                  <span className="mt-3 text-xs text-gray-400 w-5 shrink-0">{idx + 1}.</span>
+                                  <div className="flex-1">
+                                    <input
+                                      type="text"
+                                      value={p.name}
+                                      onChange={(e) => {
+                                        const val = e.target.value.replace(/[^a-zA-ZÀ-ÿ\s'-]/g, "").slice(0, 80);
+                                        setParticipantsBySession(prev => {
+                                          const arr = [...(prev[sess.id] ?? [])];
+                                          arr[idx] = { ...arr[idx], name: val };
+                                          return { ...prev, [sess.id]: arr };
+                                        });
+                                      }}
+                                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 outline-none focus:border-accent"
+                                      placeholder={`Nome do participante ${idx + 1}`}
+                                    />
+                                  </div>
+                                  <div className="w-20 shrink-0">
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      max={120}
+                                      value={p.age}
+                                      onChange={(e) => {
+                                        const val = e.target.value.replace(/\D/g, "").slice(0, 3);
+                                        setParticipantsBySession(prev => {
+                                          const arr = [...(prev[sess.id] ?? [])];
+                                          arr[idx] = { ...arr[idx], age: val };
+                                          return { ...prev, [sess.id]: arr };
+                                        });
+                                      }}
+                                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 outline-none focus:border-accent"
+                                      placeholder="Idade"
+                                    />
+                                  </div>
                                 </div>
-                                <div className="w-20 shrink-0">
-                                  <input
-                                    type="number"
-                                    min={1}
-                                    max={120}
-                                    value={p.age}
+                                <div className="ml-8 space-y-2">
+                                  <textarea
+                                    value={p.nota}
                                     onChange={(e) => {
-                                      const val = e.target.value.replace(/\D/g, "").slice(0, 3);
+                                      const val = e.target.value.slice(0, 500);
                                       setParticipantsBySession(prev => {
                                         const arr = [...(prev[sess.id] ?? [])];
-                                        arr[idx] = { ...arr[idx], age: val };
+                                        arr[idx] = { ...arr[idx], nota: val };
                                         return { ...prev, [sess.id]: arr };
                                       });
                                     }}
-                                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 outline-none focus:border-accent"
-                                    placeholder="Idade"
+                                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 outline-none focus:border-accent resize-none"
+                                    placeholder="Nota (opcional) — e.g. alergias, nível de surf, restrições..."
+                                    rows={2}
                                   />
+                                  {p.age && parseInt(p.age) < 18 && (
+                                    <label className="flex items-start gap-2 text-sm text-gray-600 cursor-pointer">
+                                      <input
+                                        type="checkbox"
+                                        checked={p.parentalConsent}
+                                        onChange={(e) => {
+                                          setParticipantsBySession(prev => {
+                                            const arr = [...(prev[sess.id] ?? [])];
+                                            arr[idx] = { ...arr[idx], parentalConsent: e.target.checked };
+                                            return { ...prev, [sess.id]: arr };
+                                          });
+                                        }}
+                                        className="mt-0.5 h-4 w-4 rounded border-gray-300 text-accent focus:ring-accent"
+                                      />
+                                      <span>Consentimento parental (menor de 18 anos)</span>
+                                    </label>
+                                  )}
                                 </div>
                               </div>
                             ))}
                           </div>
                         </div>
                       );
-                    })}
+                    }))}
                   </div>
 
                   {(() => {
@@ -956,6 +1068,7 @@ export function EscolaView({ data }: Props) {
                     const effPriceCents = vInfo?.price_cents ?? rightSvc.price_cents;
                     const totParticipants = selectedSessions.reduce((sum, s) => sum + (participantsBySession[s.id]?.length ?? 1), 0);
                     const totPrice = effPriceCents * totParticipants;
+
                     return (
                       <div className="w-[320px] shrink-0">
                         <div className="sticky top-0 space-y-4">
@@ -1010,22 +1123,62 @@ export function EscolaView({ data }: Props) {
                 ? (selectedSessions[0]?.class_type_name ?? selSvc.name)
                 : selSvc.name;
               const allParticipantsValid = selectedSessions.every(s => {
-                const ps = participantsBySession[s.id] ?? [{ name: "", age: "" }];
-                return ps.every(p => p.name.trim().length >= 2 && p.age.trim().length > 0 && parseInt(p.age) >= 1 && parseInt(p.age) <= 120);
+                const ps = participantsBySession[s.id] ?? [{ name: "", age: "", nota: "", parentalConsent: false }];
+                return ps.every(p => p.name.trim().length >= 2 && p.age.trim().length > 0 && parseInt(p.age) >= 1 && parseInt(p.age) <= 120 && (parseInt(p.age) >= 18 || p.parentalConsent));
               });
+              const payerValid = payerName.trim().length >= 2 && payerEmail.trim().includes("@") && payerEmail.trim().includes(".") && payerPhone.trim().replace(/\D/g, "").length >= 6 && (!school.terms_url || termsAccepted);
               const canContinue = isAula
-                ? (bookingStep === 1 ? selectedSessions.length > 0 : allParticipantsValid)
+                ? (bookingStep === 1 ? selectedSessions.length > 0 : bookingStep === 2 ? allParticipantsValid : payerValid)
                 : (packName.trim().length >= 2 && packEmail.trim().includes("@") && packPhone.trim().length >= 6);
 
               const handleContinue = async () => {
                 if (isAula && bookingStep === 1 && selectedSessions.length > 0) {
                   setBookingStep(2);
-                  const init: Record<string, { name: string; age: string }[]> = {};
+                  const init: Record<string, { name: string; age: string; nota: string; parentalConsent: boolean }[]> = {};
                   const sorted = [...selectedSessions].sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime());
-                  sorted.forEach(s => { init[s.id] = [{ name: "", age: "" }]; });
+                  sorted.forEach(s => { init[s.id] = [{ name: "", age: "", nota: "", parentalConsent: false }]; });
                   setParticipantsBySession(init);
                 } else if (isAula && bookingStep === 2 && allParticipantsValid) {
-                  // TODO: avançar para Step 3 (dados do pagador)
+                  setPayerName(userInfo?.name ?? "");
+                  setPayerEmail(userInfo?.email ?? "");
+                  setPayerPhone(userInfo?.phone ?? "");
+                  setBookingStep(3);
+                } else if (isAula && bookingStep === 3 && payerValid) {
+                  setBookingSubmitting(true);
+                  setBookingError(null);
+                  const turnstileToken = await turnstileExecute();
+                  const allParticipants: ParticipantInput[] = [];
+                  const seen = new Set<string>();
+                  for (const sess of selectedSessions) {
+                    const ps = participantsBySession[sess.id] ?? [];
+                    for (const p of ps) {
+                      const key = `${p.name.trim()}-${p.age}`;
+                      if (seen.has(key)) continue;
+                      seen.add(key);
+                      allParticipants.push({
+                        name: p.name.trim(),
+                        age: parseInt(p.age),
+                        ...(p.nota?.trim() ? { nota: p.nota.trim() } : {}),
+                        parentalConsent: p.parentalConsent,
+                      });
+                    }
+                  }
+                  const result = await criarReservaPublica(
+                    school.id,
+                    selectedSessions.map(s => s.id),
+                    {
+                      participants: allParticipants,
+                      contactName: payerName.trim(),
+                      contactEmail: payerEmail.trim().toLowerCase(),
+                      contactPhone: payerPhone.trim(),
+                      termsAccepted: school.terms_url ? termsAccepted : undefined,
+                      termsUrl: school.terms_url,
+                    },
+                    turnstileToken ?? undefined
+                  );
+                  setBookingSubmitting(false);
+                  if (!result.ok) { setBookingError(result.error); return; }
+                  setBookingSuccess(true);
                 } else if (isPack) {
                   const name = packName.trim();
                   const email = packEmail.trim();
@@ -1052,10 +1205,21 @@ export function EscolaView({ data }: Props) {
 
               return (
                 <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
-                  {isAula && bookingStep === 2 ? (
+                  {isAula && (bookingStep === 2 || bookingStep === 3) ? (
                     <button
                       type="button"
-                      onClick={() => setBookingStep(1)}
+                      onClick={() => {
+                        if (bookingStep === 3) {
+                          setPayerName(userInfo?.name ?? "");
+                          setPayerEmail(userInfo?.email ?? "");
+                          setPayerPhone(userInfo?.phone ?? "");
+                          setTermsAccepted(false);
+                          setBookingError(null);
+                          setBookingStep(2);
+                        } else {
+                          setBookingStep(1);
+                        }
+                      }}
                       className="text-sm text-gray-600 hover:text-accent"
                     >
                       ← Voltar
@@ -1103,21 +1267,45 @@ export function EscolaView({ data }: Props) {
                   ) : (
                     <button
                       type="button"
-                      disabled={!canContinue || packLoading}
+                      disabled={!canContinue || packLoading || bookingSubmitting}
                       onClick={handleContinue}
                       className={`rounded-full border-2 px-6 py-2 text-sm transition-all ${
-                        canContinue && !packLoading
+                        canContinue && !packLoading && !bookingSubmitting
                           ? "border-accent text-black hover:scale-105 hover:bg-accent hover:text-white"
                           : "border-gray-200 text-gray-300"
                       }`}
                     >
-                      {packLoading ? "A processar..." : bookingStep === 2 ? "Reservar" : "Continuar"}
+                      {bookingSubmitting ? "A processar..." : bookingStep === 3 ? "Confirmar reserva" : bookingStep === 2 ? "Continuar" : "Continuar"}
                     </button>
                   )}
                 </div>
               );
             })()}
           </div>
+
+          {/* Success state overlay */}
+          {bookingSuccess && (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white rounded-2xl px-6 text-center">
+              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
+                <svg className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h3 className="font-heading text-2xl font-bold text-gray-900 mb-2">Reserva confirmada!</h3>
+              <p className="text-sm text-gray-600 mb-6 max-w-xs">Receberás um email com os detalhes da tua reserva.</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowServicePicker(false);
+                  setBookingStep(1);
+                  setBookingSuccess(false);
+                }}
+                className="rounded-full bg-accent px-8 py-3 text-sm font-semibold text-white hover:brightness-110"
+              >
+                Fechar
+              </button>
+            </div>
+          )}
         </div>
       )}
 

@@ -81,7 +81,7 @@ export async function updatePassword(input: {
   });
 
   if (error) {
-    console.error("[updatePassword] error", error);
+    console.error("[updatePassword] error");
     const normalized = normalizeResetError(error.message);
     return {
       ok: false,

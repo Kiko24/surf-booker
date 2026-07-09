@@ -544,7 +544,10 @@ export function CalendarioView({ schoolId }: Props) {
                                         </span>
                                       )}
                                       {aluno.name}{aluno.groupSize ? ` · ${aluno.groupSize} pessoas` : ""}
-                                      {isFutura && !selectingStudents && (
+                                      {aluno.id.startsWith("p-") && (
+                                        <span className="ml-1 rounded-full bg-accent/10 px-1.5 py-0 font-body text-[10px] text-accent">Convidado</span>
+                                      )}
+                                      {isFutura && !selectingStudents && !aluno.id.startsWith("p-") && (
                                         <button
                                           type="button"
                                           disabled={removing}
@@ -622,7 +625,7 @@ export function CalendarioView({ schoolId }: Props) {
                                             const loading = attendanceLoading[aluno.bookingId];
                                             return (
                                               <div key={aluno.bookingId || aluno.id} className="flex items-center justify-between gap-2 bg-[#2A2A2A] rounded-lg px-2.5 py-1.5">
-                                                <span className="font-body text-xs text-text-secondary truncate min-w-0">{aluno.name}{aluno.groupSize ? ` · ${aluno.groupSize} pessoas` : ""}</span>
+                                                <span className="font-body text-xs text-text-secondary truncate min-w-0">{aluno.name}{aluno.groupSize ? ` · ${aluno.groupSize} pessoas` : ""}{aluno.id.startsWith("p-") && <span className="ml-1 rounded-full bg-accent/10 px-1.5 py-0 font-body text-[10px] text-accent">Convidado</span>}</span>
                                                 <div className="flex gap-1 shrink-0">
                                                   <button
                                                     type="button"

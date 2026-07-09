@@ -2,7 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 type AuditEvent = {
   schoolId: string | null;
-  userId: string;
+  userId: string | null;
   action: string;
   entityType: string;
   entityId: string | null;
@@ -21,6 +21,6 @@ export async function logAudit(event: AuditEvent) {
       metadata: event.metadata ?? {},
     });
   } catch (err) {
-    console.error("Audit log failed:", err);
+    console.error("Audit log failed");
   }
 }

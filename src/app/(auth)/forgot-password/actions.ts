@@ -36,7 +36,7 @@ export async function sendResetEmail(
       };
     }
 
-    console.error("[sendResetEmail] error", error);
+    console.error("[sendResetEmail] error");
   }
 
   // Importante: sempre devolver "ok" para não revelar se o email existe (anti-enumeration)

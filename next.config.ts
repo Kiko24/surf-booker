@@ -5,10 +5,11 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: __dirname,
   },
+  poweredByHeader: false,
   allowedDevOrigins: ["192.168.1.6"],
   experimental: {
     serverActions: {
-      bodySizeLimit: "10mb",
+      bodySizeLimit: "2mb",
     },
   },
   images: {

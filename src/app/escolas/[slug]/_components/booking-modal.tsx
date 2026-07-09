@@ -42,9 +42,14 @@ export function BookingModal({ sessionId, schoolId, onClose }: Props) {
     const token = await execute();
     const result = await criarReservaPublica(
       schoolId,
-      sessionId,
-      { name, email, phone },
-      activePack?.packPurchaseId ?? undefined,
+      [sessionId],
+      {
+        participants: [{ name, age: 18, parentalConsent: true }],
+        contactName: name,
+        contactEmail: email,
+        contactPhone: phone,
+        packPurchaseId: activePack?.packPurchaseId ?? undefined,
+      },
       token ?? undefined
     );
     setPending(false);

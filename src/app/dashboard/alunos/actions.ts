@@ -8,6 +8,7 @@ import { logAudit } from "@/lib/audit";
 import { requireOwner } from "@/lib/school";
 import { assertValidOrigin } from "@/lib/csrf";
 import { sendStudentInvite } from "@/lib/email";
+import { safeError } from "@/lib/safe-error";
 import { buyPack } from "../calendario/actions";
 
 export type StudentPack = {
@@ -152,7 +153,16 @@ export async function toggleWaiver(
     .update({ waiver_signed: signed })
     .eq("id", studentId);
 
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: safeError(error) };
+
+  logAudit({
+    schoolId: link.school_id,
+    userId: user.id,
+    action: signed ? "sign_waiver" : "unsign_waiver",
+    entityType: "student",
+    entityId: studentId,
+  });
+
   return { ok: true };
 }
 
@@ -184,19 +194,19 @@ export async function deleteStudent(studentId: string): Promise<{ ok: boolean; e
   if (!school) return { ok: false, error: "Sem permissão" };
 
   const { error: bErr } = await admin.from("bookings").delete().eq("student_id", studentId);
-  if (bErr) return { ok: false, error: bErr.message };
+  if (bErr) return { ok: false, error: safeError(bErr) };
 
   const { error: bgErr } = await admin.from("booking_groups").delete().eq("booked_by_student_id", studentId);
-  if (bgErr) return { ok: false, error: bgErr.message };
+  if (bgErr) return { ok: false, error: safeError(bgErr) };
 
   const { error: ppErr } = await admin.from("pack_purchases").delete().eq("student_id", studentId);
-  if (ppErr) return { ok: false, error: ppErr.message };
+  if (ppErr) return { ok: false, error: safeError(ppErr) };
 
   const { error: ssErr } = await admin.from("school_students").delete().eq("student_id", studentId);
-  if (ssErr) return { ok: false, error: ssErr.message };
+  if (ssErr) return { ok: false, error: safeError(ssErr) };
 
   const { error: sErr } = await admin.from("students").delete().eq("id", studentId);
-  if (sErr) return { ok: false, error: sErr.message };
+  if (sErr) return { ok: false, error: safeError(sErr) };
 
   logAudit({
     schoolId: link.school_id,
@@ -241,19 +251,19 @@ export async function deleteStudentsBulk(studentIds: string[]): Promise<{ ok: bo
   if (!school) return { ok: false, error: "Sem permissão" };
 
   const { error: bErr } = await admin.from("bookings").delete().in("student_id", studentIds);
-  if (bErr) return { ok: false, error: bErr.message };
+  if (bErr) return { ok: false, error: safeError(bErr) };
 
   const { error: bgErr } = await admin.from("booking_groups").delete().in("booked_by_student_id", studentIds);
-  if (bgErr) return { ok: false, error: bgErr.message };
+  if (bgErr) return { ok: false, error: safeError(bgErr) };
 
   const { error: ppErr } = await admin.from("pack_purchases").delete().in("student_id", studentIds);
-  if (ppErr) return { ok: false, error: ppErr.message };
+  if (ppErr) return { ok: false, error: safeError(ppErr) };
 
   const { error: ssErr } = await admin.from("school_students").delete().in("student_id", studentIds);
-  if (ssErr) return { ok: false, error: ssErr.message };
+  if (ssErr) return { ok: false, error: safeError(ssErr) };
 
   const { error: sErr } = await admin.from("students").delete().in("id", studentIds);
-  if (sErr) return { ok: false, error: sErr.message };
+  if (sErr) return { ok: false, error: safeError(sErr) };
 
   for (const studentId of studentIds) {
     logAudit({
@@ -314,12 +324,12 @@ export async function createStudent(
     .insert({ full_name: trimmedName, is_guest: true, ...(phone ? { phone } : {}), ...(email ? { email } : {}) })
     .select("id")
     .single();
-  if (sErr) return { ok: false, error: sErr.message };
+  if (sErr) return { ok: false, error: safeError(sErr) };
 
   const { error: ssErr } = await supabase
     .from("school_students")
     .insert({ school_id: schoolId, student_id: student.id });
-  if (ssErr) return { ok: false, error: ssErr.message };
+  if (ssErr) return { ok: false, error: safeError(ssErr) };
 
   if (email) {
     const normalizedEmail = email.trim().toLowerCase();
@@ -567,7 +577,7 @@ export async function cancelPackPurchase(
     .eq("id", purchaseId)
     .eq("school_id", schoolId);
 
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: safeError(error) };
 
   logAudit({
     schoolId,
@@ -610,7 +620,7 @@ export async function updatePackRemaining(
     .eq("id", purchaseId)
     .eq("school_id", schoolId);
 
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: safeError(error) };
 
   logAudit({
     schoolId,

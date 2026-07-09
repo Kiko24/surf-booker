@@ -187,15 +187,66 @@ This version has breaking changes — APIs, conventions, and file structure may 
 | Password policy consistente (min 8, maiúscula, número) em signup + perfil | ✅ |
 | Invalidação de sessão após alteração de password (força re-login) | ✅ |
 
+## Guardrails — Action Creator Helper
+
+Para quebrar o ciclo de "fix → novo bug → fix", todas as **novas** server actions devem usar `defineMutation`, `defineQuery`, ou `definePublicAction` de `src/lib/create-action.ts`. Estes helpers garantem auth, CSRF, rate limit, ownership e sanitização de erros **sem o developer se lembrar de os adicionar**.
+
+### `defineMutation` (escritas autenticadas)
+```typescript
+export const createSession = defineMutation({
+  name: "createSession",
+  schema: z.object({ schoolId: z.string().uuid(), /* ... */ }),
+  rateLimit: "default",        // "default" | "expensive" | false
+  checkAccess: (input) => requireOwner(input.schoolId),
+  execute: async ({ input, supabase, admin, user }) => {
+    // só lógica de negócio — CSRF, auth, rate limit já verificados
+  }
+})
+```
+
+### `defineQuery` (leituras autenticadas)
+```typescript
+export const getStudents = defineQuery({
+  name: "getStudents",
+  schema: z.object({ schoolId: z.string().uuid() }),
+  execute: async ({ input, supabase }) => {
+    const { data } = await supabase.from("school_students").select("...")
+    return { data }
+  }
+})
+```
+
+### `definePublicAction` (endpoints públicos)
+```typescript
+export const submitContact = definePublicAction({
+  name: "submitContact",
+  schema: ContactSchema,
+  rateLimit: { maxRequests: 5, window: "60 s" },
+  execute: async ({ input, supabase }) => { ... }
+})
+```
+
+### `requireServerContext` (migração incremental)
+Para actions existentes que não podem usar `defineMutation` ainda, substitui o boilerplate auth + CSRF:
+```typescript
+export async function oldAction(id: string): Promise<MutationResult> {
+  let ctx: ActionContext;
+  try { ctx = await requireServerContext(); } catch { return { ok: false, error: "..." }; }
+  // ...
+}
+```
+
 ## Security Files
 
 | Ficheiro | Função |
 |----------|--------|
+| `src/lib/create-action.ts` | `defineMutation()`, `defineQuery()`, `definePublicAction()`, `requireServerContext()` — guardrails que combinam auth + CSRF + rate limit + ownership + sanitização |
 | `src/lib/csrf.ts` | `assertValidOrigin()` — valida `origin` vs `host`, dev-safe com bypass localhost, fallback para `ALLOWED_ORIGINS` env var |
 | `src/lib/rate-limit.ts` | `rateLimitPublic()` e `rateLimitByUser()` via Upstash Redis |
 | `src/lib/audit.ts` | `logAudit()` — registo de operações destrutivas/mutações |
 | `src/lib/school.ts` | `requireOwner()` — verifica `schools.owner_user_id = auth.uid()` |
 | `src/lib/validation/signup-owner.ts` | `passwordSchema` — validação Zod partilhada (min 8, maiúscula, número) |
+| `src/proxy.ts` | CSP headers, HSTS, auth redirect — `object-src 'none'`, `frame-ancestors 'none'`, `img-src` restrito a `*.supabase.co` |
 
 ## RLS Policies
 
@@ -263,6 +314,7 @@ src/
 │   │   ├── server.ts         # createClient() — cookies-based auth
 │   │   ├── client.ts         # createClient() — browser
 │   │   └── admin.ts          # createAdminClient() — service_role
+│   ├── create-action.ts      # defineMutation/defineQuery/definePublicAction — guardrails auth+CSRF+rate limit+ownership
 │   ├── rate-limit.ts         # Rate limiting via Upstash Redis
 │   ├── audit.ts              # Audit logging utility
 │   └── utils/
@@ -633,6 +685,8 @@ Emails de notificação ao owner (`notifyOwnerBooking()`) usam `.catch()` em vez
 6. Only commit when explicitly asked
 7. For public page work: always use `createAdminClient()` for data fetching (bypass RLS); never send service_role key to client
 8. All copy must be in Portuguese (PT)
+9. **Novas server actions**: usar `defineMutation()`, `defineQuery()`, ou `definePublicAction()` de `src/lib/create-action.ts` — nunca escrever auth/CSRF/rate-limit manualmente
+10. **CI valida automaticamente**: CSP headers, `poweredByHeader`, `bodySizeLimit`, migrations, `.gitignore`, presença de `create-action.ts` — corre em cada PR via `.github/workflows/ci.yml`
 
 ## Progress
 
@@ -674,3 +728,23 @@ Emails de notificação ao owner (`notifyOwnerBooking()`) usam `.catch()` em vez
 ## Security Checks
 1. Security is the most important thing on the software, NEVER compromise it for whatever reason.
 2. If you have any question regarding security or something that can break, ask directly to me before commit anything.
+3. **Usa os helpers do `create-action.ts` sempre que possível** — eles impõem todos os 7 pontos automaticamente:
+   - `defineMutation()` — CSRF + auth + rate limit + ownership (`checkAccess`) + sanitização de erros
+   - `defineQuery()` — auth + ownership para leituras
+   - `definePublicAction()` — público com rate limit opcional
+   - `requireServerContext()` — migração incremental de actions manuais
+4. Todo o código NOVO (features, endpoints, componentes, actions, formulários públicos, integrações) deve ser verificado contra estes 7 pontos de segurança antes de ser considerado completo:
+   - Proteção CSRF (origin vs host) em server actions mutáveis
+   - Rate limiting (público com Turnstile, autenticado por user)
+   - Input validation com Zod schemas partilhados
+   - Auth + ownership verificados no servidor antes de usar admin client
+   - Dados sensíveis (passwords, tokens) nunca em logs ou respostas de erro
+   - Sessão invalidada após alteração de password
+   - Audit logging para operações destrutivas
+
+## Rate Limit & Captcha
+- `getClientIp()` usa o último IP da cadeia `x-forwarded-for` (confiável do proxy) para prevenir spoofing
+- Cloudflare Turnstile nas actions públicas (`comprarPackPublico`, `criarReservaPublica`) — gratuito, sem limites, invisível para o utilizador
+- `TURNSTILE_SECRET_KEY` e `NEXT_PUBLIC_TURNSTILE_SITE_KEY` no .env.local
+- Se a chave não estiver configurada, o Turnstile é ignorado (dev-safe)
+- Ficheiros: `src/lib/turnstile.ts` (verificação server-side), `src/app/escolas/[slug]/_components/turnstile-widget.tsx` (hook React `useTurnstile()`)

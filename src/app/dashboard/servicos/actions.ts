@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { rateLimitByUser } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
+import { safeError } from "@/lib/safe-error";
 import { getSchoolId } from "@/lib/school";
 import { z } from "zod";
 
@@ -260,7 +261,7 @@ export async function deleteServico(id: string): Promise<{ ok: boolean; error?: 
 
   // Also delete associated packs (they cascade from class_types)
   const { error } = await supabase.from("class_types").delete().eq("id", id);
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: safeError(error) };
 
   logAudit({
     schoolId: ct.school_id,

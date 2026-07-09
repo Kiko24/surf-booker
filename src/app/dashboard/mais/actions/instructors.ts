@@ -3,6 +3,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { rateLimitByUser } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
+import { safeError } from "@/lib/safe-error";
 import { validateImageContent } from "@/lib/utils/validate-image";
 import { requireOwner } from "@/lib/school";
 
@@ -81,7 +82,7 @@ export async function saveInstructor(
       });
 
     if (uploadError) {
-      console.error("[saveInstructor] upload error:", uploadError);
+      console.error("[saveInstructor] upload error");
       return { ok: false, error: `Erro ao carregar a foto: ${uploadError.message}` };
     }
     avatarUrl = filePath;
@@ -109,7 +110,7 @@ export async function saveInstructor(
       .eq("id", id)
       .eq("school_id", schoolId);
 
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: safeError(error) };
   } else {
     const { error } = await supabase
       .from("instructors")
@@ -120,7 +121,7 @@ export async function saveInstructor(
         avatar_url: avatarUrl,
       });
 
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: safeError(error) };
   }
 
   logAudit({
@@ -160,7 +161,7 @@ export async function deleteInstructor(
     .eq("id", id)
     .eq("school_id", schoolId);
 
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: safeError(error) };
 
   if (inst.avatar_url) {
     await admin.storage.from(AVATAR_BUCKET).remove([inst.avatar_url]);

@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { rateLimitByUser, rateLimitPublic } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
+import { safeError } from "@/lib/safe-error";
 import { requireOwner } from "@/lib/school";
 import { assertValidOrigin } from "@/lib/csrf";
 
@@ -51,7 +52,7 @@ export async function notifyOwnerBooking(
       time,
     });
   } catch (err) {
-    console.error("Failed to send booking notification:", err);
+    console.error("Failed to send booking notification");
   }
 }
 
@@ -94,7 +95,7 @@ export async function createBooking(
     const { data: ok, error: rpcErr } = await supabase.rpc("decrement_pack_credit", {
       p_purchase_id: packPurchaseId,
     });
-    if (rpcErr) return { ok: false, error: rpcErr.message };
+    if (rpcErr) return { ok: false, error: safeError(rpcErr) };
     if (!ok) return { ok: false, error: "Pack sem aulas restantes" };
   }
 
@@ -120,7 +121,7 @@ export async function createBooking(
     .select("id")
     .single();
 
-  if (bgErr) return { ok: false, error: bgErr.message };
+  if (bgErr) return { ok: false, error: safeError(bgErr) };
 
   const { error: bErr } = await supabase
     .from("bookings")
@@ -134,7 +135,7 @@ export async function createBooking(
       pack_purchase_id: packPurchaseId ?? null,
     });
 
-  if (bErr) return { ok: false, error: bErr.message };
+  if (bErr) return { ok: false, error: safeError(bErr) };
 
   logAudit({
     schoolId: schoolId,
@@ -178,12 +179,12 @@ export async function addGuestToSession(
     .insert({ full_name: name, is_guest: true, ...(phone ? { phone } : {}) })
     .select("id")
     .single();
-  if (sErr) return { ok: false, error: sErr.message };
+  if (sErr) return { ok: false, error: safeError(sErr) };
 
   const { error: ssErr } = await supabase
     .from("school_students")
     .insert({ school_id: schoolId, student_id: student.id });
-  if (ssErr) return { ok: false, error: ssErr.message };
+  if (ssErr) return { ok: false, error: safeError(ssErr) };
 
   const { data: bg, error: bgErr } = await supabase
     .from("booking_groups")
@@ -198,7 +199,7 @@ export async function addGuestToSession(
     })
     .select("id")
     .single();
-  if (bgErr) return { ok: false, error: bgErr.message };
+  if (bgErr) return { ok: false, error: safeError(bgErr) };
 
   const { error: bErr } = await supabase
     .from("bookings")
@@ -210,7 +211,7 @@ export async function addGuestToSession(
       payment_status: "unpaid",
       price_cents: 0,
     });
-  if (bErr) return { ok: false, error: bErr.message };
+  if (bErr) return { ok: false, error: safeError(bErr) };
 
   logAudit({
     schoolId: schoolId,
@@ -273,14 +274,14 @@ export async function addGroupBooking(
     .insert({ full_name: groupName, is_guest: true })
     .select("id")
     .single();
-  if (sErr) return { ok: false, error: sErr.message };
+  if (sErr) return { ok: false, error: safeError(sErr) };
 
   const { error: ssErr } = await supabase
     .from("school_students")
     .insert({ school_id: schoolId, student_id: student.id });
   if (ssErr) {
     await admin.from("students").delete().eq("id", student.id);
-    return { ok: false, error: ssErr.message };
+    return { ok: false, error: safeError(ssErr) };
   }
 
   const { data: bg, error: bgErr } = await supabase
@@ -299,7 +300,7 @@ export async function addGroupBooking(
     .single();
   if (bgErr) {
     await admin.from("students").delete().eq("id", student.id);
-    return { ok: false, error: bgErr.message };
+    return { ok: false, error: safeError(bgErr) };
   }
 
   const totalPrice = priceCents * numberOfPeople;
@@ -319,7 +320,7 @@ export async function addGroupBooking(
   if (bErr) {
     await supabase.from("bookings").delete().eq("booking_group_id", bg.id);
     await admin.from("students").delete().eq("id", student.id);
-    return { ok: false, error: bErr.message };
+    return { ok: false, error: safeError(bErr) };
   }
 
   logAudit({
@@ -376,7 +377,7 @@ export async function togglePaymentStatus(
     .update({ payment_status: newStatus })
     .eq("id", booking.id);
 
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: safeError(error) };
 
   logAudit({
     schoolId,
@@ -425,7 +426,7 @@ export async function cancelBooking(
     .update({ status: "cancelled_by_school", cancelled_at: new Date().toISOString() })
     .eq("id", booking.id);
 
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: safeError(error) };
 
   logAudit({
     schoolId,
@@ -479,7 +480,7 @@ export async function cancelBookingsBulk(
     .update({ status: "cancelled_by_school", cancelled_at: now })
     .in("id", bookingIds);
 
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: safeError(error) };
 
   logAudit({
     schoolId,

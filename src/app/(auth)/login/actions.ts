@@ -105,6 +105,9 @@ export async function resendConfirmationFromLogin(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try { await assertValidOrigin(); } catch { return { ok: false, error: "Origem inválida" }; }
 
+  const rl = await rateLimitPublic("resendConfirmation", 3, "60 s");
+  if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
+
   const normalizedEmail = email.trim().toLowerCase();
 
   if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {

@@ -3,6 +3,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { rateLimitByUser } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
+import { safeError } from "@/lib/safe-error";
 import { requireOwner } from "@/lib/school";
 
 export type WaiverVersion = {
@@ -114,7 +115,7 @@ export async function saveWaiverVersion(
       is_active: true,
     });
 
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: safeError(error) };
 
   logAudit({
     schoolId,

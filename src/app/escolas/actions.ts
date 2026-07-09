@@ -38,7 +38,7 @@ export async function searchSchools(
     .limit(limit);
 
   if (error) {
-    console.error("[searchSchools] error:", error);
+    console.error("[searchSchools] error");
     return [];
   }
 
@@ -68,7 +68,7 @@ export async function getShowcasedSchools(): Promise<ShowcasedSchool[]> {
     .limit(6);
 
   if (error) {
-    console.error("[getShowcasedSchools] error:", error);
+    console.error("[getShowcasedSchools] error");
     return [];
   }
 

@@ -344,7 +344,7 @@ export async function dismissAlert(schoolId: string, tipo: string, entityId: str
     .insert({ school_id: schoolId, tipo, entity_id: entityId ?? null });
 
   if (error) {
-    console.error("Failed to dismiss alert:", error);
+    console.error("Failed to dismiss alert");
     return { ok: false, error: "Erro ao dispensar alerta" };
   }
 

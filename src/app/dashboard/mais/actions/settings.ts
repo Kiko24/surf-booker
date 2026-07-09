@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { rateLimitByUser } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
+import { safeError } from "@/lib/safe-error";
 import { validateImageContent } from "@/lib/utils/validate-image";
 import { requireOwner } from "@/lib/school";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -66,8 +67,8 @@ export async function saveSchoolSettings(
       }, { onConflict: "school_id" }),
   ]);
 
-  if (schoolErr.error) return { ok: false, error: schoolErr.error.message };
-  if (settingsErr.error) return { ok: false, error: settingsErr.error.message };
+  if (schoolErr.error) return { ok: false, error: safeError(schoolErr.error) };
+  if (settingsErr.error) return { ok: false, error: safeError(settingsErr.error) };
 
   return { ok: true };
 }
@@ -91,7 +92,7 @@ export async function saveSchoolInfo(
     })
     .eq("id", schoolId);
 
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: safeError(error) };
 
   return { ok: true };
 }

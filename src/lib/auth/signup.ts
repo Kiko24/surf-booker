@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fullSignupSchema } from "@/lib/validation/signup-owner";
+import { logAudit } from "@/lib/audit";
 
 export type SignupInput = {
   email: string;
@@ -113,7 +114,7 @@ export async function signupUser(
   });
 
   if (profileError) {
-    console.error(`[${logPrefix}] profile insert failed`, profileError);
+    console.error(`[${logPrefix}] profile insert failed`);
 
     const isDuplicate =
       profileError.code === "23505" ||
@@ -126,11 +127,20 @@ export async function signupUser(
 
     const { error: deleteError } = await admin.auth.admin.deleteUser(userId);
     if (deleteError) {
-      console.error(`[${logPrefix}] cleanup delete failed`, deleteError);
+      console.error(`[${logPrefix}] cleanup delete failed`);
     }
 
     return { ok: false, error: "Erro ao criar perfil. Tenta novamente." };
   }
+
+  logAudit({
+    schoolId: null,
+    userId,
+    action: "signup",
+    entityType: "profile",
+    entityId: userId,
+    metadata: { role, name },
+  });
 
   return { ok: true };
 }
