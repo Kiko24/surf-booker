@@ -19,6 +19,7 @@ export type SchoolSettings = {
   notify_reminder_24h: boolean;
   notify_sms_cancellation: boolean;
   notify_new_schedule: boolean;
+  terms_url: string | null;
 };
 
 export async function getSchoolSettings(schoolId: string): Promise<SchoolSettings | null> {
@@ -38,6 +39,7 @@ export async function getSchoolSettings(schoolId: string): Promise<SchoolSetting
     notify_reminder_24h: settingsRes.data?.notify_reminder_24h ?? true,
     notify_sms_cancellation: settingsRes.data?.notify_sms_cancellation ?? false,
     notify_new_schedule: settingsRes.data?.notify_new_schedule ?? true,
+    terms_url: settingsRes.data?.terms_url ?? null,
   };
 }
 
@@ -64,6 +66,7 @@ export async function saveSchoolSettings(
         notify_reminder_24h: settings.notify_reminder_24h,
         notify_sms_cancellation: settings.notify_sms_cancellation,
         notify_new_schedule: settings.notify_new_schedule,
+        terms_url: settings.terms_url,
       }, { onConflict: "school_id" }),
   ]);
 

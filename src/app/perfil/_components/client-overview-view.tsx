@@ -1,7 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import type { ClientOverview } from "../actions";
+import { cancelOwnBooking } from "../actions";
 import {
   PackIcon, CalendarIcon, UserIcon,
 } from "./icons";
@@ -13,6 +16,18 @@ function formatDate(iso: string) {
 }
 
 export function ClientOverviewView({ overview }: { overview: ClientOverview | null }) {
+  const router = useRouter();
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+
+  async function handleCancel(bookingId: string, sessionId: string, schoolId: string) {
+    setCancellingId(bookingId);
+    setConfirmId(null);
+    await cancelOwnBooking(bookingId, sessionId, schoolId);
+    setCancellingId(null);
+    router.refresh();
+  }
+
   if (!overview) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -57,12 +72,19 @@ export function ClientOverviewView({ overview }: { overview: ClientOverview | nu
           ) : (
             <ul className="divide-y divide-gray-100">
               {upcomingBookings.map(b => (
-                <li key={b.id} className="flex items-center justify-between py-3">
-                  <div>
+                <li key={b.id} className="flex items-center justify-between gap-3 py-3">
+                  <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-gray-900">{b.classTypeName}</p>
                     <p className="text-xs text-gray-500">{b.schoolName}</p>
+                    <p className="text-xs text-gray-400">{formatDate(b.startsAt)}</p>
                   </div>
-                  <p className="text-xs text-gray-400">{formatDate(b.startsAt)}</p>
+                  <button
+                    onClick={() => setConfirmId(b.id)}
+                    disabled={cancellingId === b.id}
+                    className="shrink-0 rounded-lg border border-red-200 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                  >
+                    {cancellingId === b.id ? "..." : "Cancelar"}
+                  </button>
                 </li>
               ))}
             </ul>
@@ -115,6 +137,34 @@ export function ClientOverviewView({ overview }: { overview: ClientOverview | nu
           )}
         </section>
       </div>
+
+      {confirmId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-5">
+          <div className="w-full max-w-sm rounded-2xl border border-gray-200 bg-white p-6 text-center shadow-xl">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Cancelar aula?</h3>
+            <p className="text-sm text-gray-500 mb-6">
+              Tens a certeza que queres cancelar esta aula? O owner será notificado.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmId(null)}
+                className="flex-1 rounded-xl border border-gray-300 bg-white py-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Não
+              </button>
+              <button
+                onClick={() => {
+                  const b = upcomingBookings.find(x => x.id === confirmId);
+                  if (b) handleCancel(b.id, b.sessionId, b.schoolId);
+                }}
+                className="flex-1 rounded-xl bg-red-600 py-3 text-sm font-medium text-white hover:bg-red-700"
+              >
+                Sim, cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

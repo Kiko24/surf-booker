@@ -3,6 +3,12 @@
 import { useState } from "react";
 import type { PackSummary } from "../actions";
 
+function formatDate(iso: string) {
+  return new Intl.DateTimeFormat("pt-PT", {
+    day: "numeric", month: "short", year: "numeric",
+  }).format(new Date(iso));
+}
+
 export function PacksView({ packs }: { packs: PackSummary[] }) {
   const [showUsed, setShowUsed] = useState(false);
 
@@ -75,6 +81,25 @@ export function PacksView({ packs }: { packs: PackSummary[] }) {
                     style={{ width: `${pct}%` }}
                   />
                 </div>
+
+                {p.usedBookings.length > 0 && (
+                  <details className="group mt-3">
+                    <summary className="cursor-pointer text-xs font-medium text-accent hover:text-accent/80 list-none flex items-center gap-1">
+                      <svg className={`h-3 w-3 transition-transform group-open:rotate-90`} fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                      </svg>
+                      Aulas usadas ({p.usedBookings.length})
+                    </summary>
+                    <ul className="mt-2 space-y-1.5 border-t border-gray-100 pt-2">
+                      {p.usedBookings.map(pb => (
+                        <li key={pb.id} className="flex items-center justify-between text-xs">
+                          <span className="text-gray-700">{pb.classTypeName}</span>
+                          <span className="text-gray-400">{formatDate(pb.sessionStartsAt)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
               </div>
             );
           })}

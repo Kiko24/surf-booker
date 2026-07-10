@@ -361,7 +361,7 @@ src/
 │               └── mais-view.tsx        # Business info form, instructor upload (desktop + mobile), showcase images
 │
 └── supabase/
-    ├── migrations/                      # SQL migration files (0001-0022)
+    ├── migrations/                      # SQL migration files (0001-0025)
     │   ├── 0001_init.sql
     │   ├── 0002_rls.sql
     │   ├── 0003_profiles_and_class_types.sql
@@ -385,13 +385,15 @@ src/
     │   ├── 0019_class_types_description.sql
     │   ├── 0020_atomic_pack_decrement.sql
     │   ├── 0021_student_self_service.sql
-    │   └── 0022_fix_rls_recursion.sql
-    │   └── 0023_allow_duplicate_rental_names.sql
+    │   ├── 0022_fix_rls_recursion.sql
+    │   ├── 0023_allow_duplicate_rental_names.sql
+    │   ├── 0024_add_group_size.sql
+    │   └── 0025_add_bookings_participants.sql
 ```
 
 ## Server Actions com Proteção CSRF
 
-Todas as 24 server actions mutáveis chamam `await assertValidOrigin()` após verificação de auth. A proteção CSRF verifica que o header `origin` corresponde ao `host` (ou está listado em `ALLOWED_ORIGINS`), prevenindo ataques de cross-site request forgery. Em desenvolvimento, localhost é automaticamente permitido.
+Todas as 26 server actions mutáveis chamam `await assertValidOrigin()` após verificação de auth. A proteção CSRF verifica que o header `origin` corresponde ao `host` (ou está listado em `ALLOWED_ORIGINS`), prevenindo ataques de cross-site request forgery. Em desenvolvimento, localhost é automaticamente permitido.
 
 | Ficheiro | Ações protegidas |
 |----------|---------------|
@@ -610,8 +612,17 @@ SELECT id, full_name FROM students WHERE id IN (...);
 - Search dropdown: input with 300ms debounce, 5 results + "Ver mais" (+5), 64×64 school logo thumbnails, sanitized input (accented chars allowed, max 100, strips special chars)
 - `searchSchools()` server action in `src/app/escolas/actions.ts`
 
+### Perfil / Student Area
+- `perfil/actions.ts`: `updateProfile` e `updatePassword` migradas para `requireServerContext()` — auth + CSRF automáticos
+- Rate limiting via `rateLimitByUser()` (30 req/min) em ambas as ações
+- Audit logging (`logAudit()`) em `updateProfile` e `updatePassword`
+- `updatePassword`: session invalidation (`signOut() + redirect("/login")`) após log de auditoria
+- Zod validation field-level: `trimmedString`, `optionalEmailSchema`, `optionalPhoneSchema`, `passwordSchema`
+- Phone input: dois campos de texto livre (prefixo + número) com `maxLength` e sanitização client-side
+- Build verificado: `npx next build` → `✓ Compiled successfully`
+
 ### Database Schema Updates
-- 19 migrations applied (0001–0019)
+- 25 migrations applied (0001–0025)
 - `schools`: slug, description, location, logo_url, phone, timezone, cancellation_window_hours
 - `class_types`: category (`aula`/`pack`/`aluguer`), modality, total_lessons, description
 - `instructors`: table with name, level, avatar_url (created in migration 0015)
@@ -701,7 +712,7 @@ Emails de notificação ao owner (`notifyOwnerBooking()`) usam `.catch()` em vez
 | P15 | `requireOwner()` extraído para `lib/school.ts` |
 | P19 | `calendario/actions.ts` e `mais/actions.ts` partidos por domínio |
 | P20 | `StepPersonal` partilhado em `components/auth/step-personal.tsx` |
-| P10+17 | `AGENTS.md` atualizado com 24 migrations |
+| P10+17 | `AGENTS.md` atualizado com 25 migrations |
 | P18 | Ref `seed-test-session` removida |
 | Low | `eslint.json` apagado; pastas vazias removidas; dead code removido; -3 unused images; placeholder disclaimers removidos |
 | CSS | `react-datepicker` + `fadeSlideDown` dead CSS removido de `global.css` |
@@ -715,6 +726,7 @@ Emails de notificação ao owner (`notifyOwnerBooking()`) usam `.catch()` em vez
 | ErrorBoundary | Componente partilhado criado |
 | `school.name` fix | `select("id")` → `select("id, name")` em `alunos/actions.ts` |
 | `.find()` type fix | Tipo `{ email: string }` removido do callback em `alunos/actions.ts` |
+| Perfil security | `updateProfile` + `updatePassword` migradas para `requireServerContext()`, rate limit, audit logging, Zod validation field-level, phone split input, build verified |
 
 ### Mantido como está
 - `dashboard-view.tsx` modais (Sessões + Alertas) — usam header `border-b` com "Fechar", sem handle, sem footer — não alinha com BottomSheet atual

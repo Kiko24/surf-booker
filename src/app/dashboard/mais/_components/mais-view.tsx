@@ -101,6 +101,7 @@ export function MaisView({ schoolId }: Props) {
     notify_reminder_24h: true,
     notify_sms_cancellation: false,
     notify_new_schedule: true,
+    terms_url: "",
   });
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsError, setSettingsError] = useState("");
@@ -742,6 +743,18 @@ export function MaisView({ schoolId }: Props) {
                   </div>
 
                   <div className="rounded-xl bg-[#2A2A2A] p-6">
+                    <p className="font-heading text-base font-bold text-foreground mb-2">Termos e Condições</p>
+                    <p className="font-body text-sm text-text-secondary mb-4">Link para os termos e condições da escola (aparece no checkbox da reserva pública)</p>
+                    <input
+                      type="url"
+                      value={settings.terms_url ?? ""}
+                      onChange={(e) => setSettings((prev) => ({ ...prev, terms_url: e.target.value || null }))}
+                      className="w-full rounded-xl bg-surface px-4 py-3 text-sm text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+                      placeholder="https://exemplo.com/termos"
+                    />
+                  </div>
+
+                  <div className="rounded-xl bg-[#2A2A2A] p-6">
                     <p className="font-heading text-base font-bold text-foreground mb-4">Notificações</p>
                     <div className="space-y-4">
                       {[
@@ -1236,6 +1249,20 @@ export function MaisView({ schoolId }: Props) {
             />
             <span className="font-body text-sm text-text-secondary">% de capacidade</span>
           </div>
+        </div>
+
+        <div className="h-px bg-foreground/10" />
+
+        <div>
+          <p className="font-heading text-base font-bold text-foreground mb-2">Termos e Condições</p>
+          <p className="font-body text-sm text-text-secondary mb-4">Link para os termos e condições da escola (aparece no checkbox da reserva pública)</p>
+          <input
+            type="url"
+            value={settings.terms_url ?? ""}
+            onChange={(e) => setSettings((prev) => ({ ...prev, terms_url: e.target.value || null }))}
+            className="w-full rounded-xl bg-[#2A2A2A] px-4 py-3 text-sm text-foreground placeholder-text-muted outline-none focus:outline-2 focus:outline-accent"
+            placeholder="https://exemplo.com/termos"
+          />
         </div>
 
         <div className="h-px bg-foreground/10" />

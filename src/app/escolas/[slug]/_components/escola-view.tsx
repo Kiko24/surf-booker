@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import type { PublicSchoolData } from "../actions";
-import { toggleFavorite, comprarPackPublico, criarReservaPublica } from "../actions";
+import { toggleFavorite, comprarPackPublico, criarReservaPublica, criarReservaAluguer } from "../actions";
 import type { ParticipantInput } from "../actions";
 import { useTurnstile } from "./turnstile-widget";
 import { Lightbox } from "./lightbox";
@@ -61,6 +61,10 @@ export function EscolaView({ data }: Props) {
   const [bookingSubmitting, setBookingSubmitting] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
   const [bookingSuccess, setBookingSuccess] = useState(false);
+  const [rentalDate, setRentalDate] = useState("");
+  const [rentalTime, setRentalTime] = useState("");
+  const selSvc = selectedServiceId ? services.find(s => s.id === selectedServiceId) ?? null : null;
+  const isRental = selSvc?.category === "aluguer";
 
   useEffect(() => {
     if (!showServicePicker) return;
@@ -71,6 +75,8 @@ export function EscolaView({ data }: Props) {
       setPackQuantity(1);
       setPackFormError(null);
       setShowPackSuccess(false);
+      setRentalDate("");
+      setRentalTime("");
       setPayerName(userInfo?.name ?? "");
       setPayerEmail(userInfo?.email ?? "");
       setPayerPhone(userInfo?.phone ?? "");
@@ -640,7 +646,7 @@ export function EscolaView({ data }: Props) {
             </div>
 
             {bookingStep === 1 && (
-              <div className="flex flex-wrap items-center gap-2 mb-4">
+              <div className="flex flex-wrap items-center gap-2 mb-4 px-2">
                 <button
                   type="button"
                   onClick={() => setSelectedCategory(null)}
@@ -691,7 +697,7 @@ export function EscolaView({ data }: Props) {
               {bookingStep === 1 ? (
                 <>
                   {/* Services list */}
-                  <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto p-0.5 -m-0.5">
                     <div className="space-y-2">
                       {filteredServices.map((svc) => {
                         const isSelected = selectedServiceId === svc.id;
@@ -764,7 +770,7 @@ export function EscolaView({ data }: Props) {
                           />
                         );
                       }
-                      if (rightSvc.category === "pack" || rightSvc.category === "aluguer") {
+                      if (rightSvc.category === "pack") {
                         if (showPackSuccess) {
                           return (
                             <div className="text-center py-8">
@@ -870,6 +876,78 @@ export function EscolaView({ data }: Props) {
                           </div>
                         );
                       }
+                      if (rightSvc.category === "aluguer") {
+                        return (
+                          <div className="space-y-3 px-2">
+                            {rightSvc.rental_options && rightSvc.rental_options.length > 1 && (
+                              <div>
+                                <label className="block text-sm text-gray-700 mb-1">Duração</label>
+                                <div className="flex flex-wrap gap-2">
+                                  {rightSvc.rental_options.map((opt) => {
+                                    const isActive = (selectedRentalVariantId ?? rightSvc.rental_options![0].id) === opt.id;
+                                    return (
+                                      <button
+                                        key={opt.id}
+                                        type="button"
+                                        onClick={() => { setSelectedRentalVariantId(opt.id); }}
+                                        className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                                          isActive
+                                            ? "bg-accent text-white"
+                                            : "bg-white text-gray-600 border border-gray-200 hover:border-accent"
+                                        }`}
+                                      >
+                                        {formatDurationLabel(opt.duration_minutes)} · {(opt.price_cents / 100).toFixed(2).replace(".", ",")}€
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                            <div>
+                              <label className="block text-sm text-gray-700 mb-1">Quantidade</label>
+                              <div className="flex items-center gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() => setPackQuantity(Math.max(1, packQuantity - 1))}
+                                  className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 text-gray-600 transition-colors hover:border-accent hover:text-accent"
+                                >
+                                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M20 12H4" />
+                                  </svg>
+                                </button>
+                                <span className="w-8 text-center text-sm font-semibold text-gray-900">{packQuantity}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setPackQuantity(Math.min(99, packQuantity + 1))}
+                                  className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 text-gray-600 transition-colors hover:border-accent hover:text-accent"
+                                >
+                                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-sm text-gray-700 mb-1">Data</label>
+                              <input
+                                type="date"
+                                value={rentalDate}
+                                onChange={(e) => setRentalDate(e.target.value)}
+                                className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-accent [color-scheme:light] [&::-webkit-calendar-picker-indicator]:opacity-50"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm text-gray-700 mb-1">Hora</label>
+                              <input
+                                type="time"
+                                value={rentalTime}
+                                onChange={(e) => setRentalTime(e.target.value)}
+                                className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-accent [color-scheme:light] [&::-webkit-calendar-picker-indicator]:opacity-50"
+                              />
+                            </div>
+                          </div>
+                        );
+                      }
                       return <div />;
                     })()}
                   </div>
@@ -879,7 +957,7 @@ export function EscolaView({ data }: Props) {
                 <div className="flex flex-row gap-6 w-full">
                   <div className="flex-1 space-y-6">
                     {bookingStep === 3 ? (
-                      <div className="space-y-4">
+                      <div className="space-y-4 px-2">
                         <h4 className="font-heading text-sm font-bold text-gray-900">Dados do pagador</h4>
                         <div>
                           <label className="block text-sm text-gray-700 mb-1">Nome</label>
@@ -887,7 +965,7 @@ export function EscolaView({ data }: Props) {
                             type="text"
                             value={payerName}
                             onChange={(e) => setPayerName(e.target.value.replace(/[^a-zA-ZÀ-ÿ\s'-]/g, "").slice(0, 80))}
-                            className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 outline-none"
+                            className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 outline-none focus-visible:outline-[0px]"
                             placeholder="O teu nome"
                           />
                         </div>
@@ -897,7 +975,7 @@ export function EscolaView({ data }: Props) {
                             type="email"
                             value={payerEmail}
                             onChange={(e) => setPayerEmail(e.target.value.trim().toLowerCase().slice(0, 120))}
-                            className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 outline-none"
+                            className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 outline-none focus-visible:outline-[0px]"
                             placeholder="O teu email"
                           />
                         </div>
@@ -908,36 +986,126 @@ export function EscolaView({ data }: Props) {
                               type="tel"
                               value={payerPhoneCode}
                               onChange={(e) => setPayerPhoneCode(e.target.value.replace(/[^0-9+]/g, "").slice(0, 5))}
-                              className="w-24 shrink-0 rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-accent"
+                              className="w-24 shrink-0 rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 outline-none focus-visible:outline-[0px]"
                               placeholder="+351"
                             />
                             <input
                               type="tel"
                               value={payerPhone}
                               onChange={(e) => setPayerPhone(e.target.value.replace(/\D/g, "").slice(0, 15))}
-                              className="flex-1 rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-accent"
+                              className="flex-1 rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 outline-none focus-visible:outline-[0px]"
                               placeholder="O teu telemóvel"
                             />
                           </div>
                         </div>
-                        {school.terms_url && (
-                          <>
-                            <hr className="border-gray-200" />
-                            <label className="flex items-start gap-2 text-sm text-gray-600 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={termsAccepted}
-                                onChange={(e) => setTermsAccepted(e.target.checked)}
-                                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-accent"
-                              />
-                              <span>Aceito os <a href={school.terms_url} target="_blank" rel="noopener noreferrer" className="text-accent underline">Termos de Serviço</a></span>
-                            </label>
-                          </>
-                        )}
+                        <>
+                          <hr className="border-gray-200" />
+                          <label className="flex items-start gap-2 text-sm text-gray-600 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={termsAccepted}
+                              onChange={(e) => setTermsAccepted(e.target.checked)}
+                              className="mt-0.5 h-4 w-4 rounded border-gray-300 text-accent"
+                            />
+                            <span>Aceito os Termos e Condições da {school.name}</span>
+                          </label>
+                        </>
                         {bookingError && (
                           <p className="text-xs text-red-500">{bookingError}</p>
                         )}
                       </div>
+                    ) : (
+                    isRental && bookingStep === 2 ? (
+                      (() => {
+                        const count = packQuantity;
+                        const participants = Array.from({ length: count }, (_, i) =>
+                          participantsBySession["rental-virtual"]?.[i] ?? { name: "", age: "", nota: "", parentalConsent: false }
+                        );
+                        return (
+                          <div key="rental-virtual" className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+                            <p className="font-heading text-sm font-bold text-gray-900 mb-4">
+                              {rentalDate} {rentalTime} · {selSvc.name}
+                            </p>
+                            <p className="text-sm text-gray-600 mb-4">{count} {count === 1 ? "participante" : "participantes"}</p>
+                            <div className="space-y-3">
+                              {participants.map((p, idx) => (
+                                <div key={idx} className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                                  <div className="flex gap-3 items-start mb-2">
+                                    <span className="mt-3 text-xs text-gray-400 w-5 shrink-0">{idx + 1}.</span>
+                                    <div className="flex-1">
+                                      <input
+                                        type="text"
+                                        value={p.name}
+                                        onChange={(e) => {
+                                          const val = e.target.value.replace(/[^a-zA-ZÀ-ÿ\s'-]/g, "").slice(0, 80);
+                                          setParticipantsBySession(prev => {
+                                            const arr = [...(prev["rental-virtual"] ?? [])];
+                                            arr[idx] = { ...arr[idx], name: val };
+                                            return { ...prev, "rental-virtual": arr };
+                                          });
+                                        }}
+                                        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 outline-none focus:border-accent"
+                                        placeholder={`Nome do participante ${idx + 1}`}
+                                      />
+                                    </div>
+                                    <div className="w-20 shrink-0">
+                                      <input
+                                        type="number"
+                                        min={1}
+                                        max={120}
+                                        value={p.age}
+                                        onChange={(e) => {
+                                          const val = e.target.value.replace(/\D/g, "").slice(0, 3);
+                                          setParticipantsBySession(prev => {
+                                            const arr = [...(prev["rental-virtual"] ?? [])];
+                                            arr[idx] = { ...arr[idx], age: val };
+                                            return { ...prev, "rental-virtual": arr };
+                                          });
+                                        }}
+                                        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 outline-none focus:border-accent"
+                                        placeholder="Idade"
+                                      />
+                                    </div>
+                                  </div>
+                                  <div className="ml-8 space-y-2">
+                                    <textarea
+                                      value={p.nota}
+                                      onChange={(e) => {
+                                        const val = e.target.value.slice(0, 500);
+                                        setParticipantsBySession(prev => {
+                                          const arr = [...(prev["rental-virtual"] ?? [])];
+                                          arr[idx] = { ...arr[idx], nota: val };
+                                          return { ...prev, "rental-virtual": arr };
+                                        });
+                                      }}
+                                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 outline-none focus:border-accent resize-none"
+                                      placeholder="Nota (opcional) — e.g. altura, nível, restrições..."
+                                      rows={2}
+                                    />
+                                    {p.age && parseInt(p.age) < 18 && (
+                                      <label className="flex items-start gap-2 text-sm text-gray-600 cursor-pointer">
+                                        <input
+                                          type="checkbox"
+                                          checked={p.parentalConsent}
+                                          onChange={(e) => {
+                                            setParticipantsBySession(prev => {
+                                              const arr = [...(prev["rental-virtual"] ?? [])];
+                                              arr[idx] = { ...arr[idx], parentalConsent: e.target.checked };
+                                              return { ...prev, "rental-virtual": arr };
+                                            });
+                                          }}
+                                          className="mt-0.5 h-4 w-4 rounded border-gray-300 text-accent focus:ring-accent"
+                                        />
+                                        <span>Consentimento parental (menor de 18 anos)</span>
+                                      </label>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })()
                     ) : (
                     [...selectedSessions].sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime()).map((sess) => {
                       const participants = participantsBySession[sess.id] ?? [{ name: "", age: "", nota: "", parentalConsent: false }];
@@ -1058,7 +1226,7 @@ export function EscolaView({ data }: Props) {
                           </div>
                         </div>
                       );
-                    }))}
+                    })))}
                   </div>
 
                   {(() => {
@@ -1067,13 +1235,22 @@ export function EscolaView({ data }: Props) {
                     const vInfo = rightSvc.rental_options?.find(o => o.id === selectedRentalVariantId);
                     const effPriceCents = vInfo?.price_cents ?? rightSvc.price_cents;
                     const totParticipants = selectedSessions.reduce((sum, s) => sum + (participantsBySession[s.id]?.length ?? 1), 0);
-                    const totPrice = effPriceCents * totParticipants;
+                    const rentalTotal = isRental ? packQuantity * effPriceCents : effPriceCents * totParticipants;
 
                     return (
                       <div className="w-[320px] shrink-0">
                         <div className="sticky top-0 space-y-4">
-                          <h4 className="font-heading text-sm font-bold text-gray-900">Sessões selecionadas</h4>
-                          {[...selectedSessions].sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime()).map((sess) => {
+                          <h4 className="font-heading text-sm font-bold text-gray-900">{isRental ? "Resumo" : "Sessões selecionadas"}</h4>
+                          {isRental && (bookingStep === 2 || bookingStep === 3) ? (
+                            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                              <div>
+                                <p className="text-sm font-medium text-gray-900">{rentalDate} {rentalTime}</p>
+                                <p className="text-xs text-gray-500">{packQuantity} {packQuantity === 1 ? "participante" : "participantes"}</p>
+                              </div>
+                              <p className="text-sm font-semibold text-gray-900">{((packQuantity * effPriceCents) / 100).toFixed(2).replace(".", ",")} €</p>
+                            </div>
+                          ) : (
+                          [...selectedSessions].sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime()).map((sess) => {
                             const d = new Date(sess.starts_at);
                             const day = d.getDate().toString().padStart(2, "0");
                             const month = (d.getMonth() + 1).toString().padStart(2, "0");
@@ -1090,10 +1267,10 @@ export function EscolaView({ data }: Props) {
                                 <p className="text-sm font-semibold text-gray-900">{(sessionPrice / 100).toFixed(2).replace(".", ",")} €</p>
                               </div>
                             );
-                          })}
+                          }))}
                           <div className="flex items-center justify-between pt-2">
                             <p className="text-sm font-bold text-gray-900">Total</p>
-                            <p className="text-sm font-bold text-accent">{(totPrice / 100).toFixed(2).replace(".", ",")} €</p>
+                            <p className="text-sm font-bold text-accent">{(rentalTotal / 100).toFixed(2).replace(".", ",")} €</p>
                           </div>
                         </div>
                       </div>
@@ -1110,26 +1287,34 @@ export function EscolaView({ data }: Props) {
               const selSvc = services.find(s => s.id === selectedServiceId);
               if (!selectedServiceId || !selSvc) return null;
               const isAula = selSvc.category === "aula";
-              const isPack = selSvc.category === "pack" || selSvc.category === "aluguer";
+              const isPack = selSvc.category === "pack";
+              const isRental = selSvc.category === "aluguer";
               const variantInfo = selSvc.rental_options?.find(o => o.id === selectedRentalVariantId);
               const effectivePriceCents = variantInfo?.price_cents ?? selSvc.price_cents;
               const effectiveDuration = variantInfo?.duration_minutes ?? selSvc.duration_minutes;
               const totalParticipants = selectedSessions.reduce((sum, s) => sum + (participantsBySession[s.id]?.length ?? 1), 0);
-              const qty = isPack ? packQuantity : (bookingStep === 2 ? totalParticipants : selectedSessions.length);
-              const displayPrice = isPack
-                ? effectivePriceCents * qty
-                : effectivePriceCents * qty;
+              const qty = (isPack || isRental) ? packQuantity : (bookingStep === 2 ? totalParticipants : selectedSessions.length);
+              const displayPrice = effectivePriceCents * qty;
               const itemName = qty === 1
                 ? (selectedSessions[0]?.class_type_name ?? selSvc.name)
                 : selSvc.name;
-              const allParticipantsValid = selectedSessions.every(s => {
-                const ps = participantsBySession[s.id] ?? [{ name: "", age: "", nota: "", parentalConsent: false }];
-                return ps.every(p => p.name.trim().length >= 2 && p.age.trim().length > 0 && parseInt(p.age) >= 1 && parseInt(p.age) <= 120 && (parseInt(p.age) >= 18 || p.parentalConsent));
-              });
-              const payerValid = payerName.trim().length >= 2 && payerEmail.trim().includes("@") && payerEmail.trim().includes(".") && payerPhone.trim().replace(/\D/g, "").length >= 6 && (!school.terms_url || termsAccepted);
+              const allParticipantsValid = isRental && bookingStep === 2
+                ? (participantsBySession["rental-virtual"] ?? []).every(p =>
+                    p.name.trim().length >= 2 && p.age.trim().length > 0 && parseInt(p.age) >= 1 && parseInt(p.age) <= 120 && (parseInt(p.age) >= 18 || p.parentalConsent)
+                  )
+                : selectedSessions.every(s => {
+                    const ps = participantsBySession[s.id] ?? [{ name: "", age: "", nota: "", parentalConsent: false }];
+                    return ps.every(p => p.name.trim().length >= 2 && p.age.trim().length > 0 && parseInt(p.age) >= 1 && parseInt(p.age) <= 120 && (parseInt(p.age) >= 18 || p.parentalConsent));
+                  });
+              const fullPhone = payerPhoneCode.trim() + payerPhone.trim();
+              const payerValid = payerName.trim().length >= 2 && payerEmail.trim().includes("@") && payerEmail.trim().includes(".") && fullPhone.replace(/\D/g, "").length >= 6 && termsAccepted;
               const canContinue = isAula
                 ? (bookingStep === 1 ? selectedSessions.length > 0 : bookingStep === 2 ? allParticipantsValid : payerValid)
-                : (packName.trim().length >= 2 && packEmail.trim().includes("@") && packPhone.trim().length >= 6);
+                : isPack
+                  ? (packName.trim().length >= 2 && packEmail.trim().includes("@") && packPhone.trim().length >= 6)
+                  : isRental
+                    ? (bookingStep === 1 ? rentalDate.length > 0 && rentalTime.length > 0 : bookingStep === 2 ? allParticipantsValid : payerValid)
+                    : false;
 
               const handleContinue = async () => {
                 if (isAula && bookingStep === 1 && selectedSessions.length > 0) {
@@ -1170,9 +1355,9 @@ export function EscolaView({ data }: Props) {
                       participants: allParticipants,
                       contactName: payerName.trim(),
                       contactEmail: payerEmail.trim().toLowerCase(),
-                      contactPhone: payerPhone.trim(),
-                      termsAccepted: school.terms_url ? termsAccepted : undefined,
-                      termsUrl: school.terms_url,
+                      contactPhone: payerPhoneCode.trim() + payerPhone.trim(),
+                      termsAccepted,
+                      termsUrl: school.terms_url ?? null,
                     },
                     turnstileToken ?? undefined
                   );
@@ -1200,22 +1385,71 @@ export function EscolaView({ data }: Props) {
                   setPackLoading(false);
                   if (!result.ok) { setPackFormError(result.error); return; }
                   setShowPackSuccess(true);
+                } else if (isRental && bookingStep === 1) {
+                  setBookingStep(2);
+                  const rentalParticipants = Array.from({ length: packQuantity }, () => ({
+                    name: "", age: "", nota: "", parentalConsent: false,
+                  }));
+                  setParticipantsBySession({ "rental-virtual": rentalParticipants });
+                } else if (isRental && bookingStep === 2 && allParticipantsValid) {
+                  setPayerName(userInfo?.name ?? "");
+                  setPayerEmail(userInfo?.email ?? "");
+                  setPayerPhone(userInfo?.phone ?? "");
+                  setBookingError(null);
+                  setBookingStep(3);
+                } else if (isRental && bookingStep === 3 && payerValid) {
+                  setBookingSubmitting(true);
+                  setBookingError(null);
+                  const turnstileToken = await turnstileExecute();
+                  const classTypeId = selectedRentalVariantId || selSvc.id;
+                  const [y, m, d] = rentalDate.split('-').map(Number);
+                  const [hh, mm] = rentalTime.split(':').map(Number);
+                  const startsAt = new Date(y, m - 1, d, hh, mm).toISOString();
+                  const rentalParticipants = (participantsBySession["rental-virtual"] ?? []).map(p => ({
+                    name: p.name.trim(),
+                    age: parseInt(p.age),
+                    ...(p.nota?.trim() ? { nota: p.nota.trim() } : {}),
+                    parentalConsent: p.parentalConsent,
+                  }));
+                  const result = await criarReservaAluguer(
+                    school.id,
+                    classTypeId,
+                    rentalParticipants.length,
+                    startsAt,
+                    { name: payerName.trim(), email: payerEmail.trim().toLowerCase(), phone: payerPhoneCode.trim() + payerPhone.trim() },
+                    turnstileToken ?? undefined,
+                    rentalParticipants
+                  );
+                  setBookingSubmitting(false);
+                  if (!result.ok) { setBookingError(result.error); return; }
+                  setBookingSuccess(true);
                 }
               };
 
               return (
                 <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
-                  {isAula && (bookingStep === 2 || bookingStep === 3) ? (
+                  {(isAula || isRental) && (bookingStep === 2 || bookingStep === 3) ? (
                     <button
                       type="button"
                       onClick={() => {
                         if (bookingStep === 3) {
-                          setPayerName(userInfo?.name ?? "");
-                          setPayerEmail(userInfo?.email ?? "");
-                          setPayerPhone(userInfo?.phone ?? "");
-                          setTermsAccepted(false);
-                          setBookingError(null);
-                          setBookingStep(2);
+                          if (isAula || isRental) {
+                            setPayerName(userInfo?.name ?? "");
+                            setPayerEmail(userInfo?.email ?? "");
+                            const phone = userInfo?.phone ?? "";
+                            const knownCodes = ["+351", "+34", "+1", "+44", "+49", "+33", "+55"];
+                            const matchedCode = knownCodes.find(c => phone.startsWith(c));
+                            if (matchedCode) {
+                              setPayerPhoneCode(matchedCode);
+                              setPayerPhone(phone.slice(matchedCode.length));
+                            } else {
+                              setPayerPhoneCode("+351");
+                              setPayerPhone(phone);
+                            }
+                            setTermsAccepted(false);
+                            setBookingError(null);
+                            setBookingStep(2);
+                          }
                         } else {
                           setBookingStep(1);
                         }
@@ -1243,6 +1477,26 @@ export function EscolaView({ data }: Props) {
                           })}
                         </span>
                       ) : isPack ? (
+                        <>
+                          <span>{qty > 1 ? `${qty}x ` : ""}{itemName}</span>
+                          {variantInfo && (
+                            <span className="mx-1 text-xs text-gray-400">({formatDurationLabel(effectiveDuration)})</span>
+                          )}
+                          <span className="mx-1.5">=</span>
+                          <span className="font-semibold">{(displayPrice / 100).toFixed(2).replace(".", ",")} €</span>
+                        </>
+                      ) : isRental && bookingStep === 1 ? (
+                        <>
+                          <span>{qty > 1 ? `${qty}x ` : ""}{itemName}</span>
+                          {variantInfo && (
+                            <span className="mx-1 text-xs text-gray-400">({formatDurationLabel(effectiveDuration)})</span>
+                          )}
+                          <span className="mx-1.5">·</span>
+                          <span className="text-xs text-gray-500">{rentalDate} {rentalTime}</span>
+                          <span className="mx-1.5">=</span>
+                          <span className="font-semibold">{(displayPrice / 100).toFixed(2).replace(".", ",")} €</span>
+                        </>
+                      ) : isRental && (bookingStep === 2 || bookingStep === 3) ? (
                         <>
                           <span>{qty > 1 ? `${qty}x ` : ""}{itemName}</span>
                           {variantInfo && (

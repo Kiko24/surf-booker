@@ -416,12 +416,24 @@ export async function comprarPackPublico(
 
   const admin = createAdminClient();
 
-  if (data.name.trim().length < 2) return { ok: false, error: "Nome deve ter pelo menos 2 caracteres." };
-  if (!data.email.includes("@") || !data.email.includes(".")) return { ok: false, error: "Email inválido." };
-  if (data.phone.replace(/\D/g, "").length < 6) return { ok: false, error: "Telemóvel deve ter pelo menos 6 dígitos." };
-  if (quantity < 1 || quantity > 99) return { ok: false, error: "Quantidade inválida." };
+  const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRe.test(schoolId)) return { ok: false, error: "Escola inválida." };
+  if (!uuidRe.test(classTypeId)) return { ok: false, error: "Serviço inválido." };
 
-  const student = await findOrCreateStudent(admin, schoolId, data);
+  const cleanName = data.name.trim().replace(/[\x00-\x1F]/g, "");
+  if (cleanName.length < 2) return { ok: false, error: "Nome deve ter pelo menos 2 caracteres." };
+  if (cleanName.length > 120) return { ok: false, error: "Nome demasiado longo." };
+
+  const cleanEmail = data.email.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) return { ok: false, error: "Email inválido." };
+
+  const digits = data.phone.replace(/\D/g, "");
+  if (digits.length < 6) return { ok: false, error: "Telemóvel deve ter pelo menos 6 dígitos." };
+  if (digits.length > 20) return { ok: false, error: "Telemóvel demasiado longo." };
+
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) return { ok: false, error: "Quantidade inválida." };
+
+  const student = await findOrCreateStudent(admin, schoolId, { name: cleanName, email: cleanEmail, phone: digits });
   if (!student) return { ok: false, error: "Erro ao criar aluno." };
 
   const { data: classType } = await admin
@@ -466,7 +478,7 @@ export async function comprarPackPublico(
     .insert({
       school_id: schoolId,
       pack_id: packId,
-      student_id: student.id,
+    student_id: null,
       lessons_remaining: quantity,
       status: "active",
     })
@@ -485,6 +497,136 @@ export async function comprarPackPublico(
   });
 
   return { ok: true, packPurchaseId: purchase.id };
+}
+
+export async function criarReservaAluguer(
+  schoolId: string,
+  classTypeId: string,
+  quantity: number,
+  startsAt: string,
+  data: { name: string; email: string; phone: string },
+  turnstileToken?: string,
+  participants?: ParticipantInput[]
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const rl = await rateLimitPublic("criarReservaAluguer", 5, "60 s");
+  if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
+
+  if (turnstileToken) {
+    const valid = await verifyTurnstileToken(turnstileToken);
+    if (!valid) return { ok: false, error: "Verificação de segurança falhou. Tenta novamente." };
+  }
+
+  const admin = createAdminClient();
+
+  const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRe.test(schoolId)) return { ok: false, error: "Escola inválida." };
+  if (!uuidRe.test(classTypeId)) return { ok: false, error: "Serviço inválido." };
+
+  const cleanName = data.name.trim().replace(/[\x00-\x1F]/g, "");
+  if (cleanName.length < 2) return { ok: false, error: "Nome deve ter pelo menos 2 caracteres." };
+  if (cleanName.length > 120) return { ok: false, error: "Nome demasiado longo." };
+
+  const cleanEmail = data.email.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) return { ok: false, error: "Email inválido." };
+
+  const digits = data.phone.replace(/\D/g, "");
+  if (digits.length < 6) return { ok: false, error: "Telemóvel deve ter pelo menos 6 dígitos." };
+  if (digits.length > 20) return { ok: false, error: "Telemóvel demasiado longo." };
+
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) return { ok: false, error: "Quantidade inválida." };
+
+  if (participants) {
+    if (!Array.isArray(participants) || !participants.length) return { ok: false, error: "Nenhum participante." };
+    for (const p of participants) {
+      const pName = (p.name ?? "").trim().replace(/[\x00-\x1F]/g, "");
+      if (pName.length < 2) return { ok: false, error: "Cada participante deve ter um nome com pelo menos 2 caracteres." };
+      if (!Number.isInteger(p.age) || p.age < 1 || p.age > 120) return { ok: false, error: "Idade inválida para um participante." };
+    }
+  }
+
+  const { data: classType, error: classTypeErr } = await admin
+    .from("class_types")
+    .select("default_duration_minutes, price_cents")
+    .eq("id", classTypeId)
+    .eq("school_id", schoolId)
+    .single();
+
+  if (classTypeErr || !classType) return { ok: false, error: "Serviço não encontrado." };
+
+  const startsAtDate = new Date(startsAt);
+  if (isNaN(startsAtDate.getTime())) return { ok: false, error: "Data ou hora inválida." };
+  if (startsAtDate < new Date()) return { ok: false, error: "Data não pode ser no passado." };
+  const oneYearFromNow = new Date();
+  oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
+  if (startsAtDate > oneYearFromNow) return { ok: false, error: "Data demasiado distante." };
+
+  const { data: session, error: sessionErr } = await admin
+    .from("sessions")
+    .insert({
+      school_id: schoolId,
+      starts_at: startsAtDate.toISOString(),
+      duration_minutes: classType.default_duration_minutes,
+      capacity: participants ? participants.length : quantity,
+      price_cents: classType.price_cents * (participants ? participants.length : quantity),
+      class_type_id: classTypeId,
+      status: "scheduled",
+    })
+    .select("id")
+    .single();
+
+  if (sessionErr || !session) return { ok: false, error: "Erro ao criar sessão." };
+
+  const { data: bookingGroup, error: bgErr } = await admin
+    .from("booking_groups")
+    .insert({
+      school_id: schoolId,
+      session_id: session.id,
+      booked_by_student_id: null,
+      contact_name: data.name.trim(),
+      contact_email: data.email.trim().toLowerCase(),
+      contact_phone: data.phone.trim(),
+      source: "guest",
+    })
+    .select("id")
+    .single();
+
+  if (bgErr || !bookingGroup) return { ok: false, error: "Erro ao criar reserva." };
+
+  const participantsJson = participants
+    ? participants.map((p) => ({
+        name: p.name.trim().replace(/[\x00-\x1F]/g, ""),
+        age: p.age,
+        ...(p.nota?.trim() ? { nota: p.nota.trim() } : {}),
+        parentalConsent: p.parentalConsent,
+      }))
+    : [];
+
+  const { error: bErr } = await admin.from("bookings").insert({
+    booking_group_id: bookingGroup.id,
+    session_id: session.id,
+    student_id: null,
+    payment_method: "single",
+    payment_status: "unpaid",
+    price_cents: classType.price_cents * (participants ? participants.length : quantity),
+    ...(participantsJson.length ? { participants: participantsJson } : {}),
+  });
+
+  if (bErr) return { ok: false, error: "Erro ao confirmar reserva." };
+
+  logAudit({
+    schoolId,
+    userId: null,
+    action: "create_rental_booking",
+    entityType: "booking_group",
+    entityId: bookingGroup.id,
+    metadata: { email: data.email, classTypeId, startsAt, quantity },
+  });
+
+  notifyOwnerBooking(schoolId, session.id, data.name.trim()).catch(() => {
+    console.error("Erro ao notificar dono");
+  });
+
+  return { ok: true };
 }
 
 export async function buscarPackAtivo(
@@ -556,12 +698,25 @@ export async function criarReservaPublica(
 
   if (!sessionIds.length) return { ok: false, error: "Nenhuma sessão selecionada." };
   if (!data.participants.length) return { ok: false, error: "Nenhum participante." };
-  if (data.contactName.trim().length < 2) return { ok: false, error: "Nome de contacto deve ter pelo menos 2 caracteres." };
-  if (!data.contactEmail.includes("@") || !data.contactEmail.includes(".")) return { ok: false, error: "Email inválido." };
-  if (data.contactPhone.replace(/\D/g, "").length < 6) return { ok: false, error: "Telemóvel deve ter pelo menos 6 dígitos." };
+
+  const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRe.test(schoolId)) return { ok: false, error: "Escola inválida." };
+
+  const cleanContactName = data.contactName.trim().replace(/[\x00-\x1F]/g, "");
+  if (cleanContactName.length < 2) return { ok: false, error: "Nome de contacto deve ter pelo menos 2 caracteres." };
+  if (cleanContactName.length > 120) return { ok: false, error: "Nome de contacto demasiado longo." };
+
+  const cleanContactEmail = data.contactEmail.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanContactEmail)) return { ok: false, error: "Email inválido." };
+
+  const contactDigits = data.contactPhone.replace(/\D/g, "");
+  if (contactDigits.length < 6) return { ok: false, error: "Telemóvel deve ter pelo menos 6 dígitos." };
+  if (contactDigits.length > 20) return { ok: false, error: "Telemóvel demasiado longo." };
 
   for (const p of data.participants) {
-    if (p.name.trim().length < 2) return { ok: false, error: `Nome do participante "${p.name}" é muito curto.` };
+    const pName = p.name.trim().replace(/[\x00-\x1F]/g, "");
+    if (pName.length < 2) return { ok: false, error: `Nome do participante "${p.name}" é muito curto.` };
+    if (pName.length > 120) return { ok: false, error: `Nome do participante "${p.name}" demasiado longo.` };
     if (!p.age || p.age < 1 || p.age > 120) return { ok: false, error: `Idade inválida para "${p.name}".` };
     if (p.age < 18 && !p.parentalConsent) return { ok: false, error: `Consentimento parental necessário para "${p.name}" (menor de 18).` };
   }
@@ -612,9 +767,9 @@ export async function criarReservaPublica(
         school_id: schoolId,
         session_id: sessionId,
         booked_by_student_id: null,
-        contact_name: data.contactName.trim(),
-        contact_email: data.contactEmail.trim().toLowerCase(),
-        contact_phone: data.contactPhone.trim(),
+        contact_name: cleanContactName,
+        contact_email: cleanContactEmail,
+        contact_phone: contactDigits,
         source: "guest",
       })
       .select("id")

@@ -1,10 +1,15 @@
 "use server";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { safeError } from "@/lib/safe-error";
-import { assertValidOrigin } from "@/lib/csrf";
+import { requireServerContext } from "@/lib/create-action";
+import { rateLimitByUser, rateLimitPublic } from "@/lib/rate-limit";
+import { logAudit } from "@/lib/audit";
 import { passwordSchema } from "@/lib/validation/signup-owner";
+import { trimmedString, optionalEmailSchema, optionalPhoneSchema } from "@/lib/validation/schemas/helpers";
 import { redirect } from "next/navigation";
 
 export type StudentProfile = {
@@ -17,6 +22,7 @@ export type StudentProfile = {
 export type BookingHistoryItem = {
   id: string;
   sessionId: string;
+  schoolId: string;
   startsAt: string;
   durationMinutes: number;
   schoolName: string;
@@ -31,6 +37,13 @@ export type BookingHistoryItem = {
   isPast: boolean;
 };
 
+export type PackBooking = {
+  id: string;
+  sessionStartsAt: string;
+  classTypeName: string;
+  schoolName: string;
+};
+
 export type PackSummary = {
   id: string;
   packName: string;
@@ -40,6 +53,7 @@ export type PackSummary = {
   lessonsRemaining: number;
   status: string;
   purchasedAt: string;
+  usedBookings: PackBooking[];
 };
 
 export type FavoriteSchool = {
@@ -187,6 +201,7 @@ export async function getClientOverview(): Promise<ClientOverview | null> {
     .map(b => ({
       id: b.id,
       sessionId: b.session_id,
+      schoolId: b.session.school.id,
       startsAt: b.session.starts_at,
       durationMinutes: b.session.duration_minutes,
       schoolName: b.session.school.name,
@@ -219,6 +234,7 @@ export async function getClientOverview(): Promise<ClientOverview | null> {
       lessonsRemaining: p.lessons_remaining,
       status: p.status,
       purchasedAt: p.purchased_at,
+      usedBookings: [],
     }));
 
   const faves = (favoritesRes.data ?? []) as unknown as {
@@ -247,55 +263,93 @@ export async function getClientOverview(): Promise<ClientOverview | null> {
   };
 }
 
-export async function updateProfile(data: { fullName: string; email: string; phone: string }) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { success: false, error: "Não autenticado" };
+const profileUpdateSchema = z.object({
+  fullName: trimmedString(1, 120),
+  email: optionalEmailSchema,
+  phone: optionalPhoneSchema,
+});
 
-  try { await assertValidOrigin(); } catch { return { success: false, error: "Origem inválida" }; }
+export async function updateProfile(data: { fullName: string; email: string; phone: string | null }) {
+  let ctx;
+  try { ctx = await requireServerContext(); } catch { return { success: false, error: "Não autenticado" }; }
 
+  const rl = await rateLimitByUser(ctx.user.id, "updateProfile");
+  if (!rl.ok) return { success: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
+
+  const parsed = profileUpdateSchema.safeParse(data);
+  if (!parsed.success) {
+    const errors: Record<string, string> = {};
+    for (const issue of parsed.error.issues) {
+      const field = issue.path.join(".");
+      if (!errors[field]) errors[field] = issue.message;
+    }
+    return { success: false, error: "Dados inválidos", errors };
+  }
+
+  const { fullName, email, phone } = parsed.data;
   const updates: Record<string, string | null> = {
-    full_name: data.fullName,
-    phone: data.phone || null,
+    full_name: fullName,
+    phone: phone ?? null,
   };
 
-  if (data.email) updates.email = data.email;
+  if (email) updates.email = email;
 
-  const { error } = await supabase
+  const { error } = await ctx.supabase
     .from("students")
     .update(updates)
-    .eq("auth_user_id", user.id);
+    .eq("auth_user_id", ctx.user.id);
 
   if (error) return { success: false, error: safeError(error) };
+
+  logAudit({
+    schoolId: null,
+    userId: ctx.user.id,
+    action: "update_profile",
+    entityType: "student",
+    entityId: ctx.user.id,
+    metadata: { fields: Object.keys(updates) },
+  }).catch(() => {});
+
   return { success: true };
 }
 
 export async function updatePassword(data: { currentPassword: string; newPassword: string }) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user?.email) return { success: false, error: "Não autenticado" };
+  let ctx;
+  try { ctx = await requireServerContext(); } catch { return { success: false, error: "Não autenticado" }; }
 
-  try { await assertValidOrigin(); } catch { return { success: false, error: "Origem inválida" }; }
+  const rl = await rateLimitByUser(ctx.user.id, "updatePassword");
+  if (!rl.ok) return { success: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
+
+  const { data: { user } } = await ctx.supabase.auth.getUser();
+  if (!user?.email) return { success: false, error: "Não autenticado" };
 
   const parsed = passwordSchema.safeParse(data.newPassword);
   if (!parsed.success) {
-    return { success: false, error: safeError(parsed.error) ?? "Password inválida" };
+    return { success: false, error: "Password inválida" };
   }
 
-  const { error: signInError } = await supabase.auth.signInWithPassword({
+  const { error: signInError } = await ctx.supabase.auth.signInWithPassword({
     email: user.email,
     password: data.currentPassword,
   });
 
   if (signInError) return { success: false, error: "Password atual incorreta" };
 
-  const { error: updateError } = await supabase.auth.updateUser({
+  const { error: updateError } = await ctx.supabase.auth.updateUser({
     password: data.newPassword,
   });
 
   if (updateError) return { success: false, error: updateError.message };
 
-  await supabase.auth.signOut();
+  logAudit({
+    schoolId: null,
+    userId: ctx.user.id,
+    action: "update_password",
+    entityType: "auth",
+    entityId: ctx.user.id,
+  }).catch(() => {});
+
+  await ctx.supabase.auth.signOut();
   redirect("/login");
 }
 
@@ -327,7 +381,7 @@ export async function getBookingHistory(): Promise<BookingHistoryItem[]> {
     created_at: string;
     session: {
       starts_at: string; duration_minutes: number;
-      school: { name: string; slug: string };
+      school: { id: string; name: string; slug: string };
       class_types: { name: string }[] | null;
     };
   }[];
@@ -335,6 +389,7 @@ export async function getBookingHistory(): Promise<BookingHistoryItem[]> {
   return bookings.map(b => ({
     id: b.id,
     sessionId: b.session_id,
+    schoolId: b.session.school.id,
     startsAt: b.session.starts_at,
     durationMinutes: b.session.duration_minutes,
     schoolName: b.session.school.name,
@@ -372,6 +427,45 @@ export async function getStudentPacks(): Promise<PackSummary[]> {
     school: { name: string; slug: string };
   }[];
 
+  const packIds = packs.map(p => p.id);
+
+  let packBookingsMap: Record<string, PackBooking[]> = {};
+  if (packIds.length > 0) {
+    const { data: pbRaw } = await supabase
+      .from("bookings")
+      .select(`
+        id, pack_purchase_id,
+        session:sessions!inner(
+          starts_at,
+          class_types(name),
+          school:schools!inner(name)
+        )
+      `)
+      .in("pack_purchase_id", packIds)
+      .order("created_at", { ascending: false });
+
+    const pbData = (pbRaw ?? []) as unknown as {
+      id: string; pack_purchase_id: string;
+      session: {
+        starts_at: string;
+        class_types: { name: string }[] | null;
+        school: { name: string };
+      };
+    }[];
+
+    for (const pb of pbData) {
+      if (!packBookingsMap[pb.pack_purchase_id]) {
+        packBookingsMap[pb.pack_purchase_id] = [];
+      }
+      packBookingsMap[pb.pack_purchase_id].push({
+        id: pb.id,
+        sessionStartsAt: pb.session.starts_at,
+        classTypeName: pb.session.class_types?.[0]?.name ?? "Aula",
+        schoolName: pb.session.school.name,
+      });
+    }
+  }
+
   return packs.map(p => ({
     id: p.id,
     packName: p.pack.name,
@@ -381,6 +475,7 @@ export async function getStudentPacks(): Promise<PackSummary[]> {
     lessonsRemaining: p.lessons_remaining,
     status: p.status,
     purchasedAt: p.purchased_at,
+    usedBookings: packBookingsMap[p.id] ?? [],
   }));
 }
 
@@ -456,12 +551,12 @@ export async function getInvoices(): Promise<Invoice[]> {
       id, booking_group_id, session_id, payment_status, payment_method, price_cents, created_at,
       session:sessions!inner(
         starts_at,
-        school:schools!inner(name, slug),
+        school:schools!inner(id, name, slug),
         class_types(name)
       )
     `)
     .eq("student_id", student.id)
-    .not("payment_status", "eq", "unpaid")
+    .neq("status", "cancelled_by_student")
     .order("created_at", { ascending: false })
     .limit(100);
 
@@ -487,4 +582,97 @@ export async function getInvoices(): Promise<Invoice[]> {
     paymentMethod: b.payment_method,
     createdAt: b.created_at,
   }));
+}
+
+export async function cancelOwnBooking(
+  bookingId: string,
+  sessionId: string,
+  schoolId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Não autenticado" };
+
+  const rl = await rateLimitByUser(user.id, "cancelOwnBooking");
+  if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
+
+  const student = await getStudent(supabase);
+  if (!student) return { ok: false, error: "Aluno não encontrado" };
+
+  const { data: booking } = await supabase
+    .from("bookings")
+    .select("id, status, payment_method, pack_purchase_id")
+    .eq("id", bookingId)
+    .eq("student_id", student.id)
+    .maybeSingle();
+
+  if (!booking) return { ok: false, error: "Reserva não encontrada" };
+  if (booking.status !== "confirmed") return { ok: false, error: "Reserva já cancelada" };
+
+  const { error: updateErr } = await supabase
+    .from("bookings")
+    .update({ status: "cancelled_by_student", cancelled_at: new Date().toISOString() })
+    .eq("id", booking.id);
+
+  if (updateErr) return { ok: false, error: safeError(updateErr) };
+
+  if (booking.payment_method === "pack" && booking.pack_purchase_id) {
+    await supabase.rpc("increment_pack_lessons", {
+      p_purchase_id: booking.pack_purchase_id,
+    });
+  }
+
+  logAudit({
+    schoolId,
+    userId: user.id,
+    action: "cancel_own_booking",
+    entityType: "booking",
+    entityId: booking.id,
+    metadata: { sessionId },
+  });
+
+  const rl2 = await rateLimitPublic("notifyOwnerCancellation", 10, "60 s");
+  if (rl2.ok) {
+    try {
+      const admin = createAdminClient();
+      const [sessionRes, schoolRes] = await Promise.all([
+        admin.from("sessions").select("starts_at, class_types(name)").eq("id", sessionId).single(),
+        admin.from("schools").select("name, owner_user_id").eq("id", schoolId).single(),
+      ]);
+      const session = sessionRes.data;
+      const school = schoolRes.data;
+      if (session && school) {
+        const { data: ownerUser } = await admin.auth.admin.getUserById(school.owner_user_id);
+        const ownerEmail = ownerUser?.user?.email;
+        if (ownerEmail) {
+          const d = new Date(session.starts_at);
+          const date = d.toLocaleDateString("pt-PT", { day: "numeric", month: "long" });
+          const time = `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
+          const className = (session.class_types as unknown as { name: string } | null)?.name ?? "Aula";
+
+          const { sendCancellationNotification, sendOwnerCancellationNotification } = await import("@/lib/email");
+          await sendCancellationNotification({
+            studentEmail: user.email ?? student.email ?? "",
+            studentName: student.full_name,
+            schoolName: school.name,
+            className,
+            date,
+            time,
+          });
+          await sendOwnerCancellationNotification({
+            ownerEmail,
+            schoolName: school.name,
+            studentName: student.full_name,
+            className,
+            date,
+            time,
+          });
+        }
+      }
+    } catch {
+      console.error("Failed to send cancellation notification");
+    }
+  }
+
+  return { ok: true };
 }
