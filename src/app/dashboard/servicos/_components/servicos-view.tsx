@@ -195,7 +195,7 @@ export function ServicosView({ schoolId }: Props) {
                   <td className="px-6 py-4 font-body-md text-body-md text-on-surface-variant align-middle text-center">{s.duracao} min</td>
                   <td className="px-6 py-4 align-middle text-center">
                     <span className="px-3 py-1 rounded-full bg-primary-fixed-dim/10 text-primary-fixed-dim text-[12px] font-bold uppercase tracking-wider">
-                      {s.avulsoDisponivel ? "Avulso" : "Pack"}
+                      {s.categoria === "pack" ? "Pack de Aulas" : s.categoria === "aluguer" ? "Aluguer" : "Aula Avulso"}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right align-middle">

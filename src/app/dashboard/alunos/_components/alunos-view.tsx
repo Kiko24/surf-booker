@@ -1,9 +1,8 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 
-import { deleteStudent, deleteStudentsBulk, toggleWaiver, createStudent, getStudentProfile, cancelPackPurchase, updatePackRemaining, type StudentRecord, type StudentProfileData } from "../actions";
+import { getStudents, deleteStudent, deleteStudentsBulk, toggleWaiver, createStudent, getStudentProfile, cancelPackPurchase, updatePackRemaining, type StudentRecord, type StudentProfileData, type BookingHistoryItem } from "../actions";
 import { getAvailablePacks, buyPack, type AvailablePack } from "../../calendario/actions";
 import { DotsIcon, TrashIcon } from "../../_components/icons";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
@@ -17,7 +16,7 @@ function getInitials(name: string): string {
   return name.split(" ").map(p => p[0]).join("").substring(0, 2).toUpperCase();
 }
 
-const FILTERS = ["Todos", "Com pack", "Recorrente", "Inativo"];
+const FILTERS = ["Todos", "Com pack", "Inativo"];
 
 function StatusDot({ active }: { active: boolean }) {
   return (
@@ -53,17 +52,18 @@ function searchStudents(students: StudentRecord[], query: string): StudentRecord
 }
 
 export function AlunosView({ schoolId }: Props) {
-  const router = useRouter();
   const [localStudents, setLocalStudents] = useState<StudentRecord[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(true);
 
-  useEffect(() => {
+  const fetchStudents = useCallback(() => {
     if (!schoolId) return;
     setLoadingStudents(true);
-    import("../actions").then(({ getStudents }) =>
-      getStudents(schoolId).then(setLocalStudents).finally(() => setLoadingStudents(false))
-    );
+    getStudents(schoolId).then(setLocalStudents).finally(() => setLoadingStudents(false));
   }, [schoolId]);
+
+  useEffect(() => {
+    fetchStudents();
+  }, [fetchStudents]);
   const [activeFilter, setActiveFilter] = useState("Todos");
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -88,11 +88,11 @@ export function AlunosView({ schoolId }: Props) {
   const [profileLoading, setProfileLoading] = useState(false);
   const [waiverError, setWaiverError] = useState("");
   const [deleteError, setDeleteError] = useState("");
-  const [showEditPack, setShowEditPack] = useState(false);
+  const [editingPack, setEditingPack] = useState<{ id: string; name: string; remaining: number; total: number } | null>(null);
   const [editPackRemaining, setEditPackRemaining] = useState("");
   const [editPackSaving, setEditPackSaving] = useState(false);
   const [editPackError, setEditPackError] = useState("");
-  const [showDeletePackConfirm, setShowDeletePackConfirm] = useState(false);
+  const [deletingPackData, setDeletingPackData] = useState<{ id: string; name: string } | null>(null);
   const [deletingPack, setDeletingPack] = useState(false);
   const [selecting, setSelecting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -320,7 +320,7 @@ export function AlunosView({ schoolId }: Props) {
                   <div className="flex-1 min-w-0">
                     <h3 className="font-body text-base font-bold text-foreground truncate">{s.name}</h3>
                     <div className="mt-0.5 text-xs text-text-secondary">
-                      Total de Aulas: {s.totalClasses}
+                      Aulas concluídas: {s.totalClasses}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -358,7 +358,7 @@ export function AlunosView({ schoolId }: Props) {
                 {selecting && <th className="px-5 py-3 w-10"></th>}
                 <th className="px-5 py-3 font-body text-[10px] text-text-secondary uppercase tracking-widest text-center">Nome do Aluno</th>
                 <th className="px-5 py-3 font-body text-[10px] text-text-secondary uppercase tracking-widest text-center">Status do Pack</th>
-                <th className="px-5 py-3 font-body text-[10px] text-text-secondary uppercase tracking-widest text-center">Total Aulas</th>
+                <th className="px-5 py-3 font-body text-[10px] text-text-secondary uppercase tracking-widest text-center">Aulas concluídas</th>
                 <th className="px-5 py-3 font-body text-[10px] text-text-secondary uppercase tracking-widest text-center">Estado</th>
                 <th className="px-5 py-3 font-body text-[10px] text-text-secondary uppercase tracking-widest text-center">Waiver</th>
                 <th className="px-5 py-3"></th>
@@ -401,7 +401,7 @@ export function AlunosView({ schoolId }: Props) {
                     </div>
                   </td>
                   <td className="px-5 py-3 font-body text-sm text-text-secondary align-middle text-center">
-                    {s.packs.length > 0 ? `${s.packs[0].remaining} aulas` : "Sem pack"}
+                    {s.packs.length > 0 ? `${s.packs[0].name}: ${s.packs[0].remaining} aulas` : "Sem pack"}
                   </td>
                   <td className="px-5 py-3 font-body text-sm text-text-secondary align-middle text-center">
                     {s.totalClasses}
@@ -471,22 +471,14 @@ export function AlunosView({ schoolId }: Props) {
                 </div>
               </div>
 
-              <div className="space-y-3">
-                {selectedStudent.email && (
-                  <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
-                    <p className="font-body text-xs text-text-secondary">Email</p>
-                    <p className="font-body text-sm text-foreground">{selectedStudent.email}</p>
-                  </div>
-                )}
-                {selectedStudent.phone && (
-                  <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
-                    <p className="font-body text-xs text-text-secondary">Telemóvel</p>
-                    <p className="font-body text-sm text-foreground">{selectedStudent.phone}</p>
-                  </div>
-                )}
+              <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
-                  <p className="font-body text-xs text-text-secondary">Total de Aulas</p>
-                  <p className="font-body text-sm text-foreground">{selectedStudent.totalClasses}</p>
+                  <p className="font-body text-xs text-text-secondary">Email</p>
+                  <p className="font-body text-sm text-foreground truncate">{selectedStudent.email || "—"}</p>
+                </div>
+                <div className="rounded-xl bg-[#2A2A2A] px-4 py-3">
+                  <p className="font-body text-xs text-text-secondary">Telemóvel</p>
+                  <p className="font-body text-sm text-foreground">{selectedStudent.phone || "—"}</p>
                 </div>
                 {(!profileLoading && studentProfile?.stats.groupSize) ? (
                   <div className="rounded-xl bg-accent/10 px-4 py-3">
@@ -505,39 +497,41 @@ export function AlunosView({ schoolId }: Props) {
                 <>
                   <div className="mt-4 rounded-xl border border-accent/10 bg-[#2A2A2A] px-4 py-3">
                     <p className="font-body text-xs text-text-secondary mb-2">Packs ativos</p>
-                    {studentProfile.activePack ? (
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-body text-sm font-semibold text-foreground">{studentProfile.activePack.name}</p>
-                          <p className="font-body text-xs text-text-secondary">
-                            {studentProfile.activePack.remaining} / {studentProfile.activePack.total} aulas
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <span className="font-body text-sm font-semibold text-accent">
-                            {Math.round((studentProfile.activePack.remaining / studentProfile.activePack.total) * 100)}%
-                          </span>
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              setEditPackRemaining(String(studentProfile.activePack!.remaining));
-                              setEditPackError("");
-                              setShowEditPack(true);
-                            }}
-                            className="ml-2 rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-white/5 hover:text-foreground"
-                          >
-                            <DotsIcon className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setShowDeletePackConfirm(true);
-                            }}
-                            className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-error/10 hover:text-error"
-                          >
-                            <TrashIcon className="h-4 w-4" />
-                          </button>
-                        </div>
+                    {studentProfile.activePacks.length > 0 ? (
+                      <div className="space-y-3">
+                        {studentProfile.activePacks.map((pack) => (
+                          <div key={pack.id} className="flex items-center justify-between rounded-lg bg-[#1A1A1A] px-3 py-2">
+                            <div>
+                              <p className="font-body text-sm font-semibold text-foreground">{pack.name}</p>
+                              <p className="font-body text-xs text-text-secondary">
+                                {pack.remaining} / {pack.total} aulas
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <span className="font-body text-sm font-semibold text-accent">
+                                {Math.round((pack.remaining / pack.total) * 100)}%
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingPack({ id: pack.id, name: pack.name, remaining: pack.remaining, total: pack.total });
+                                  setEditPackRemaining(String(pack.remaining));
+                                  setEditPackError("");
+                                }}
+                                className="ml-2 rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-white/5 hover:text-foreground"
+                              >
+                                <DotsIcon className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setDeletingPackData({ id: pack.id, name: pack.name })}
+                                className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-error/10 hover:text-error"
+                              >
+                                <TrashIcon className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     ) : (
                       <p className="font-body text-sm text-text-muted">Não tem pack ativo</p>
@@ -559,56 +553,7 @@ export function AlunosView({ schoolId }: Props) {
                   </div>
 
                   {studentProfile.bookings.length > 0 && (
-                    <div className="mt-4 rounded-xl bg-[#2A2A2A] px-4 py-3">
-                      <p className="font-body text-xs text-text-secondary mb-3">Histórico de aulas</p>
-                      <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                        {studentProfile.bookings.map((b) => {
-                          const d = new Date(b.startsAt);
-                          const formatted = d.toLocaleDateString("pt-PT", {
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                          });
-                          const time = d.toLocaleTimeString("pt-PT", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          });
-                          const statusColor =
-                            b.status === "attended"
-                              ? "bg-success/20 text-success"
-                              : b.status === "no_show"
-                                ? "bg-error/20 text-error"
-                                : b.status === "cancelled_by_student" || b.status === "cancelled_by_school"
-                                  ? "bg-white/5 text-text-muted"
-                                  : "bg-accent/10 text-accent";
-                          const statusLabel =
-                            b.status === "attended"
-                              ? "Presente"
-                              : b.status === "no_show"
-                                ? "Falta"
-                                : b.status.startsWith("cancelled")
-                                  ? "Cancelada"
-                                  : "Confirmada";
-                          return (
-                            <div key={b.id} className="flex items-center justify-between gap-2 rounded-lg bg-[#1A1A1A] px-3 py-2">
-                              <div className="min-w-0 flex-1">
-                                <p className="font-body text-sm text-foreground truncate">
-                                  {formatted} · {time}
-                                </p>
-                                <p className="font-body text-xs text-text-muted truncate">
-                                  {b.classTypeName ?? "—"}
-                                  {b.groupSize ? ` · ${b.groupSize} pessoas` : ""}
-                                  {b.instructorName ? ` · ${b.instructorName}` : ""}
-                                </p>
-                              </div>
-                              <span className={`shrink-0 rounded-md px-2 py-0.5 font-body text-xs font-semibold ${statusColor}`}>
-                                {statusLabel}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
+                    <StudentHistory bookings={studentProfile.bookings} />
                   )}
                 </>
               ) : null}
@@ -690,17 +635,19 @@ export function AlunosView({ schoolId }: Props) {
           const deletedId = selectedStudent.id;
           const deletedStudent = selectedStudent;
           setLocalStudents((prev) => prev.filter((s) => s.id !== deletedId));
-          setSelectedStudent(null);
           const res = await deleteStudent(deletedId);
           if (!res.ok) {
             setLocalStudents((prev) => [...prev, deletedStudent].sort((a, b) => a.name.localeCompare(b.name)));
             setDeleteError(res.error ?? "Erro ao eliminar aluno");
+            throw new Error(res.error);
           }
+          setSelectedStudent(null);
         }}
         title="Eliminar aluno"
         message={`Tens a certeza que queres eliminar "${selectedStudent?.name}"? Esta ação remove o aluno de todas as aulas e não pode ser desfeita.`}
         confirmLabel="Sim, eliminar"
         cancelLabel="Cancelar"
+        error={deleteError || undefined}
         variant="danger"
       />
 
@@ -728,7 +675,7 @@ export function AlunosView({ schoolId }: Props) {
                 if (!res.ok) { setAddError(res.error ?? "Erro ao adicionar aluno"); setAddSaving(false); return; }
                 setShowAddModal(false);
                 setAddSaving(false);
-                router.refresh();
+                fetchStudents();
               }}
               className="flex-1 rounded-xl bg-accent py-3 font-body text-sm font-semibold text-primary-foreground transition-transform active:scale-95 disabled:opacity-50"
             >
@@ -849,7 +796,7 @@ export function AlunosView({ schoolId }: Props) {
                   setShowAssignPack(false);
                   const profile = await getStudentProfile(selectedStudent.id, schoolId);
                   if (profile) setStudentProfile(profile);
-                  router.refresh();
+                  fetchStudents();
                 } else {
                   setAssignPackError(res.error ?? "Erro ao atribuir pack");
                 }
@@ -908,15 +855,15 @@ export function AlunosView({ schoolId }: Props) {
       </BottomSheet>
 
       <BottomSheet
-        isOpen={showEditPack && !!studentProfile?.activePack}
-        onClose={() => { setShowEditPack(false); setEditPackError(""); }}
+        isOpen={!!editingPack}
+        onClose={() => { setEditingPack(null); setEditPackError(""); }}
         title="Editar pack"
         showHandle
         footer={
           <>
             <button
               type="button"
-              onClick={() => { setShowEditPack(false); setEditPackError(""); }}
+              onClick={() => { setEditingPack(null); setEditPackError(""); }}
               className="flex-1 rounded-xl bg-[#2A2A2A] py-3 font-body text-sm font-semibold text-text-secondary transition-colors hover:text-foreground"
             >
               Cancelar
@@ -925,19 +872,19 @@ export function AlunosView({ schoolId }: Props) {
               type="button"
               disabled={editPackSaving}
               onClick={async () => {
-                if (!studentProfile?.activePack || !selectedStudent) return;
+                if (!editingPack || !selectedStudent) return;
                 setEditPackError("");
                 setEditPackSaving(true);
                 const res = await updatePackRemaining(
-                  studentProfile.activePack.id,
+                  editingPack.id,
                   schoolId,
                   Number(editPackRemaining)
                 );
                 if (res.ok) {
-                  setShowEditPack(false);
+                  setEditingPack(null);
                   const profile = await getStudentProfile(selectedStudent.id, schoolId);
                   if (profile) setStudentProfile(profile);
-                  router.refresh();
+                  fetchStudents();
                 } else {
                   setEditPackError(res.error ?? "Erro ao editar pack");
                 }
@@ -951,7 +898,7 @@ export function AlunosView({ schoolId }: Props) {
         }
       >
         <p className="font-body text-sm text-text-secondary mb-4">
-          {studentProfile?.activePack?.name}
+          {editingPack?.name}
         </p>
         <label className="font-body text-sm font-semibold text-text-secondary mb-1 block">
           Aulas restantes
@@ -975,13 +922,15 @@ export function AlunosView({ schoolId }: Props) {
         onConfirm={async () => {
           const ids = Array.from(selectedIds);
           if (ids.length === 0) return;
+          const prevStudents = localStudents;
           setLocalStudents((prev) => prev.filter((s) => !ids.includes(s.id)));
           setSelecting(false);
           setSelectedIds(new Set());
           setShowBulkDeleteConfirm(false);
           const res = await deleteStudentsBulk(ids);
           if (!res.ok) {
-            router.refresh();
+            setLocalStudents(prevStudents);
+            throw new Error(res.error);
           }
         }}
         title="Remover alunos"
@@ -992,28 +941,106 @@ export function AlunosView({ schoolId }: Props) {
       />
 
       <ConfirmDialog
-        isOpen={showDeletePackConfirm && !!studentProfile?.activePack}
-        onClose={() => { setShowDeletePackConfirm(false); }}
+        isOpen={!!deletingPackData}
+        onClose={() => { setDeletingPackData(null); setEditPackError(""); }}
         onConfirm={async () => {
-          if (!studentProfile?.activePack) return;
+          if (!deletingPackData) return;
           setDeletingPack(true);
-          const res = await cancelPackPurchase(studentProfile.activePack.id, schoolId);
+          const res = await cancelPackPurchase(deletingPackData.id, schoolId);
           if (res.ok) {
-            setStudentProfile(prev => prev ? { ...prev, activePack: null } : null);
-            router.refresh();
+            setStudentProfile(prev => prev ? { ...prev, activePacks: prev.activePacks.filter(p => p.id !== deletingPackData!.id) } : null);
+            fetchStudents();
+            setDeletingPackData(null);
           } else {
             setEditPackError(res.error ?? "Erro ao eliminar pack");
+            throw new Error(res.error);
           }
           setDeletingPack(false);
         }}
         title="Eliminar pack"
-        message={`Tens a certeza que queres eliminar o pack "${studentProfile?.activePack?.name}" deste aluno?`}
+        message={`Tens a certeza que queres eliminar o pack "${deletingPackData?.name}" deste aluno?`}
         confirmLabel="Sim, eliminar"
         cancelLabel="Cancelar"
         variant="danger"
         icon={<TrashIcon className="h-6 w-6 text-error" />}
+        error={editPackError || undefined}
       />
 
     </>
+  );
+}
+
+function StudentHistory({ bookings }: { bookings: BookingHistoryItem[] }) {
+  const now = new Date();
+  const future = bookings.filter((b) => new Date(b.startsAt) >= now);
+  const past = bookings.filter((b) => new Date(b.startsAt) < now);
+
+  return (
+    <div className="mt-4 rounded-xl bg-[#2A2A2A] px-4 py-3">
+      {future.length > 0 && (
+        <>
+          <p className="font-body text-xs text-text-secondary mb-3">Próximas aulas</p>
+          <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+            {future.map(renderBookingRow)}
+          </div>
+        </>
+      )}
+      {past.length > 0 && (
+        <>
+          {future.length > 0 && <div className="mt-4" />}
+          <p className="font-body text-xs text-text-secondary mb-3">Histórico</p>
+          <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+            {past.map(renderBookingRow)}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function renderBookingRow(b: BookingHistoryItem) {
+  const d = new Date(b.startsAt);
+  const formatted = d.toLocaleDateString("pt-PT", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+  const time = d.toLocaleTimeString("pt-PT", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const statusColor =
+    b.status === "attended"
+      ? "bg-success/20 text-success"
+      : b.status === "no_show"
+        ? "bg-error/20 text-error"
+        : b.status === "cancelled_by_student" || b.status === "cancelled_by_school"
+          ? "bg-white/5 text-text-muted"
+          : "bg-accent/10 text-accent";
+  const statusLabel =
+    b.status === "attended"
+      ? "Presente"
+      : b.status === "no_show"
+        ? "Falta"
+        : b.status.startsWith("cancelled")
+          ? "Cancelada"
+          : "Confirmada";
+
+  return (
+    <div key={b.id} className="flex items-center justify-between gap-2 rounded-lg bg-[#1A1A1A] px-3 py-2">
+      <div className="min-w-0 flex-1">
+        <p className="font-body text-sm text-foreground truncate">
+          {formatted} · {time}
+        </p>
+        <p className="font-body text-xs text-text-muted truncate">
+          {b.classTypeName ?? "—"}
+          {b.groupSize ? ` · ${b.groupSize} pessoas` : ""}
+          {b.instructorName ? ` · ${b.instructorName}` : ""}
+        </p>
+      </div>
+      <span className={`shrink-0 rounded-md px-2 py-0.5 font-body text-xs font-semibold ${statusColor}`}>
+        {statusLabel}
+      </span>
+    </div>
   );
 }

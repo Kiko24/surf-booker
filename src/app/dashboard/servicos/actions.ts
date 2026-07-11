@@ -213,6 +213,15 @@ export async function addServico(
       }))
     );
     if (pErr) return { ok: false, error: pErr.message };
+  } else if (data.categoria === "pack" && data.totalLessons && data.totalLessons > 0) {
+    const { error: autoErr } = await supabase.from("packs").insert({
+      school_id: schoolId,
+      class_type_id: created.id,
+      name: data.nome,
+      total_lessons: data.totalLessons,
+      price_cents: data.avulsoPreco,
+    });
+    if (autoErr) return { ok: false, error: autoErr.message };
   }
 
   logAudit({
@@ -367,6 +376,24 @@ export async function updateServico(
       }))
     );
     if (pErr) return { ok: false, error: pErr.message };
+  }
+
+  if (data.categoria === "pack" && data.totalLessons && data.totalLessons > 0 && ct) {
+    const { data: remaining } = await supabase
+      .from("packs")
+      .select("id")
+      .eq("class_type_id", id)
+      .limit(1);
+    if (!remaining || remaining.length === 0) {
+      const { error: autoErr } = await supabase.from("packs").insert({
+        school_id: ct.school_id,
+        class_type_id: id,
+        name: data.nome,
+        total_lessons: data.totalLessons,
+        price_cents: data.avulsoPreco,
+      });
+      if (autoErr) return { ok: false, error: autoErr.message };
+    }
   }
 
   if (ct) {

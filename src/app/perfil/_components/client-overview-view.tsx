@@ -40,7 +40,7 @@ export function ClientOverviewView({ overview }: { overview: ClientOverview | nu
     );
   }
 
-  const { profile, upcomingBookings, activePacks } = overview;
+  const { profile, upcomingBookings, activePacks, totalBookings, totalAttended, totalNoShow, favoriteSchools, pendingWaivers } = overview;
 
   return (
     <div className="space-y-6">
@@ -48,6 +48,29 @@ export function ClientOverviewView({ overview }: { overview: ClientOverview | nu
         <h1 className="text-2xl font-bold text-gray-900">
           Olá, {profile?.fullName?.split(" ")[0] ?? "Cliente"}
         </h1>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="rounded-xl border border-gray-200 bg-white px-5 py-4">
+          <p className="text-xs font-medium uppercase tracking-wider text-gray-400">Aulas realizadas</p>
+          <p className="mt-1 text-2xl font-bold text-gray-900">{totalAttended}</p>
+        </div>
+        <div className="rounded-xl border border-gray-200 bg-white px-5 py-4">
+          <p className="text-xs font-medium uppercase tracking-wider text-gray-400">Total de aulas concluídas</p>
+          <p className="mt-1 text-2xl font-bold text-gray-900">{totalBookings}</p>
+        </div>
+        <div className="rounded-xl border border-gray-200 bg-white px-5 py-4">
+          <p className="text-xs font-medium uppercase tracking-wider text-gray-400">Faltas</p>
+          <p className="mt-1 text-2xl font-bold text-gray-900">{totalNoShow}</p>
+        </div>
+        <div className="rounded-xl border border-gray-200 bg-white px-5 py-4">
+          <p className="text-xs font-medium uppercase tracking-wider text-gray-400">Escolas favoritas</p>
+          <p className="mt-1 text-2xl font-bold text-gray-900">{favoriteSchools.length}</p>
+        </div>
+        <div className="rounded-xl border border-gray-200 bg-white px-5 py-4">
+          <p className="text-xs font-medium uppercase tracking-wider text-gray-400">Waivers pendentes</p>
+          <p className="mt-1 text-2xl font-bold text-gray-900">{pendingWaivers}</p>
+        </div>
       </div>
 
       <div className="grid gap-8 lg:grid-cols-2">

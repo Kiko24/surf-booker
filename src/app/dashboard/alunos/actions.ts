@@ -50,7 +50,10 @@ export async function getStudents(schoolId: string): Promise<StudentRecord[]> {
     .eq("school_id", schoolId)
     .order("first_seen_at", { ascending: false });
 
-  if (!rows) return [];
+  if (ssErr || !rows) {
+    if (ssErr) console.error("school_students query failed:", ssErr);
+    return [];
+  }
 
   const studentIds = rows.map(r => r.student_id).filter(Boolean);
   if (studentIds.length === 0) return [];
@@ -60,14 +63,18 @@ export async function getStudents(schoolId: string): Promise<StudentRecord[]> {
     .select("id, full_name, email, phone, is_guest, waiver_signed")
     .in("id", studentIds);
 
+  if (stErr) console.error("students query failed:", stErr);
+
   const studentMap = new Map(studentRows?.map(s => [s.id, s]) ?? []);
 
   // get bookings for each student
-  const { data: allBookings } = await admin
+  const { data: allBookings, error: bookingsErr } = await admin
     .from("bookings")
     .select("student_id, session_id, status")
     .in("student_id", studentIds)
-    .in("status", ["confirmed", "attended", "no_show"]);
+    .in("status", ["attended"]);
+
+  if (bookingsErr) console.error("bookings query failed:", bookingsErr);
 
   // count total classes per student
   const totalClassesMap = new Map<string, number>();
@@ -234,18 +241,24 @@ export async function deleteStudentsBulk(studentIds: string[]): Promise<{ ok: bo
 
   const admin = createAdminClient();
 
-  // verify ownership using the first student's school
-  const { data: link } = await admin
+  // verify ALL students belong to the same school
+  const { data: links, error: linksErr } = await admin
     .from("school_students")
     .select("school_id")
-    .eq("student_id", studentIds[0])
-    .maybeSingle();
-  if (!link) return { ok: false, error: "Aluno não encontrado" };
+    .in("student_id", studentIds);
+  if (linksErr || !links || links.length !== studentIds.length) {
+    return { ok: false, error: "Aluno não encontrado" };
+  }
+
+  const uniqueSchools = [...new Set(links.map(l => l.school_id))];
+  if (uniqueSchools.length !== 1) {
+    return { ok: false, error: "Todos os alunos devem pertencer à mesma escola" };
+  }
 
   const { data: school } = await supabase
     .from("schools")
     .select("id")
-    .eq("id", link.school_id)
+    .eq("id", uniqueSchools[0])
     .eq("owner_user_id", user.id)
     .maybeSingle();
   if (!school) return { ok: false, error: "Sem permissão" };
@@ -267,7 +280,7 @@ export async function deleteStudentsBulk(studentIds: string[]): Promise<{ ok: bo
 
   for (const studentId of studentIds) {
     logAudit({
-      schoolId: link.school_id,
+      schoolId: uniqueSchools[0],
       userId: user.id,
       action: "delete_student",
       entityType: "student",
@@ -402,8 +415,8 @@ export type BookingHistoryItem = {
 
 export type StudentProfileData = {
   bookings: BookingHistoryItem[];
-  activePack: { id: string; name: string; remaining: number; total: number } | null;
-  stats: { totalClasses: number; attendanceRate: number | null; groupSize?: number };
+  activePacks: { id: string; name: string; remaining: number; total: number }[];
+  stats: { totalClasses: number; totalAttended: number; attendanceRate: number | null; groupSize?: number };
 };
 
 export async function getStudentProfile(
@@ -413,39 +426,52 @@ export async function getStudentProfile(
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { bookings: [], activePack: null, stats: { totalClasses: 0, attendanceRate: null } };
+  if (!user) return { bookings: [], activePacks: [], stats: { totalClasses: 0, totalAttended: 0, attendanceRate: null } };
 
   try {
     await requireOwner(schoolId);
   } catch {
-    return { bookings: [], activePack: null, stats: { totalClasses: 0, attendanceRate: null } };
+    return { bookings: [], activePacks: [], stats: { totalClasses: 0, totalAttended: 0, attendanceRate: null } };
   }
 
-  // fetch bookings with session, class_type, instructor details
-  const { data: bookingRows } = await supabase
+  const adminClient = createAdminClient();
+
+  // fetch bookings — simple select, no embedding (no FK from bookings to sessions)
+  const { data: bookingRows } = await adminClient
     .from("bookings")
-    .select(`
-      id,
-      status,
-      booking_group_id,
-      session:sessions!inner(
-        starts_at,
-        instructor_id,
-        class_type_id,
-        class_types(name)
-      )
-    `)
+    .select("id, status, booking_group_id, session_id, created_at")
     .eq("student_id", studentId)
     .order("created_at", { ascending: false });
 
-  // fetch group_size from booking_groups via admin client
-  // (avoids PostgREST composite FK embedding ambiguity)
+  // fetch sessions with class_type info (sessions has FK to class_types)
+  const sessionIds = [
+    ...new Set((bookingRows ?? []).map((b) => b.session_id as string).filter(Boolean)),
+  ] as string[];
+  const sessionMap = new Map<string, {
+    starts_at: string;
+    instructor_id: string | null;
+    class_types: { name: string } | null;
+  }>();
+  if (sessionIds.length > 0) {
+    const { data: sessionRows } = await adminClient
+      .from("sessions")
+      .select("id, starts_at, instructor_id, class_types(name)")
+      .in("id", sessionIds);
+    for (const s of sessionRows ?? []) {
+      sessionMap.set(s.id, {
+        starts_at: s.starts_at,
+        instructor_id: s.instructor_id,
+        class_types: s.class_types?.[0] ?? null,
+      });
+    }
+  }
+
+  // fetch group_size from booking_groups
   const bgIds = [
-    ...new Set((bookingRows ?? []).map((r) => r.booking_group_id as string).filter(Boolean)),
+    ...new Set((bookingRows ?? []).map((b) => b.booking_group_id as string).filter(Boolean)),
   ] as string[];
   let groupSizeMap = new Map<string, number>();
   if (bgIds.length > 0) {
-    const adminClient = createAdminClient();
     const { data: bgRows } = await adminClient
       .from("booking_groups")
       .select("id, group_size")
@@ -457,16 +483,11 @@ export async function getStudentProfile(
   let attendedCount = 0;
   let noShowCount = 0;
   let totalCount = 0;
+  const bookingInstructorIds = new Map<string, string | null>();
 
   if (bookingRows) {
     for (const b of bookingRows) {
-      const sess = b.session as unknown as {
-        starts_at: string;
-        instructor_id: string | null;
-        class_type_id: string | null;
-        class_types: { name: string } | null;
-      } | null;
-
+      const sess = b.session_id ? sessionMap.get(b.session_id as string) : null;
       if (!sess) continue;
 
       const bookingStatus = b.status as string;
@@ -476,10 +497,12 @@ export async function getStudentProfile(
         id: b.id as string,
         startsAt: sess.starts_at,
         classTypeName: sess.class_types?.name ?? null,
-        instructorName: null, // will resolve below
+        instructorName: null,
         status: bookingStatus,
         groupSize: gs > 1 ? gs : undefined,
       });
+
+      bookingInstructorIds.set(b.id as string, sess.instructor_id);
 
       if (bookingStatus === "attended") attendedCount++;
       else if (bookingStatus === "no_show") noShowCount++;
@@ -488,11 +511,7 @@ export async function getStudentProfile(
   }
 
   // resolve instructor names in batch
-  const instructorIds = [...new Set(bookingRows?.map(b => {
-    const sess = b.session as unknown as { instructor_id: string | null } | null;
-    return sess?.instructor_id;
-  }).filter(Boolean) as string[])];
-
+  const instructorIds = [...new Set([...bookingInstructorIds.values()].filter(Boolean))] as string[];
   const instructorMap = new Map<string, string>();
   if (instructorIds.length > 0) {
     const { data: instructors } = await supabase
@@ -505,44 +524,41 @@ export async function getStudentProfile(
   }
 
   for (const item of bookingItems) {
-    const sess = bookingRows?.find(b => b.id === item.id)?.session as unknown as {
-      instructor_id: string | null;
-    } | null;
-    if (sess?.instructor_id) {
-      item.instructorName = instructorMap.get(sess.instructor_id) ?? null;
+    const instId = bookingInstructorIds.get(item.id) ?? null;
+    if (instId) {
+      item.instructorName = instructorMap.get(instId) ?? null;
     }
   }
 
-  // fetch active pack
-  const { data: packRow } = await supabase
+  // fetch active packs
+  const { data: packRows } = await supabase
     .from("pack_purchases")
     .select("id, lessons_remaining, pack:packs!inner(name, total_lessons)")
     .eq("student_id", studentId)
     .eq("school_id", schoolId)
     .eq("status", "active")
     .gt("lessons_remaining", 0)
-    .order("purchased_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .order("purchased_at", { ascending: false });
 
-  let activePack: StudentProfileData["activePack"] = null;
-  if (packRow) {
-    const p = packRow.pack as unknown as { name: string; total_lessons: number } | null;
+  const activePacks: StudentProfileData["activePacks"] = [];
+  for (const row of packRows ?? []) {
+    const p = row.pack as unknown as { name: string; total_lessons: number } | null;
     if (p) {
-      activePack = {
-        id: packRow.id,
+      activePacks.push({
+        id: row.id as string,
         name: p.name,
-        remaining: packRow.lessons_remaining,
+        remaining: row.lessons_remaining,
         total: p.total_lessons,
-      };
+      });
     }
   }
 
   return {
     bookings: bookingItems,
-    activePack,
+    activePacks,
     stats: {
       totalClasses: totalCount,
+      totalAttended: attendedCount,
       attendanceRate:
         attendedCount + noShowCount > 0
           ? Math.round((attendedCount / (attendedCount + noShowCount)) * 100)

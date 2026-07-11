@@ -75,19 +75,6 @@ export type WaiverAcceptance = {
   version: number;
 };
 
-export type Invoice = {
-  id: string;
-  bookingGroupId: string;
-  sessionStartsAt: string;
-  schoolName: string;
-  schoolSlug: string;
-  classTypeName: string;
-  priceCents: number;
-  paymentStatus: string;
-  paymentMethod: string;
-  createdAt: string;
-};
-
 export type ClientOverview = {
   profile: StudentProfile | null;
   authEmail: string | null;
@@ -96,6 +83,8 @@ export type ClientOverview = {
   favoriteSchools: FavoriteSchool[];
   pendingWaivers: number;
   totalBookings: number;
+  totalAttended: number;
+  totalNoShow: number;
 };
 
 type StudentRow = {
@@ -132,6 +121,8 @@ export async function getClientOverview(): Promise<ClientOverview | null> {
     favoriteSchools: [],
     pendingWaivers: 0,
     totalBookings: 0,
+    totalAttended: 0,
+    totalNoShow: 0,
   };
 
   const profile: StudentProfile = {
@@ -143,7 +134,7 @@ export async function getClientOverview(): Promise<ClientOverview | null> {
 
   const now = new Date().toISOString();
 
-  const [bookingsRes, packsRes, favoritesRes, waiversRes, countRes] = await Promise.all([
+  const [bookingsRes, packsRes, favoritesRes, waiversRes, countRes, attendedCountRes, noShowCountRes] = await Promise.all([
     supabase
       .from("bookings")
       .select(`
@@ -182,6 +173,16 @@ export async function getClientOverview(): Promise<ClientOverview | null> {
       .from("bookings")
       .select("id", { count: "exact", head: true })
       .eq("student_id", student.id),
+    supabase
+      .from("bookings")
+      .select("id", { count: "exact", head: true })
+      .eq("student_id", student.id)
+      .eq("status", "attended"),
+    supabase
+      .from("bookings")
+      .select("id", { count: "exact", head: true })
+      .eq("student_id", student.id)
+      .eq("status", "no_show"),
   ]);
 
   const bookings = (bookingsRes.data ?? []) as unknown as {
@@ -260,6 +261,8 @@ export async function getClientOverview(): Promise<ClientOverview | null> {
     favoriteSchools,
     pendingWaivers: waiversRes.count ?? 0,
     totalBookings: countRes.count ?? 0,
+    totalAttended: attendedCountRes.count ?? 0,
+    totalNoShow: noShowCountRes.count ?? 0,
   };
 }
 
@@ -540,66 +543,30 @@ export async function getWaiverAcceptances(): Promise<WaiverAcceptance[]> {
   }));
 }
 
-export async function getInvoices(): Promise<Invoice[]> {
-  const supabase = await createClient();
-  const student = await getStudent(supabase);
-  if (!student) return [];
-
-  const { data: raw } = await supabase
-    .from("bookings")
-    .select(`
-      id, booking_group_id, session_id, payment_status, payment_method, price_cents, created_at,
-      session:sessions!inner(
-        starts_at,
-        school:schools!inner(id, name, slug),
-        class_types(name)
-      )
-    `)
-    .eq("student_id", student.id)
-    .neq("status", "cancelled_by_student")
-    .order("created_at", { ascending: false })
-    .limit(100);
-
-  const bookings = (raw ?? []) as unknown as {
-    id: string; booking_group_id: string; session_id: string;
-    payment_status: string; payment_method: string; price_cents: number; created_at: string;
-    session: {
-      starts_at: string;
-      school: { name: string; slug: string };
-      class_types: { name: string }[] | null;
-    };
-  }[];
-
-  return bookings.map(b => ({
-    id: b.id,
-    bookingGroupId: b.booking_group_id,
-    sessionStartsAt: b.session.starts_at,
-    schoolName: b.session.school.name,
-    schoolSlug: b.session.school.slug,
-    classTypeName: b.session.class_types?.[0]?.name ?? "Aula",
-    priceCents: b.price_cents,
-    paymentStatus: b.payment_status,
-    paymentMethod: b.payment_method,
-    createdAt: b.created_at,
-  }));
-}
+const cancelBookingSchema = z.object({
+  bookingId: z.string().uuid(),
+  sessionId: z.string().uuid(),
+  schoolId: z.string().uuid(),
+});
 
 export async function cancelOwnBooking(
   bookingId: string,
   sessionId: string,
   schoolId: string,
 ): Promise<{ ok: boolean; error?: string }> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: "Não autenticado" };
+  const parsed = cancelBookingSchema.safeParse({ bookingId, sessionId, schoolId });
+  if (!parsed.success) return { ok: false, error: "Parâmetros inválidos" };
 
-  const rl = await rateLimitByUser(user.id, "cancelOwnBooking");
+  let ctx: import("@/lib/create-action").ActionContext;
+  try { ctx = await requireServerContext(); } catch { return { ok: false, error: "Não autenticado" }; }
+
+  const rl = await rateLimitByUser(ctx.user.id, "cancelOwnBooking");
   if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
 
-  const student = await getStudent(supabase);
+  const student = await getStudent(ctx.supabase);
   if (!student) return { ok: false, error: "Aluno não encontrado" };
 
-  const { data: booking } = await supabase
+  const { data: booking } = await ctx.supabase
     .from("bookings")
     .select("id, status, payment_method, pack_purchase_id")
     .eq("id", bookingId)
@@ -609,7 +576,7 @@ export async function cancelOwnBooking(
   if (!booking) return { ok: false, error: "Reserva não encontrada" };
   if (booking.status !== "confirmed") return { ok: false, error: "Reserva já cancelada" };
 
-  const { error: updateErr } = await supabase
+  const { error: updateErr } = await ctx.supabase
     .from("bookings")
     .update({ status: "cancelled_by_student", cancelled_at: new Date().toISOString() })
     .eq("id", booking.id);
@@ -617,14 +584,14 @@ export async function cancelOwnBooking(
   if (updateErr) return { ok: false, error: safeError(updateErr) };
 
   if (booking.payment_method === "pack" && booking.pack_purchase_id) {
-    await supabase.rpc("increment_pack_lessons", {
+    await ctx.supabase.rpc("increment_pack_lessons", {
       p_purchase_id: booking.pack_purchase_id,
     });
   }
 
   logAudit({
     schoolId,
-    userId: user.id,
+    userId: ctx.user.id,
     action: "cancel_own_booking",
     entityType: "booking",
     entityId: booking.id,
@@ -634,17 +601,17 @@ export async function cancelOwnBooking(
   const rl2 = await rateLimitPublic("notifyOwnerCancellation", 10, "60 s");
   if (rl2.ok) {
     try {
-      const admin = createAdminClient();
       const [sessionRes, schoolRes] = await Promise.all([
-        admin.from("sessions").select("starts_at, class_types(name)").eq("id", sessionId).single(),
-        admin.from("schools").select("name, owner_user_id").eq("id", schoolId).single(),
+        ctx.admin.from("sessions").select("starts_at, class_types(name)").eq("id", sessionId).single(),
+        ctx.admin.from("schools").select("name, owner_user_id").eq("id", schoolId).single(),
       ]);
       const session = sessionRes.data;
       const school = schoolRes.data;
       if (session && school) {
-        const { data: ownerUser } = await admin.auth.admin.getUserById(school.owner_user_id);
+          const { data: ownerUser } = await ctx.admin.auth.admin.getUserById(school.owner_user_id);
         const ownerEmail = ownerUser?.user?.email;
         if (ownerEmail) {
+          const { data: { user: authUser } } = await ctx.supabase.auth.getUser();
           const d = new Date(session.starts_at);
           const date = d.toLocaleDateString("pt-PT", { day: "numeric", month: "long" });
           const time = `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
@@ -652,7 +619,7 @@ export async function cancelOwnBooking(
 
           const { sendCancellationNotification, sendOwnerCancellationNotification } = await import("@/lib/email");
           await sendCancellationNotification({
-            studentEmail: user.email ?? student.email ?? "",
+            studentEmail: authUser?.email ?? student.email ?? "",
             studentName: student.full_name,
             schoolName: school.name,
             className,

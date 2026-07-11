@@ -68,7 +68,7 @@ export async function getStudentProfile(
       .in("status", ["confirmed", "attended", "no_show"]),
     supabase
       .from("pack_purchases")
-      .select("id, name, start_date, end_date, sessions_total, sessions_used, status")
+      .select("id, lessons_remaining, status, pack:packs!inner(name, total_lessons)")
       .eq("student_id", studentId)
       .eq("school_id", schoolId)
       .order("created_at", { ascending: false }),
@@ -84,16 +84,16 @@ export async function getStudentProfile(
     createdAt: student.created_at,
     totalSessions: totalSessions ?? 0,
     packs: (packs ?? []).map((p) => {
-      const total = p.sessions_total ?? 0;
-      const used = p.sessions_used ?? 0;
+      const pack = p.pack as unknown as { name: string; total_lessons: number } | null;
+      const total = pack?.total_lessons ?? 0;
       return {
         id: p.id,
-        name: p.name ?? "Pack",
-        start: p.start_date,
-        end: p.end_date,
+        name: pack?.name ?? "Pack",
+        start: null,
+        end: null,
         sessionsTotal: total,
-        sessionsUsed: used,
-        remaining: total - used,
+        sessionsUsed: total - p.lessons_remaining,
+        remaining: p.lessons_remaining,
         status: p.status ?? "unknown",
       };
     }),
@@ -109,12 +109,16 @@ export type AvailablePack = {
 
 export async function getAvailablePacks(schoolId: string): Promise<AvailablePack[]> {
   const supabase = await createClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("packs")
     .select("id, name, price_cents, total_lessons")
     .eq("school_id", schoolId)
     .eq("is_active", true)
     .order("price_cents", { ascending: true });
+  if (error) {
+    console.error("getAvailablePacks error:", error);
+    return [];
+  }
   return (data ?? []).map((p) => ({ id: p.id, name: p.name, price_cents: p.price_cents, total_lessons: p.total_lessons }));
 }
 
@@ -133,7 +137,7 @@ export async function buyPack(
 
   const { data: pack } = await supabase
     .from("packs")
-    .select("sessions")
+    .select("total_lessons")
     .eq("id", packId)
     .single();
   if (!pack) return { ok: false, error: "Pack não encontrado" };
@@ -142,8 +146,7 @@ export async function buyPack(
     student_id: studentId,
     school_id: schoolId,
     pack_id: packId,
-    sessions_total: sessionsToAssign ?? pack.sessions,
-    sessions_used: 0,
+    lessons_remaining: sessionsToAssign ?? pack.total_lessons,
     status: "active",
   });
 
