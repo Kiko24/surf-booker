@@ -72,7 +72,7 @@ export function ContactoSection({ onOpenCalendar }: { onOpenCalendar: () => void
                     {errors.message && <p className="mt-1 text-xs text-red-500">{errors.message}</p>}
                   </div>
                   <div className="text-center">
-                    <button type="submit" className="group mx-auto inline-flex items-center justify-center gap-2 rounded-full bg-accent px-6 py-3 text-sm font-semibold text-black shadow-sm w-[200px] transition-all duration-300 ease-out hover:shadow-md hover:scale-[1.04] hover:-translate-y-0.5">
+                    <button type="submit" className="group mx-auto inline-flex items-center justify-center gap-2 rounded-full bg-accent px-6 py-3 text-sm font-semibold text-white shadow-sm w-[200px] transition-all duration-300 ease-out hover:shadow-md hover:scale-[1.04] hover:-translate-y-0.5">
                       Enviar
                       <svg className="h-4 w-4 transition-transform duration-300 ease-out group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />

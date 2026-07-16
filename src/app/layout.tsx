@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Oswald, Lato } from 'next/font/google';
+import { CookieConsentBanner } from './_components/cookie-consent-banner';
 import './global.css';
 
 const oswald = Oswald({
@@ -57,6 +58,7 @@ export default function RootLayout({
           }}
         />
         {children}
+        <CookieConsentBanner />
       </body>
     </html>
   );

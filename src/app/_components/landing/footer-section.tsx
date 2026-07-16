@@ -40,8 +40,9 @@ export function FooterSection() {
         <div className="mt-10 pt-6 border-t border-gray-700 flex flex-col sm:flex-row items-center justify-between gap-2">
           <p className="text-xs text-gray-400">&copy; 2026 Alaia</p>
           <div className="flex gap-4 text-xs text-gray-400">
-            <a href="/termos" className="hover:text-accent-light transition-colors focus-visible:outline-2 focus-visible:outline-accent-light">Termos</a>
-            <a href="/privacidade" className="hover:text-accent-light transition-colors focus-visible:outline-2 focus-visible:outline-accent-light">Privacidade</a>
+            <a href="/termos-e-condicoes" className="hover:text-accent-light transition-colors focus-visible:outline-2 focus-visible:outline-accent-light">Termos</a>
+            <a href="/politica-de-privacidade" className="hover:text-accent-light transition-colors focus-visible:outline-2 focus-visible:outline-accent-light">Privacidade</a>
+            <a href="/politica-de-cookies" className="hover:text-accent-light transition-colors focus-visible:outline-2 focus-visible:outline-accent-light">Cookies</a>
           </div>
         </div>
       </div>

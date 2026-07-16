@@ -16,6 +16,11 @@ export type StudentPack = {
   remaining: number;
 };
 
+export type StudentPendingPack = {
+  id: string;
+  name: string;
+};
+
 type PackInfo = { name: string; is_active: boolean };
 
 export type StudentRecord = {
@@ -26,6 +31,8 @@ export type StudentRecord = {
   isGuest: boolean;
   waiverSigned: boolean;
   hasActivePack: boolean;
+  hasPendingPack: boolean;
+  pendingPacks: StudentPendingPack[];
   totalClasses: number;
   firstSeenAt: string;
   packs: StudentPack[];
@@ -86,7 +93,7 @@ export async function getStudents(schoolId: string): Promise<StudentRecord[]> {
 
 
 
-  // get pack purchases for all students
+  // get active pack purchases for all students
   const { data: studentPacks } = await admin
     .from("pack_purchases")
     .select("student_id, lessons_remaining, pack:packs!inner(name, is_active)")
@@ -102,11 +109,29 @@ export async function getStudents(schoolId: string): Promise<StudentRecord[]> {
     packsByStudent.set(sp.student_id, list);
   }
 
+  // get pending payment packs for all students
+  const { data: pendingPacks } = await admin
+    .from("pack_purchases")
+    .select("id, student_id, pack:packs!inner(name, is_active)")
+    .eq("school_id", schoolId)
+    .eq("status", "pending_payment");
+
+  const pendingPacksByStudent = new Map<string, StudentPendingPack[]>();
+  for (const pp of pendingPacks ?? []) {
+    const p = pp.pack as unknown as PackInfo | null;
+    if (!p || !p.is_active) continue;
+    const list = pendingPacksByStudent.get(pp.student_id) ?? [];
+    list.push({ id: pp.id as string, name: p.name });
+    pendingPacksByStudent.set(pp.student_id, list);
+  }
+
   const result: StudentRecord[] = [];
 
   for (const r of rows) {
     const s = studentMap.get(r.student_id) ?? null;
     if (!s) continue;
+
+    const studentPendingPacks = pendingPacksByStudent.get(s.id) ?? [];
 
     result.push({
       id: s.id,
@@ -116,6 +141,8 @@ export async function getStudents(schoolId: string): Promise<StudentRecord[]> {
       isGuest: s.is_guest,
       waiverSigned: s.waiver_signed ?? false,
       hasActivePack: (packsByStudent.get(s.id)?.length ?? 0) > 0,
+      hasPendingPack: studentPendingPacks.length > 0,
+      pendingPacks: studentPendingPacks,
       totalClasses: totalClassesMap.get(s.id) ?? 0,
       firstSeenAt: r.first_seen_at,
       packs: packsByStudent.get(s.id) ?? [],
@@ -416,6 +443,7 @@ export type BookingHistoryItem = {
 export type StudentProfileData = {
   bookings: BookingHistoryItem[];
   activePacks: { id: string; name: string; remaining: number; total: number }[];
+  pendingPacks: { id: string; name: string; total: number }[];
   stats: { totalClasses: number; totalAttended: number; attendanceRate: number | null; groupSize?: number };
 };
 
@@ -426,12 +454,12 @@ export async function getStudentProfile(
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { bookings: [], activePacks: [], stats: { totalClasses: 0, totalAttended: 0, attendanceRate: null } };
+  if (!user) return { bookings: [], activePacks: [], pendingPacks: [], stats: { totalClasses: 0, totalAttended: 0, attendanceRate: null } };
 
   try {
     await requireOwner(schoolId);
   } catch {
-    return { bookings: [], activePacks: [], stats: { totalClasses: 0, totalAttended: 0, attendanceRate: null } };
+    return { bookings: [], activePacks: [], pendingPacks: [], stats: { totalClasses: 0, totalAttended: 0, attendanceRate: null } };
   }
 
   const adminClient = createAdminClient();
@@ -553,9 +581,30 @@ export async function getStudentProfile(
     }
   }
 
+  // fetch pending payment packs
+  const { data: pendingPackRows } = await supabase
+    .from("pack_purchases")
+    .select("id, pack:packs!inner(name, total_lessons)")
+    .eq("student_id", studentId)
+    .eq("school_id", schoolId)
+    .eq("status", "pending_payment");
+
+  const pendingPacks: StudentProfileData["pendingPacks"] = [];
+  for (const row of pendingPackRows ?? []) {
+    const p = row.pack as unknown as { name: string; total_lessons: number } | null;
+    if (p) {
+      pendingPacks.push({
+        id: row.id as string,
+        name: p.name,
+        total: p.total_lessons,
+      });
+    }
+  }
+
   return {
     bookings: bookingItems,
     activePacks,
+    pendingPacks,
     stats: {
       totalClasses: totalCount,
       totalAttended: attendedCount,
@@ -603,6 +652,46 @@ export async function cancelPackPurchase(
     entityId: purchaseId,
   });
 
+  return { ok: true };
+}
+
+export async function confirmPackPayment(
+  purchaseId: string,
+  schoolId: string
+): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Não autenticado" };
+
+  try { await assertValidOrigin(); } catch { return { ok: false, error: "Origem inválida" }; }
+
+  const rl = await rateLimitByUser(user.id, "confirmPackPayment");
+  if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
+
+  try {
+    await requireOwner(schoolId);
+  } catch {
+    return { ok: false, error: "Sem permissão" };
+  }
+
+  const { error } = await supabase
+    .from("pack_purchases")
+    .update({ status: "active", payment_status: "pago" })
+    .eq("id", purchaseId)
+    .eq("school_id", schoolId);
+
+  if (error) return { ok: false, error: safeError(error) };
+
+  logAudit({
+    schoolId,
+    userId: user.id,
+    action: "confirm_pack_payment",
+    entityType: "pack_purchase",
+    entityId: purchaseId,
+    metadata: { confirmed: true },
+  });
+
+  revalidatePath("/dashboard/alunos");
   return { ok: true };
 }
 

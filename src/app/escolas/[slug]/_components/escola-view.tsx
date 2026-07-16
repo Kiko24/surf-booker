@@ -48,6 +48,8 @@ export function EscolaView({ data }: Props) {
   const [packFormError, setPackFormError] = useState<string | null>(null);
   const [packQuantity, setPackQuantity] = useState(1);
   const [showPackSuccess, setShowPackSuccess] = useState(false);
+  const [packPaymentIban, setPackPaymentIban] = useState<string | null>(null);
+  const [packPaymentMbway, setPackPaymentMbway] = useState<string | null>(null);
   const [packLoading, setPackLoading] = useState(false);
   const [selectedRentalVariantId, setSelectedRentalVariantId] = useState<string | null>(null);
   const { containerRef: turnstileRef, execute: turnstileExecute } = useTurnstile();
@@ -773,106 +775,174 @@ export function EscolaView({ data }: Props) {
                       if (rightSvc.category === "pack") {
                         if (showPackSuccess) {
                           return (
-                            <div className="text-center py-8">
-                              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
-                                <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                </svg>
+                            <div className="text-left py-4">
+                              <div className="text-center">
+                                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
+                                  <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                  </svg>
+                                </div>
+                                <h3 className="font-heading text-lg font-bold text-gray-900">
+                                  Pedido registado!
+                                </h3>
+                                <p className="mt-2 text-sm text-gray-600">
+                                  Recebeste um email com os detalhes. O pack será ativado após confirmação do pagamento.
+                                </p>
                               </div>
-                              <h3 className="font-heading text-lg font-bold text-gray-900">
-                                Pedido confirmado!
-                              </h3>
-                              <p className="mt-2 text-sm text-gray-600">
-                                O seu pedido foi confirmado, entraremos em contacto.
-                              </p>
+                              {(packPaymentIban || packPaymentMbway) && (
+                                <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                                  <h4 className="font-heading text-sm font-bold text-gray-900 mb-3">Dados para pagamento</h4>
+                                  <div className="space-y-3 text-sm">
+                                    {packPaymentIban && (
+                                      <div>
+                                        <span className="text-gray-500">IBAN</span>
+                                        <p className="font-mono font-bold text-gray-900 mt-0.5 select-all">{packPaymentIban}</p>
+                                      </div>
+                                    )}
+                                    {packPaymentMbway && (
+                                      <div>
+                                        <span className="text-gray-500">MB Way</span>
+                                        <p className="font-mono font-bold text-gray-900 mt-0.5 select-all">{packPaymentMbway}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           );
                         }
+                        const packTotal = rightSvc.price_cents * packQuantity;
                         return (
-                          <div className="space-y-3">
-                            {rightSvc.rental_options && rightSvc.rental_options.length > 1 && (
+                          <div className="space-y-4">
+                            {/* Price summary */}
+                            <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4 shadow-sm">
+                              <h4 className="font-heading text-sm font-bold text-gray-900 mb-3">Resumo</h4>
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-gray-600">{packQuantity}x {rightSvc.name}</span>
+                                <span className="text-sm font-semibold text-gray-900">{(packTotal / 100).toFixed(2).replace(".", ",")} €</span>
+                              </div>
+                              <hr className="border-gray-200 my-3" />
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-bold text-gray-900">Total</span>
+                                <span className="text-sm font-bold text-accent">{(packTotal / 100).toFixed(2).replace(".", ",")} €</span>
+                              </div>
+                            </div>
+
+                            {/* Payer form */}
+                            <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm space-y-3">
+                              <h4 className="font-heading text-sm font-bold text-gray-900">Dados do pagador</h4>
+                              {rightSvc.rental_options && rightSvc.rental_options.length > 1 && (
+                                <div>
+                                  <label className="block text-sm text-gray-700 mb-1">Duração</label>
+                                  <div className="flex flex-wrap gap-2">
+                                    {rightSvc.rental_options.map((opt) => {
+                                      const isActive = (selectedRentalVariantId ?? rightSvc.rental_options![0].id) === opt.id;
+                                      return (
+                                        <button
+                                          key={opt.id}
+                                          type="button"
+                                          onClick={() => {
+                                            setSelectedRentalVariantId(opt.id);
+                                          }}
+                                          className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                                            isActive
+                                              ? "bg-accent text-white"
+                                              : "bg-white text-gray-600 border border-gray-200 hover:border-accent"
+                                          }`}
+                                        >
+                                          {formatDurationLabel(opt.duration_minutes)} · {(opt.price_cents / 100).toFixed(2).replace(".", ",")}€
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
                               <div>
-                                <label className="block text-sm text-gray-700 mb-1">Duração</label>
-                                <div className="flex flex-wrap gap-2">
-                                  {rightSvc.rental_options.map((opt) => {
-                                    const isActive = (selectedRentalVariantId ?? rightSvc.rental_options![0].id) === opt.id;
-                                    return (
-                                      <button
-                                        key={opt.id}
-                                        type="button"
-                                        onClick={() => {
-                                          setSelectedRentalVariantId(opt.id);
-                                        }}
-                                        className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                                          isActive
-                                            ? "bg-accent text-white"
-                                            : "bg-white text-gray-600 border border-gray-200 hover:border-accent"
-                                        }`}
-                                      >
-                                        {formatDurationLabel(opt.duration_minutes)} · {(opt.price_cents / 100).toFixed(2).replace(".", ",")}€
-                                      </button>
-                                    );
-                                  })}
+                                <label className="block text-sm text-gray-700 mb-1">Nome</label>
+                                <input
+                                  type="text"
+                                  value={packName}
+                                  onChange={(e) => { setPackFormError(null); setPackName(sanitizeName(e.target.value)); }}
+                                  className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-accent"
+                                  placeholder="O teu nome"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm text-gray-700 mb-1">Email</label>
+                                <input
+                                  type="email"
+                                  value={packEmail}
+                                  onChange={(e) => { setPackFormError(null); setPackEmail(sanitizeEmail(e.target.value)); }}
+                                  className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-accent"
+                                  placeholder="O teu email"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm text-gray-700 mb-1">Telemóvel</label>
+                                <input
+                                  type="tel"
+                                  value={packPhone}
+                                  onChange={(e) => { setPackFormError(null); setPackPhone(sanitizePhone(e.target.value)); }}
+                                  className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-accent"
+                                  placeholder="O teu telemóvel"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm text-gray-700 mb-1">Quantidade</label>
+                                <div className="flex items-center gap-3">
+                                  <button
+                                    type="button"
+                                    onClick={() => setPackQuantity(Math.max(1, packQuantity - 1))}
+                                    className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 text-gray-600 transition-colors hover:border-accent hover:text-accent"
+                                  >
+                                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M20 12H4" />
+                                    </svg>
+                                  </button>
+                                  <span className="w-8 text-center text-sm font-semibold text-gray-900">{packQuantity}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setPackQuantity(Math.min(99, packQuantity + 1))}
+                                    className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 text-gray-600 transition-colors hover:border-accent hover:text-accent"
+                                  >
+                                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                                    </svg>
+                                  </button>
                                 </div>
                               </div>
-                            )}
-                            <div>
-                              <label className="block text-sm text-gray-700 mb-1">Nome</label>
-                              <input
-                                type="text"
-                                value={packName}
-                                onChange={(e) => { setPackFormError(null); setPackName(sanitizeName(e.target.value)); }}
-                                className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-accent"
-                                placeholder="O teu nome"
-                              />
+                              <>
+                                <hr className="border-gray-200" />
+                                <label className="flex items-start gap-2 text-sm text-gray-600 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={termsAccepted}
+                                    onChange={(e) => setTermsAccepted(e.target.checked)}
+                                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-accent"
+                                  />
+                                  {school.terms_url ? (
+                                    <span>
+                                      Aceito os{" "}
+                                      <a
+                                        href={school.terms_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-accent underline hover:text-accent-light"
+                                        onClick={(e) => { e.preventDefault(); window.open(school.terms_url!, '_blank', 'noopener,noreferrer'); }}
+                                      >
+                                        Termos e Condições
+                                      </a>{" "}
+                                      da {school.name}
+                                    </span>
+                                  ) : (
+                                    <span>Aceito os Termos e Condições da {school.name}</span>
+                                  )}
+                                </label>
+                              </>
+                              {packFormError && (
+                                <p className="text-xs text-red-500">{packFormError}</p>
+                              )}
                             </div>
-                            <div>
-                              <label className="block text-sm text-gray-700 mb-1">Email</label>
-                              <input
-                                type="email"
-                                value={packEmail}
-                                onChange={(e) => { setPackFormError(null); setPackEmail(sanitizeEmail(e.target.value)); }}
-                                className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-accent"
-                                placeholder="O teu email"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm text-gray-700 mb-1">Telemóvel</label>
-                              <input
-                                type="tel"
-                                value={packPhone}
-                                onChange={(e) => { setPackFormError(null); setPackPhone(sanitizePhone(e.target.value)); }}
-                                className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-accent"
-                                placeholder="O teu telemóvel"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm text-gray-700 mb-1">Quantidade</label>
-                              <div className="flex items-center gap-3">
-                                <button
-                                  type="button"
-                                  onClick={() => setPackQuantity(Math.max(1, packQuantity - 1))}
-                                  className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 text-gray-600 transition-colors hover:border-accent hover:text-accent"
-                                >
-                                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M20 12H4" />
-                                  </svg>
-                                </button>
-                                <span className="w-8 text-center text-sm font-semibold text-gray-900">{packQuantity}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => setPackQuantity(Math.min(99, packQuantity + 1))}
-                                  className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 text-gray-600 transition-colors hover:border-accent hover:text-accent"
-                                >
-                                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                                  </svg>
-                                </button>
-                              </div>
-                            </div>
-                            {packFormError && (
-                              <p className="text-xs text-red-500">{packFormError}</p>
-                            )}
                           </div>
                         );
                       }
@@ -1007,7 +1077,23 @@ export function EscolaView({ data }: Props) {
                               onChange={(e) => setTermsAccepted(e.target.checked)}
                               className="mt-0.5 h-4 w-4 rounded border-gray-300 text-accent"
                             />
-                            <span>Aceito os Termos e Condições da {school.name}</span>
+                            {school.terms_url ? (
+                              <span>
+                                Aceito os{" "}
+                                <a
+                                  href={school.terms_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-accent underline hover:text-accent-light"
+                                  onClick={(e) => { e.preventDefault(); window.open(school.terms_url!, '_blank', 'noopener,noreferrer'); }}
+                                >
+                                  Termos e Condições
+                                </a>{" "}
+                                da {school.name}
+                              </span>
+                            ) : (
+                              <span>Aceito os Termos e Condições da {school.name}</span>
+                            )}
                           </label>
                         </>
                         {bookingError && (
@@ -1311,7 +1397,7 @@ export function EscolaView({ data }: Props) {
               const canContinue = isAula
                 ? (bookingStep === 1 ? selectedSessions.length > 0 : bookingStep === 2 ? allParticipantsValid : payerValid)
                 : isPack
-                  ? (packName.trim().length >= 2 && packEmail.trim().includes("@") && packPhone.trim().length >= 6)
+                  ? (packName.trim().length >= 2 && packEmail.trim().includes("@") && packPhone.trim().length >= 6 && termsAccepted)
                   : isRental
                     ? (bookingStep === 1 ? rentalDate.length > 0 && rentalTime.length > 0 : bookingStep === 2 ? allParticipantsValid : payerValid)
                     : false;
@@ -1379,11 +1465,13 @@ export function EscolaView({ data }: Props) {
                     school.id,
                     classTypeId,
                     packQuantity,
-                    { name, email: email.toLowerCase(), phone },
+                    { name, email: email.toLowerCase(), phone, termsAccepted, termsUrl: school.terms_url ?? null },
                     turnstileToken ?? undefined
                   );
                   setPackLoading(false);
                   if (!result.ok) { setPackFormError(result.error); return; }
+                  setPackPaymentIban(result.paymentIban ?? null);
+                  setPackPaymentMbway(result.paymentMbway ?? null);
                   setShowPackSuccess(true);
                 } else if (isRental && bookingStep === 1) {
                   setBookingStep(2);
@@ -1416,7 +1504,7 @@ export function EscolaView({ data }: Props) {
                     classTypeId,
                     rentalParticipants.length,
                     startsAt,
-                    { name: payerName.trim(), email: payerEmail.trim().toLowerCase(), phone: payerPhoneCode.trim() + payerPhone.trim() },
+                    { name: payerName.trim(), email: payerEmail.trim().toLowerCase(), phone: payerPhoneCode.trim() + payerPhone.trim(), termsAccepted, termsUrl: school.terms_url ?? null },
                     turnstileToken ?? undefined,
                     rentalParticipants
                   );
@@ -1605,8 +1693,9 @@ export function EscolaView({ data }: Props) {
           <div className="mt-10 pt-6 border-t border-gray-700 flex flex-col sm:flex-row items-center justify-between gap-2">
             <p className="text-xs text-gray-400">&copy; 2026 Alaia</p>
             <div className="flex gap-4 text-xs text-gray-400">
-              <a href="/termos" className="hover:text-accent-light transition-colors focus-visible:outline-2 focus-visible:outline-accent-light">Termos</a>
-              <a href="/privacidade" className="hover:text-accent-light transition-colors focus-visible:outline-2 focus-visible:outline-accent-light">Privacidade</a>
+              <a href="/termos-e-condicoes" className="hover:text-accent-light transition-colors focus-visible:outline-2 focus-visible:outline-accent-light">Termos</a>
+              <a href="/politica-de-privacidade" className="hover:text-accent-light transition-colors focus-visible:outline-2 focus-visible:outline-accent-light">Privacidade</a>
+              <a href="/politica-de-cookies" className="hover:text-accent-light transition-colors focus-visible:outline-2 focus-visible:outline-accent-light">Cookies</a>
             </div>
           </div>
         </div>

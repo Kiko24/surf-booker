@@ -1,36 +1,56 @@
 # TODO — Surf Booker
 
-## Críticos (pré-lançamento)
+## Stripe Checkout (ALTA)
 
-- [ ] **Check-in / marcação de presenças** — funcionalidade core não implementada
-- [ ] **Sistema de email/notificações (Resend)** — presente mas incompleto
-  - [ ] **Toggles `school_settings` são decorativos** — `notifyOwnerBooking()` nunca lê `notify_email_confirmation`; `cancelSession()` nunca lê `notify_sms_cancellation`; `notify_new_schedule` toggle existe mas zero código de broadcast
-  - [ ] **Lembretes 24h (`notify_reminder_24h`)** — não existe qualquer sistema de agendamento/cron/job
-  - [ ] **Sem fila de emails** — tudo inline; sem retry, sem dead-letter; falha do Resend = notificação perdida silenciosamente
-  - [ ] **Sem provider SMS** — toggle `notify_sms_cancellation` envia email, não SMS
-  - [ ] **`RESEND_FROM_EMAIL` não configurado** — fallback para `onboarding@resend.dev`
-  - [ ] **Sem `notify_new_schedule`** — toggle guarda mas ninguém dispara notificação de novo horário
-- [ ] **Criar escola de teste via onboarding** — validar fluxo completo end-to-end com dados reais
-- [ ] **Escola "Oporto" com dados incompletos** — 0 class_types, 0 instrutores, 0 imagens (corrigir seed ou onboarding)
+- [ ] **Migration 0028** — `stripe_enabled` column em schools, CHECK constraints para `paid_stripe`/`stripe`
+- [ ] **Server actions** — `criarCheckoutSessionAula()` e `criarCheckoutSessionPack()`
+- [ ] **UI overlay** — BookingModal decide Stripe vs offline com base em `school.stripe_enabled`
+- [ ] **`.env.local`** — configurar `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`
+- [ ] **Setup dashboard Stripe** — apontar webhook para `/api/webhooks/stripe`
 
-## Importantes
+## Agendar aula a partir do pack (MÉDIA)
 
-- [ ] **Página de perfil do aluno** — histórico completo de sessões, packs, presenças
-- [ ] **Visualizar compras de packs** — no dashboard (alunos page), mostrar créditos restantes por aluno
-- [ ] **Cobertura de testes** — atualmente < 1% (apenas `format.test.ts`)
+- [ ] **Opção B** — No `/perfil/packs`, cada pack ativo com `remaining > 0` ter botão "Agendar aula"
+  - [ ] Navegar para `/escolas/[slug]` da escola desse pack
+  - [ ] Pack já pré-selecionado ao chegar à página da escola
 
-## Melhorias
+## SEO (MÉDIA)
 
-- [ ] **SEO** — meta tags, Open Graph, JSON‑LD para páginas de escola (`/escolas/[slug]`)
+- [ ] **Meta tags + Open Graph** — em `/escolas/[slug]` (title, description, image, url)
+- [ ] **JSON-LD** — structured data para School + Course + Event
 
-##  Reservas
+## Student booking from profile (BAIXA)
 
-- adicionar check-box para consentir termos da escola step 3
-- Pensar como é que vamos fazer nos packs
-- Ligar termos e condições da escola aos termos e condições do site de cada escola.
+- [ ] **Atalho "Agendar nova aula"** no `/perfil`
+  - [ ] Lista escolas favoritas/frequentadas
+  - [ ] Ao clicar → `/escolas/[slug]` com contacto pré-preenchido
 
-## Embed
-- Criar forma fácil de criar embed para quando clicarem nos botões de book, enviar para esta página - como iframe ou outra forma, analisar isto e fazer isto de forma competente.
+## Sistema de email/notificações (MÉDIA)
 
-## Stripe 
-- Dar setup na stripe para os pagamentos
+- [ ] **Toggles decorativos** — `notifyOwnerBooking()` nunca lê `notify_email_confirmation`; `cancelSession()` nunca lê `notify_sms_cancellation`
+- [ ] **Lembretes 24h** — `notify_reminder_24h` não tem cron/job a enviar emails
+- [ ] **Sem fila de emails** — tudo inline; sem retry, sem dead-letter
+- [ ] **Sem provider SMS** — toggle `notify_sms_cancellation` envia email, não SMS
+- [ ] **`RESEND_FROM_EMAIL`** — configurar domínio próprio (fallback `onboarding@resend.dev`)
+- [ ] **`notify_new_schedule`** — toggle guarda mas ninguém dispara notificação
+
+## Check-in / presenças (MÉDIA)
+
+- [ ] **Review UI** — `markAttendance`/`markNoShow` existem mas o fluxo precisa de validação
+
+## Code quality (BAIXA)
+
+- [ ] **`console.log` em produção**
+- [ ] **Botões sem `type` explícito**
+- [ ] **`step-email` duplicado**
+- [ ] **`aria-labels` em falta**
+
+## Embed (BAIXA)
+
+- [ ] **Criar iframe/embed** para escolas colocarem nos seus sites → `/escolas/[slug]`
+
+## Infra & testes (BAIXA)
+
+- [ ] **Criar escola de teste via onboarding** — validar fluxo completo end-to-end
+- [ ] **Escola "Oporto" com dados incompletos** — corrigir seed ou onboarding
+- [ ] **Cobertura de testes** — atualmente < 1%

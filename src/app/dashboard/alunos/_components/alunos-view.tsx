@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 
-import { getStudents, deleteStudent, deleteStudentsBulk, toggleWaiver, createStudent, getStudentProfile, cancelPackPurchase, updatePackRemaining, type StudentRecord, type StudentProfileData, type BookingHistoryItem } from "../actions";
+import { getStudents, deleteStudent, deleteStudentsBulk, toggleWaiver, createStudent, getStudentProfile, cancelPackPurchase, confirmPackPayment, updatePackRemaining, type StudentRecord, type StudentProfileData, type BookingHistoryItem } from "../actions";
 import { getAvailablePacks, buyPack, type AvailablePack } from "../../calendario/actions";
 import { DotsIcon, TrashIcon } from "../../_components/icons";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
@@ -16,7 +16,7 @@ function getInitials(name: string): string {
   return name.split(" ").map(p => p[0]).join("").substring(0, 2).toUpperCase();
 }
 
-const FILTERS = ["Todos", "Com pack", "Inativo"];
+const FILTERS = ["Todos", "Com pack", "Pagamento pendente", "Inativo"];
 
 function StatusDot({ active }: { active: boolean }) {
   return (
@@ -36,6 +36,8 @@ function filterStudents(students: StudentRecord[], filter: string): StudentRecor
   switch (filter) {
     case "Com pack":
       return students.filter((s) => s.hasActivePack);
+    case "Pagamento pendente":
+      return students.filter((s) => s.hasPendingPack);
     case "Inativo":
       return students.filter((s) => isInactive(s));
     default:
@@ -401,7 +403,12 @@ export function AlunosView({ schoolId }: Props) {
                     </div>
                   </td>
                   <td className="px-5 py-3 font-body text-sm text-text-secondary align-middle text-center">
-                    {s.packs.length > 0 ? `${s.packs[0].name}: ${s.packs[0].remaining} aulas` : "Sem pack"}
+                    <span>{s.packs.length > 0 ? `${s.packs[0].name}: ${s.packs[0].remaining} aulas` : "Sem pack"}</span>
+                    {s.hasPendingPack && (
+                      <span className="ml-2 inline-block rounded-full bg-error/10 px-2 py-0.5 text-[10px] font-semibold text-error whitespace-nowrap">
+                        Pendente
+                      </span>
+                    )}
                   </td>
                   <td className="px-5 py-3 font-body text-sm text-text-secondary align-middle text-center">
                     {s.totalClasses}
@@ -551,6 +558,34 @@ export function AlunosView({ schoolId }: Props) {
                       Atribuir pack
                     </button>
                   </div>
+
+                  {studentProfile.pendingPacks.length > 0 && (
+                    <div className="mt-4 rounded-xl border border-error/20 bg-error/5 px-4 py-3">
+                      <p className="font-body text-xs text-text-secondary mb-2">Pagamento pendente</p>
+                      <div className="space-y-3">
+                        {studentProfile.pendingPacks.map((pack) => (
+                          <div key={pack.id} className="flex items-center justify-between rounded-lg bg-[#1A1A1A] px-3 py-2">
+                            <p className="font-body text-sm font-semibold text-foreground">{pack.name}</p>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                const res = await confirmPackPayment(pack.id, schoolId);
+                                if (res.ok) {
+                                  setStudentProfile(prev => prev ? {
+                                    ...prev,
+                                    pendingPacks: prev.pendingPacks.filter(p => p.id !== pack.id),
+                                  } : null);
+                                }
+                              }}
+                              className="rounded-lg bg-success px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:brightness-110"
+                            >
+                              Confirmar pagamento
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {studentProfile.bookings.length > 0 && (
                     <StudentHistory bookings={studentProfile.bookings} />

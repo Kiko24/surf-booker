@@ -7,16 +7,19 @@ import { useTurnstile } from "./turnstile-widget";
 type Props = {
   sessionId: string;
   schoolId: string;
+  schoolName: string;
+  termsUrl: string | null;
   onClose: () => void;
 };
 
-export function BookingModal({ sessionId, schoolId, onClose }: Props) {
+export function BookingModal({ sessionId, schoolId, schoolName, termsUrl, onClose }: Props) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [pending, setPending] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   const [activePack, setActivePack] = useState<{ packPurchaseId: string; remaining: number; name: string } | null>(null);
   const [packLoading, setPackLoading] = useState(false);
@@ -48,6 +51,8 @@ export function BookingModal({ sessionId, schoolId, onClose }: Props) {
         contactName: name,
         contactEmail: email,
         contactPhone: phone,
+        termsAccepted,
+        termsUrl,
         packPurchaseId: activePack?.packPurchaseId ?? undefined,
       },
       token ?? undefined
@@ -167,6 +172,29 @@ export function BookingModal({ sessionId, schoolId, onClose }: Props) {
                   className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm text-gray-900 focus:border-accent-light focus:outline-none focus:ring-1 focus:ring-accent-light"
                 />
               </div>
+              {termsUrl && (
+                <label className="flex items-start gap-2 text-sm text-gray-600 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={termsAccepted}
+                    onChange={(e) => setTermsAccepted(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-accent"
+                  />
+                  <span>
+                    Aceito os{" "}
+                    <a
+                      href={termsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => { e.preventDefault(); window.open(termsUrl, '_blank', 'noopener,noreferrer'); }}
+                      className="text-accent underline hover:text-accent-light"
+                    >
+                      Termos e Condições
+                    </a>{" "}
+                    da {schoolName}
+                  </span>
+                </label>
+              )}
               {error && <p className="text-sm text-red-500">{error}</p>}
               <button
                 type="submit"

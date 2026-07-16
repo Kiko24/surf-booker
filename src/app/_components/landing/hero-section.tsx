@@ -18,8 +18,8 @@ export function HeroSection() {
           Os alunos reservam online, tu geres tudo num só lugar.
         </p>
         <a href="/user-flow" className="group mt-8 flex w-56 md:w-60 items-center justify-center rounded-full bg-accent px-8 py-3.5 shadow-lg transition-all duration-300 ease-out hover:shadow-xl hover:scale-[1.04] hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-white">
-          <span className="font-body text-sm font-semibold text-black uppercase">Começar já</span>
-          <svg className="ml-2 h-4 w-4 text-black transition-transform duration-300 ease-out group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+          <span className="font-body text-sm font-semibold text-white uppercase">Começar já</span>
+          <svg className="ml-2 h-4 w-4 text-white transition-transform duration-300 ease-out group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
           </svg>
         </a>

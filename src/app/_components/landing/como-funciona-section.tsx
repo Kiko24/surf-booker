@@ -53,8 +53,8 @@ export function ComoFuncionaSection() {
                     </div>
                   </div>
                   <a href="/como-organizar-melhor" className="group mt-10 flex items-center gap-2 rounded-full bg-accent px-6 py-3 shadow-lg transition-all duration-300 ease-out hover:shadow-xl hover:scale-[1.04] hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-white">
-                    <span className="font-body text-sm font-semibold text-black">Como organizar melhor</span>
-                    <svg className="h-4 w-4 text-black transition-transform duration-300 ease-out group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <span className="font-body text-sm font-semibold text-white">Como organizar melhor</span>
+                    <svg className="h-4 w-4 text-white transition-transform duration-300 ease-out group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                     </svg>
                   </a>

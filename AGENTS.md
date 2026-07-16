@@ -47,6 +47,10 @@ This version has breaking changes — APIs, conventions, and file structure may 
 | cancellation_window_hours | int | default 24 |
 | created_at | timestamptz | |
 | updated_at | timestamptz | |
+| payment_iban | text? | IBAN para pagamento offline (migração 0027) |
+| payment_mbway | text? | MBWay para pagamento offline (migração 0027) |
+| stripe_enabled | boolean | default false — ativar Stripe Checkout (futura migração) |
+| stripe_secret_key | text? | Stripe secret key específica da escola (opcional, futura migração) |
 
 ### `students`
 | Column | Type | Notes |
@@ -135,8 +139,8 @@ This version has breaking changes — APIs, conventions, and file structure may 
 | session_id | uuid | composite FK → booking_groups(id, session_id) CASCADE |
 | student_id | uuid | |
 | status | text | 'confirmed' / 'cancelled_by_student' / 'cancelled_by_school' / 'attended' / 'no_show' |
-| payment_method | text | 'single' / 'pack' |
-| payment_status | text | 'unpaid' / 'paid_offline' |
+| payment_method | text | 'single' / 'pack' / 'stripe' |
+| payment_status | text | 'unpaid' / 'paid_offline' / 'paid_stripe' |
 | price_cents | int | 0-500000 |
 | UNIQUE | (session_id, student_id) | one booking per student per session |
 
@@ -387,8 +391,11 @@ src/
     │   ├── 0021_student_self_service.sql
     │   ├── 0022_fix_rls_recursion.sql
     │   ├── 0023_allow_duplicate_rental_names.sql
-    │   ├── 0024_add_group_size.sql
-    │   └── 0025_add_bookings_participants.sql
+│   ├── 0024_add_group_size.sql
+│   ├── 0025_add_bookings_participants.sql
+│   ├── 0026_add_pack_metadata.sql
+│   ├── 0027_add_pack_payment_status.sql
+│   └── 0028_stripe_support.sql          # (futura) stripe_enabled, CHECK constraints para paid_stripe/stripe
 ```
 
 ## Server Actions com Proteção CSRF
@@ -622,7 +629,7 @@ SELECT id, full_name FROM students WHERE id IN (...);
 - Build verificado: `npx next build` → `✓ Compiled successfully`
 
 ### Database Schema Updates
-- 25 migrations applied (0001–0025)
+- 27 migrations applied (0001–0027)
 - `schools`: slug, description, location, logo_url, phone, timezone, cancellation_window_hours
 - `class_types`: category (`aula`/`pack`/`aluguer`), modality, total_lessons, description
 - `instructors`: table with name, level, avatar_url (created in migration 0015)
@@ -630,6 +637,7 @@ SELECT id, full_name FROM students WHERE id IN (...);
 - `packs`: table with total_lessons, price_cents, class_type_id (created in 0001, modified 0007)
 - `pack_purchases`: table with student_id, pack_id, lessons_remaining, status (created in 0001)
 - `bookings`: includes `pack_purchase_id` FK + constraint `bookings_pack_consistency_check`
+- `pack_purchases`: `payment_status` ('pendente'/'pago'/'reembolsado'), `payment_method` ('stripe'/'multibanco'/'mbway'/'transferencia') — migration 0027
 - 3 storage buckets with RLS policies (migration 0018)
 - Seed SQL: test sessions for June 4-5 2026 (BSS school)
 
@@ -644,6 +652,7 @@ SELECT id, full_name FROM students WHERE id IN (...);
 - Create test school via onboarding to validate end-to-end
 - SEO: meta tags, Open Graph, JSON-LD for school page
 - View pack purchases on dashboard (alunos page — remaining credits per student)
+- **Stripe Checkout** (plano documentado na secção "Stripe Integration Guide" abaixo)
 
 ## Key Decisions
 1. **Admin client with server-side validation** for operations on tables that can't enforce ownership via RLS (e.g. `students` has no `school_id` column). The server action always verifies `auth.getUser()` + `schools.owner_user_id` before using admin client.
@@ -760,3 +769,247 @@ Emails de notificação ao owner (`notifyOwnerBooking()`) usam `.catch()` em vez
 - `TURNSTILE_SECRET_KEY` e `NEXT_PUBLIC_TURNSTILE_SITE_KEY` no .env.local
 - Se a chave não estiver configurada, o Turnstile é ignorado (dev-safe)
 - Ficheiros: `src/lib/turnstile.ts` (verificação server-side), `src/app/escolas/[slug]/_components/turnstile-widget.tsx` (hook React `useTurnstile()`)
+
+---
+
+## Stripe Integration Guide
+
+Este documento descreve o plano de integração Stripe Checkout. Deve ser lido antes de qualquer implementação Stripe para garantir que o agente segue o desenho acordado.
+
+### Visão Geral
+
+O Stripe Checkout substitui o atual fluxo offline (exibir IBAN/MBWay) por um checkout hospedado pela Stripe. O **Step 3 (Dados do Pagador)** mantém-se inalterado — os campos `name` e `email` são copiados para preencher automaticamente o Stripe Checkout (`customer_email`, `customer_name`). O `phone` fica apenas na nossa base de dados (Stripe Checkout não aceita telefone no prefill).
+
+Existem 3 cenários de checkout:
+
+| Cenário | Server action | O que cria | Stripe Checkout contém |
+|---------|--------------|------------|------------------------|
+| Aula (múltiplas sessões) | `criarReservaPublica()` | booking_groups + bookings (unpaid) | line_items com cada sessão, customer_email, customer_name |
+| Aluguer | `criarReservaAluguer()` | session + booking_group + booking (unpaid) | line_item com o aluguer, customer_email, customer_name |
+| Pack | `comprarPackPublico()` | pack_purchases (pendente) | line_item com o pack, customer_email, customer_name |
+
+### Fluxo Completo (Aula/Aluguer)
+
+```
+1. Utilizador preenche Step 3 (nome, email, telefone)
+2. Server action cria a reserva com payment_status = 'unpaid'
+3. Em vez de mostrar overlay IBAN/MBWay → criar Stripe Checkout Session
+4. Redirecionar para URL do Stripe Checkout
+5. Utilizador paga no Stripe
+6. Webhook checkput.session.completed → atualizar payment_status = 'paid_stripe'
+```
+
+### Fluxo Completo (Pack)
+
+```
+1. Utilizador preenche formulário (nome, email, telefone)
+2. comprarPackPublico() cria pack_purchases com status = 'pendente'
+3. Criar Stripe Checkout Session com metadata.pack_purchase_id
+4. Redirecionar para Stripe Checkout
+5. Webhook → ativar pack: status = 'active', payment_status = 'pago'
+```
+
+### O que NÃO muda
+
+- Step 3 (Dados do Pagador) — **mantém-se exatamente como está**. Os campos `name`, `email`, `phone` continuam a ser guardados na BD.
+- Toda a validação existente (Zod, servidor, base de dados).
+- O fluxo offline (IBAN/MBWay) continua a funcionar para escolas sem Stripe ativo.
+
+### Variáveis de Ambiente
+
+| Variável | Onde | Obrigatória? | Uso |
+|----------|------|--------------|-----|
+| `STRIPE_SECRET_KEY` | servidor (server action) | Sim (se stripe_enabled) | Criar Stripe Checkout Sessions |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | cliente | Sim (se stripe_enabled) | Inicializar Stripe.js (se necessário) |
+| `STRIPE_WEBHOOK_SECRET` | servidor (webhook handler) | Sim (se stripe_enabled) | Verificar assinatura dos webhooks |
+| `NEXT_PUBLIC_BASE_URL` | servidor + cliente | Sim | URLs de retorno (success_url, cancel_url) — provavelmente já existe |
+
+### Schema Alterações (Migration 0028)
+
+```sql
+-- 1. Flag para ativar Stripe por escola
+alter table schools add column stripe_enabled boolean not null default false;
+
+-- 2. Permitir novos valores de pagamento em bookings
+alter table bookings drop constraint bookings_payment_method_check;
+alter table bookings add constraint bookings_payment_method_check
+  check (payment_method in ('single', 'pack', 'stripe'));
+
+alter table bookings drop constraint bookings_payment_status_check;
+alter table bookings add constraint bookings_payment_status_check
+  check (payment_status in ('unpaid', 'paid_offline', 'paid_stripe'));
+```
+
+### Webhook Stripe
+
+**Endpoint**: `POST /api/webhooks/stripe`
+
+```typescript
+// Pseudocódigo do webhook handler
+export async function POST(request: Request) {
+  const sig = request.headers.get('stripe-signature');
+  const event = stripe.webhooks.constructEvent(body, sig, STRIPE_WEBHOOK_SECRET);
+
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object;
+    const { booking_group_id, pack_purchase_id } = session.metadata;
+
+    if (booking_group_id) {
+      // Marcar bookings como pagos
+      await admin.from('bookings')
+        .update({ payment_status: 'paid_stripe' })
+        .eq('booking_group_id', booking_group_id);
+    }
+
+    if (pack_purchase_id) {
+      // Ativar pack
+      await admin.from('pack_purchases')
+        .update({ status: 'active', payment_status: 'pago' })
+        .eq('id', pack_purchase_id);
+    }
+  }
+
+  return NextResponse.json({ received: true });
+}
+```
+
+**Nota**: O Stripe verifica a assinatura antes de qualquer lógica de negócio. Nunca confiar no body não verificado.
+
+### Segurança no Webhook
+
+1. **Idempotência via Redis** — Stripe pode entregar o mesmo evento `checkout.session.completed` várias vezes. O handler verifica `stripe:idempotent:{session.id}` antes de atualizar a BD:
+   ```typescript
+   const jáProcessado = await redis.get(`stripe:session:${session.id}`);
+   if (jáProcessado) return NextResponse.json({ received: true });
+   await redis.set(`stripe:session:${session.id}`, true, { ex: 86400 });
+   ```
+
+2. **Assinatura obrigatória** — `stripe.webhooks.constructEvent()` rejeita qualquer payload não assinado com `STRIPE_WEBHOOK_SECRET`. Nunca processar um evento sem esta verificação.
+
+3. **Validação de metadata** — `booking_group_id` e `pack_purchase_id` são UUIDs (não incrementais), sem risco de enumeração. Validar que são UUIDs antes de usar.
+
+4. **Rate limiting no endpoint** — o webhook Stripe tem um IP fixo documentado, mas por segurança aplicar rate limit por IP no handler.
+
+5. **Logging de eventos** — registar todos os eventos recebidos com `logger.info()` para auditoria e debugging.
+
+### Segurança nas Server Actions (Checkout Session)
+
+1. **Rate limiting** — `criarCheckoutSessionAula()` e `criarCheckoutSessionPack()` devem usar rate limit (ex: 10 req/min por IP) para evitar abuso (gerar sessões Stripe sem intenção de pagar).
+
+2. **CSRF** — ambas as actions são chamadas do frontend público e devem usar `assertValidOrigin()`.
+
+3. **Validar stripe_enabled** — verificar que a escola tem `stripe_enabled = true` antes de criar sessão. Devolver erro se Stripe não estiver ativo.
+
+4. **Validar valores** — `price_cents` > 0, `customer_email` com formato válido, `customer_name` não vazio.
+
+5. **Sem exposição de secrets** — o `STRIPE_SECRET_KEY` nunca sai do servidor. Cliente só vê o `url` da sessão.
+
+### Validação ao Arranque
+
+Na inicialização do servidor (ou lazy import), validar que se alguma escola tem `stripe_enabled = true`, então `STRIPE_SECRET_KEY` e `STRIPE_WEBHOOK_SECRET` existem:
+
+```typescript
+// src/lib/stripe-server.ts
+const requiredVars = ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"] as const;
+for (const v of requiredVars) {
+  if (!process.env[v]) {
+    throw new Error(`Falta variável de ambiente: ${v}`);
+  }
+}
+```
+
+Isto evita falhas silenciosas quando um utilizador tenta pagar e a chave não está configurada.
+
+### Criar Stripe Checkout Session (Aula/Aluguer)
+
+Após a criação da reserva com sucesso (mas antes de mostrar overlay), o frontend chama uma nova server action (ou a mesma devolve o URL):
+
+```typescript
+export async function criarCheckoutSessionAula(
+  bookingGroupIds: string[],
+  customerEmail: string,
+  customerName: string,
+): Promise<{ url: string } | { error: string }> {
+  const schoolId = await getSchoolIdFromBooking(bookingGroupIds[0]);
+  const school = await getSchoolStripeInfo(schoolId);
+  if (!school?.stripe_enabled) return { error: 'Stripe não ativado' };
+
+  const lineItems = await buildLineItemsForBookings(bookingGroupIds);
+
+  const session = await stripe.checkout.sessions.create({
+    mode: 'payment',
+    customer_email: customerEmail,     // ← preenchido do Step 3
+    line_items: lineItems,
+    metadata: {
+      booking_group_id: bookingGroupIds[0],
+      school_id: schoolId,
+    },
+    success_url: `${baseUrl}/escolas/${schoolSlug}?stripe=success`,
+    cancel_url: `${baseUrl}/escolas/${schoolSlug}?stripe=cancel`,
+  });
+
+  return { url: session.url! };
+}
+```
+
+### Criar Stripe Checkout Session (Pack)
+
+```typescript
+export async function criarCheckoutSessionPack(
+  packPurchaseId: string,
+  packPriceCents: number,
+  packName: string,
+  customerEmail: string,
+  customerName: string,
+  schoolId: string,
+): Promise<{ url: string } | { error: string }> {
+  const session = await stripe.checkout.sessions.create({
+    mode: 'payment',
+    customer_email: customerEmail,     // ← preenchido do Step 3
+    line_items: [{
+      price_data: {
+        currency: 'eur',
+        product_data: { name: packName },
+        unit_amount: packPriceCents,
+      },
+      quantity: 1,
+    }],
+    metadata: {
+      pack_purchase_id: packPurchaseId,
+      school_id: schoolId,
+    },
+    success_url: `${baseUrl}/escolas/${slug}?stripe=success`,
+    cancel_url: `${baseUrl}/escolas/${slug}?stripe=cancel`,
+  });
+
+  return { url: session.url! };
+}
+```
+
+### Decisão UI: Quando mostrar Stripe vs Offline
+
+O overlay de sucesso atual (que mostra IBAN/MBWay) deve verificar:
+
+```typescript
+if (school.stripe_enabled) {
+  // Criar Stripe Checkout Session e redirecionar
+  const { url } = await criarCheckoutSessionAula(bookingGroupIds, email, name);
+  window.location.href = url;
+} else {
+  // Mostrar overlay offline atual (IBAN/MBWay)
+  showOfflinePaymentOverlay(iban, mbway);
+}
+```
+
+### Checklist de Implementação
+
+- [ ] Migration 0028: adicionar `stripe_enabled` a schools, atualizar CHECK constraints
+- [ ] Criar `src/lib/stripe-server.ts` — inicializar Stripe com `STRIPE_SECRET_KEY`
+- [ ] Criar `POST /api/webhooks/stripe` — handler com verificação de assinatura
+- [ ] Criar server action `criarCheckoutSessionAula()` (aceita bookingGroupIds + email + name)
+- [ ] Criar server action `criarCheckoutSessionPack()` (aceita packPurchaseId + email + name)
+- [ ] Alterar overlay de sucesso: se stripe_enabled → redirecionar para Stripe Checkout
+- [ ] Configurar Stripe Webhook no dashboard Stripe (apontar para `/api/webhooks/stripe`)
+- [ ] Adicionar variáveis de ambiente ao .env.local e à plataforma de deployment
+- [ ] Testar fluxo completo: reserva → Stripe Checkout → webhook → booking paid_stripe
+- [ ] Testar fluxo offline continua a funcionar (escolas sem stripe_enabled)

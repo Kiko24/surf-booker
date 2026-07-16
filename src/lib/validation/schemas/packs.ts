@@ -21,7 +21,11 @@ export const packUpdateSchema = z
   })
   .partial();
 
-export const packPurchaseStatusSchema = z.enum(["active", "exhausted", "cancelled"]);
+export const packPurchaseStatusSchema = z.enum(["active", "exhausted", "cancelled", "pending_payment"]);
+
+export const packPaymentStatusSchema = z.enum(["pendente", "pago", "reembolsado"]);
+
+export const packPaymentMethodSchema = z.enum(["stripe", "multibanco", "mbway", "transferencia"]);
 
 export const packPurchaseSchema = z.object({
   id: uuidSchema.optional(),
@@ -30,12 +34,16 @@ export const packPurchaseSchema = z.object({
   student_id: uuidSchema,
   lessons_remaining: z.number().int().min(0).max(100),
   status: packPurchaseStatusSchema.default("active"),
+  payment_status: packPaymentStatusSchema.default("pendente"),
+  payment_method: packPaymentMethodSchema.optional(),
   purchased_at: z.coerce.date().optional(),
 });
 
 export const packPurchaseInsertSchema = packPurchaseSchema.omit({
   id: true,
   status: true,
+  payment_status: true,
+  payment_method: true,
   purchased_at: true,
 });
 
@@ -43,5 +51,6 @@ export const packPurchaseUpdateSchema = z
   .object({
     lessons_remaining: z.number().int().min(0).max(100),
     status: packPurchaseStatusSchema,
+    payment_status: packPaymentStatusSchema,
   })
   .partial();

@@ -403,9 +403,9 @@ export async function comprarPackPublico(
   schoolId: string,
   classTypeId: string,
   quantity: number,
-  data: { name: string; email: string; phone: string },
+  data: { name: string; email: string; phone: string; termsAccepted?: boolean; termsUrl?: string | null },
   turnstileToken?: string
-): Promise<{ ok: true; packPurchaseId: string } | { ok: false; error: string }> {
+): Promise<{ ok: true; packPurchaseId: string; offline: true; paymentIban: string | null; paymentMbway: string | null } | { ok: false; error: string }> {
   const rl = await rateLimitPublic("comprarPackPublico", 5, "60 s");
   if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
 
@@ -432,6 +432,9 @@ export async function comprarPackPublico(
   if (digits.length > 20) return { ok: false, error: "Telemóvel demasiado longo." };
 
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) return { ok: false, error: "Quantidade inválida." };
+
+  if (data.termsUrl && !data.termsAccepted)
+    return { ok: false, error: "Deves aceitar os termos de serviço." };
 
   const student = await findOrCreateStudent(admin, schoolId, { name: cleanName, email: cleanEmail, phone: digits });
   if (!student) return { ok: false, error: "Erro ao criar aluno." };
@@ -478,9 +481,10 @@ export async function comprarPackPublico(
     .insert({
       school_id: schoolId,
       pack_id: packId,
-    student_id: null,
+      student_id: student.id,
       lessons_remaining: quantity,
-      status: "active",
+      status: "pending_payment",
+      payment_status: "pendente",
     })
     .select("id")
     .single();
@@ -496,7 +500,101 @@ export async function comprarPackPublico(
     metadata: { email: data.email, classTypeId },
   });
 
-  return { ok: true, packPurchaseId: purchase.id };
+  const totalPriceCents = classType.price_cents * quantity;
+
+  const { data: schoolPayment } = await admin
+    .from("schools")
+    .select("payment_iban, payment_mbway")
+    .eq("id", schoolId)
+    .single();
+
+  notifyOwnerPackPurchase(
+    schoolId,
+    { studentName: cleanName, packName: classType.name, quantity, totalPriceCents }
+  ).catch(() => {
+    console.error("Erro ao notificar dono do pack");
+  });
+
+  sendBuyerPackConfirmation(
+    cleanEmail,
+    cleanName,
+    schoolId,
+    { packName: classType.name, quantity, totalPriceCents },
+    schoolPayment?.payment_iban ?? null,
+    schoolPayment?.payment_mbway ?? null
+  ).catch(() => {
+    console.error("Erro ao enviar confirmação ao comprador");
+  });
+
+  return {
+    ok: true,
+    packPurchaseId: purchase.id,
+    offline: true,
+    paymentIban: schoolPayment?.payment_iban ?? null,
+    paymentMbway: schoolPayment?.payment_mbway ?? null,
+  };
+}
+
+async function notifyOwnerPackPurchase(
+  schoolId: string,
+  info: { studentName: string; packName: string; quantity: number; totalPriceCents: number }
+): Promise<void> {
+  try {
+    const admin = createAdminClient();
+    const { data: school } = await admin
+      .from("schools")
+      .select("name, owner_user_id")
+      .eq("id", schoolId)
+      .single();
+    if (!school) return;
+
+    const { data: ownerUser } = await admin.auth.admin.getUserById(school.owner_user_id);
+    const ownerEmail = ownerUser?.user?.email;
+    if (!ownerEmail) return;
+
+    const { sendPackPurchaseOwnerNotification } = await import("@/lib/email");
+    await sendPackPurchaseOwnerNotification({
+      ownerEmail,
+      schoolName: school.name,
+      studentName: info.studentName,
+      packName: info.packName,
+      quantity: info.quantity,
+      totalPriceCents: info.totalPriceCents,
+    });
+  } catch (err) {
+    console.error("Failed to notify owner about pack purchase");
+  }
+}
+
+async function sendBuyerPackConfirmation(
+  buyerEmail: string,
+  buyerName: string,
+  schoolId: string,
+  info: { packName: string; quantity: number; totalPriceCents: number },
+  paymentIban: string | null,
+  paymentMbway: string | null,
+): Promise<void> {
+  try {
+    const admin = createAdminClient();
+    const { data: school } = await admin
+      .from("schools")
+      .select("name")
+      .eq("id", schoolId)
+      .single();
+    if (!school) return;
+
+    const { sendPackPurchaseConfirmation } = await import("@/lib/email");
+    await sendPackPurchaseConfirmation({
+      buyerEmail,
+      buyerName,
+      schoolName: school.name,
+      packName: info.packName,
+      quantity: info.quantity,
+      totalPriceCents: info.totalPriceCents,
+    }, paymentIban, paymentMbway);
+  } catch (err) {
+    console.error("Failed to send pack confirmation email");
+  }
 }
 
 export async function criarReservaAluguer(
@@ -504,7 +602,7 @@ export async function criarReservaAluguer(
   classTypeId: string,
   quantity: number,
   startsAt: string,
-  data: { name: string; email: string; phone: string },
+  data: { name: string; email: string; phone: string; termsAccepted?: boolean; termsUrl?: string | null },
   turnstileToken?: string,
   participants?: ParticipantInput[]
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -534,6 +632,9 @@ export async function criarReservaAluguer(
   if (digits.length > 20) return { ok: false, error: "Telemóvel demasiado longo." };
 
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) return { ok: false, error: "Quantidade inválida." };
+
+  if (data.termsUrl && !data.termsAccepted)
+    return { ok: false, error: "Deves aceitar os termos de serviço." };
 
   if (participants) {
     if (!Array.isArray(participants) || !participants.length) return { ok: false, error: "Nenhum participante." };
@@ -601,10 +702,17 @@ export async function criarReservaAluguer(
       }))
     : [];
 
+  const renStudent = await findOrCreateStudent(admin, schoolId, {
+    name: cleanName,
+    email: cleanEmail,
+    phone: digits,
+  });
+  if (!renStudent) return { ok: false, error: "Erro ao criar aluno." };
+
   const { error: bErr } = await admin.from("bookings").insert({
     booking_group_id: bookingGroup.id,
     session_id: session.id,
-    student_id: null,
+    student_id: renStudent.id,
     payment_method: "single",
     payment_status: "unpaid",
     price_cents: classType.price_cents * (participants ? participants.length : quantity),
@@ -615,7 +723,7 @@ export async function criarReservaAluguer(
 
   logAudit({
     schoolId,
-    userId: null,
+    userId: renStudent.id,
     action: "create_rental_booking",
     entityType: "booking_group",
     entityId: bookingGroup.id,
@@ -732,6 +840,13 @@ export async function criarReservaPublica(
     parentalConsent: p.parentalConsent,
   }));
 
+  const aulaStudent = await findOrCreateStudent(admin, schoolId, {
+    name: cleanContactName,
+    email: cleanContactEmail,
+    phone: contactDigits,
+  });
+  if (!aulaStudent) return { ok: false, error: "Erro ao criar aluno." };
+
   const { data: sessions } = await admin
     .from("sessions")
     .select("id, price_cents")
@@ -780,7 +895,7 @@ export async function criarReservaPublica(
     const bookingInsert: Record<string, unknown> = {
       booking_group_id: bookingGroup.id,
       session_id: sessionId,
-      student_id: null,
+      student_id: aulaStudent.id,
       participants: participantsJson,
       payment_method: paymentMethod,
       payment_status: "unpaid",

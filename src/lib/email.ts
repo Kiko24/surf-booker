@@ -83,6 +83,24 @@ type CancellationNotification = {
   time: string;
 };
 
+type PackPurchaseOwnerNotification = {
+  ownerEmail: string;
+  schoolName: string;
+  studentName: string;
+  packName: string;
+  quantity: number;
+  totalPriceCents: number;
+};
+
+type PackPurchaseConfirmation = {
+  buyerEmail: string;
+  buyerName: string;
+  schoolName: string;
+  packName: string;
+  quantity: number;
+  totalPriceCents: number;
+};
+
 type OwnerCancellationNotification = {
   ownerEmail: string;
   schoolName: string;
@@ -91,6 +109,95 @@ type OwnerCancellationNotification = {
   date: string;
   time: string;
 };
+
+export async function sendPackPurchaseOwnerNotification(opts: PackPurchaseOwnerNotification): Promise<void> {
+  const { ownerEmail, schoolName, studentName, packName, quantity, totalPriceCents } = opts;
+
+  try {
+    await resend.emails.send({
+      from: FROM,
+      to: ownerEmail,
+      subject: `Pack comprado — ${schoolName}`,
+      html: `
+        <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+          <h2 style="color:#FF6B35">Pack comprado!</h2>
+          <p><strong>${studentName}</strong> comprou um pack de <strong>${packName}</strong></p>
+          <table style="width:100%;border-collapse:collapse;margin-top:16px">
+            <tr><td style="padding:8px 0;color:#666">Pack</td><td style="padding:8px 0">${packName}</td></tr>
+            <tr><td style="padding:8px 0;color:#666">Quantidade</td><td style="padding:8px 0">${quantity} aulas</td></tr>
+            <tr><td style="padding:8px 0;color:#666">Total</td><td style="padding:8px 0">${(totalPriceCents / 100).toFixed(2).replace(".", ",")} €</td></tr>
+            <tr><td style="padding:8px 0;color:#666">Cliente</td><td style="padding:8px 0">${studentName}</td></tr>
+            <tr><td style="padding:8px 0;color:#666">Escola</td><td style="padding:8px 0">${schoolName}</td></tr>
+          </table>
+        </div>
+      `,
+    });
+  } catch (err) {
+    console.error("Failed to send pack purchase owner notification");
+  }
+}
+
+export function buildPaymentInstructionsHtml(
+  iban: string | null,
+  mbway: string | null,
+): string {
+  if (!iban && !mbway) return "";
+  const lines: string[] = [
+    '<h3 style="color:#FF6B35;margin-top:24px">💳 Dados para pagamento</h3>',
+    "<p>O pagamento pode ser feito por transferência bancária ou MB Way.</p>",
+    '<table style="width:100%;border-collapse:collapse;margin-top:12px">',
+  ];
+  if (iban) {
+    lines.push(
+      `<tr><td style="padding:6px 0;color:#666;white-space:nowrap;padding-right:12px">IBAN</td><td style="padding:6px 0;font-family:monospace;font-weight:bold">${iban}</td></tr>`,
+    );
+  }
+  if (mbway) {
+    lines.push(
+      `<tr><td style="padding:6px 0;color:#666;white-space:nowrap;padding-right:12px">MB Way</td><td style="padding:6px 0;font-family:monospace;font-weight:bold">${mbway}</td></tr>`,
+    );
+  }
+  lines.push(
+    "</table>",
+    '<p style="color:#666;font-size:14px;margin-top:12px">Após a confirmação do pagamento, o pack será ativado e poderás começar a agendar as tuas aulas.</p>',
+  );
+  return lines.join("\n");
+}
+
+export async function sendPackPurchaseConfirmation(
+  opts: PackPurchaseConfirmation,
+  paymentIban: string | null,
+  paymentMbway: string | null,
+): Promise<void> {
+  const { buyerEmail, buyerName, schoolName, packName, quantity, totalPriceCents } = opts;
+  const paymentHtml = buildPaymentInstructionsHtml(paymentIban, paymentMbway);
+
+  try {
+    await resend.emails.send({
+      from: FROM,
+      to: buyerEmail,
+      subject: `Compra pendente — ${packName} — ${schoolName}`,
+      html: `
+        <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+          <h2 style="color:#FF6B35">Compra registada!</h2>
+          <p>Olá <strong>${buyerName}</strong>,</p>
+          <p>Recebemos o teu pedido de pack na <strong>${schoolName}</strong>.</p>
+          <table style="width:100%;border-collapse:collapse;margin-top:16px">
+            <tr><td style="padding:8px 0;color:#666">Pack</td><td style="padding:8px 0">${packName}</td></tr>
+            <tr><td style="padding:8px 0;color:#666">Sessões</td><td style="padding:8px 0">${quantity}</td></tr>
+            <tr><td style="padding:8px 0;color:#666">Total</td><td style="padding:8px 0">${(totalPriceCents / 100).toFixed(2).replace(".", ",")} €</td></tr>
+          </table>
+          <p style="color:#EF4444;font-weight:bold;margin-top:16px">⚠️ O pack ainda não está ativo — o pagamento está pendente.</p>
+          ${paymentHtml}
+          <hr style="border:none;border-top:1px solid #eee;margin:24px 0" />
+          <p style="color:#999;font-size:12px">Alaia — Plataforma de gestão para escolas de surf</p>
+        </div>
+      `,
+    });
+  } catch (err) {
+    console.error("Failed to send pack purchase confirmation");
+  }
+}
 
 export async function sendCancellationNotification(opts: CancellationNotification): Promise<void> {
   const { studentEmail, studentName, schoolName, className, date, time } = opts;
