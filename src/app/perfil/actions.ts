@@ -104,7 +104,27 @@ async function getStudent(supabase: SupabaseClient): Promise<StudentRow | null> 
     .eq("auth_user_id", user.id)
     .maybeSingle();
 
-  return data;
+  if (data) return data;
+
+  if (!user.email) return null;
+
+  const admin = createAdminClient();
+  const { data: byEmail } = await admin
+    .from("students")
+    .select("id, full_name, email, phone")
+    .eq("email", user.email)
+    .is("auth_user_id", null)
+    .maybeSingle();
+
+  if (byEmail) {
+    await admin
+      .from("students")
+      .update({ auth_user_id: user.id, is_guest: false })
+      .eq("id", byEmail.id);
+    return byEmail;
+  }
+
+  return null;
 }
 
 export async function getClientOverview(): Promise<ClientOverview | null> {

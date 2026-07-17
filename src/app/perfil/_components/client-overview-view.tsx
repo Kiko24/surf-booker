@@ -135,9 +135,10 @@ export function ClientOverviewView({ overview }: { overview: ClientOverview | nu
           ) : (
             <ul className="divide-y divide-gray-100">
               {activePacks.slice(0, 4).map(p => {
-                const pct = Math.round(
-                  ((p.totalLessons - p.lessonsRemaining) / p.totalLessons) * 100,
-                );
+                const pct = p.totalLessons > 0
+                  ? Math.round((p.lessonsRemaining / p.totalLessons) * 100)
+                  : 0;
+                const low = pct <= 25;
                 return (
                   <li key={p.id} className="py-3">
                     <div className="mb-1 flex items-center justify-between">
@@ -148,11 +149,19 @@ export function ClientOverviewView({ overview }: { overview: ClientOverview | nu
                     </div>
                     <div className="h-1.5 overflow-hidden rounded-full bg-gray-200">
                       <div
-                        className="h-full rounded-full bg-accent transition-all"
+                        className={`h-full rounded-full transition-all ${low ? "bg-error" : "bg-accent"}`}
                         style={{ width: `${pct}%` }}
                       />
                     </div>
-                    <p className="mt-1 text-xs text-gray-500">{p.schoolName}</p>
+                    <div className="mt-1 flex items-center justify-between">
+                      <p className="text-xs text-gray-500">{p.schoolName}</p>
+                      <Link
+                        href={`/escolas/${p.schoolSlug}`}
+                        className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white shadow transition-all hover:scale-105 hover:bg-accent/90"
+                      >
+                        Marcar aula
+                      </Link>
+                    </div>
                   </li>
                 );
               })}

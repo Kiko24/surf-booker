@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import type { PublicSchoolData } from "../actions";
-import { toggleFavorite, comprarPackPublico, criarReservaPublica, criarReservaAluguer } from "../actions";
+import { toggleFavorite, comprarPackPublico, criarReservaPublica, criarReservaAluguer, buscarPackAtivo } from "../actions";
 import type { ParticipantInput } from "../actions";
 import { useTurnstile } from "./turnstile-widget";
 import { Lightbox } from "./lightbox";
@@ -67,6 +67,8 @@ export function EscolaView({ data }: Props) {
   const [rentalTime, setRentalTime] = useState("");
   const selSvc = selectedServiceId ? services.find(s => s.id === selectedServiceId) ?? null : null;
   const isRental = selSvc?.category === "aluguer";
+  const [activePack, setActivePack] = useState<{ packPurchaseId: string; remaining: number; name: string } | null>(null);
+  const [packChecking, setPackChecking] = useState(false);
 
   useEffect(() => {
     if (!showServicePicker) return;
@@ -77,6 +79,7 @@ export function EscolaView({ data }: Props) {
       setPackQuantity(1);
       setPackFormError(null);
       setShowPackSuccess(false);
+      setActivePack(null);
       setRentalDate("");
       setRentalTime("");
       setPayerName(userInfo?.name ?? "");
@@ -121,6 +124,23 @@ export function EscolaView({ data }: Props) {
     };
     check();
   }, [school.id]);
+
+  useEffect(() => {
+    if (!selectedServiceId || !userInfo?.email) {
+      setActivePack(null);
+      return;
+    }
+    const svc = services.find(s => s.id === selectedServiceId);
+    if (!svc || svc.category !== "aula") {
+      setActivePack(null);
+      return;
+    }
+    setPackChecking(true);
+    buscarPackAtivo(school.id, userInfo.email).then(p => {
+      setActivePack(p);
+      setPackChecking(false);
+    });
+  }, [selectedServiceId, userInfo?.email, school.id, services]);
 
   const sanitizeName = (v: string) => v.replace(/[^a-zA-Zà-ÿÀ-ß '´`-]/g, "").slice(0, 80);
   const sanitizeEmail = (v: string) => v.trim().toLowerCase().slice(0, 120);
@@ -169,14 +189,14 @@ export function EscolaView({ data }: Props) {
               type="button"
               onClick={handleToggleFavorite}
               disabled={favoriteLoading}
-              className="shrink-0 h-9 w-9 rounded-full border border-blue-500 bg-white flex items-center justify-center text-black transition-colors hover:border-accent hover:bg-accent/5 disabled:opacity-50 mt-2 ml-2"
+              className={`shrink-0 h-9 w-9 rounded-full border flex items-center justify-center transition-colors disabled:opacity-50 mt-2 ml-2 ${favorited ? "border-accent bg-accent text-white" : "border-blue-500 bg-white text-black hover:border-accent hover:bg-accent/5"}`}
               aria-label={favorited ? "Remover dos favoritos" : "Adicionar aos favoritos"}
             >
               <svg
                 className="h-4 w-4"
                 viewBox="0 0 24 24"
-                fill={favorited ? "#FF6B35" : "none"}
-                stroke={favorited ? "#FF6B35" : "currentColor"}
+                fill={favorited ? "white" : "none"}
+                stroke={favorited ? "white" : "currentColor"}
                 strokeWidth={2}
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -1027,6 +1047,24 @@ export function EscolaView({ data }: Props) {
                 <div className="flex flex-row gap-6 w-full">
                   <div className="flex-1 space-y-6">
                     {bookingStep === 3 ? (
+                      selSvc?.category === "aula" && activePack ? (
+                        <div className="space-y-4 px-2">
+                          <div className="rounded-2xl border border-blue-100 bg-blue-50 p-5">
+                            <div className="flex items-center gap-2 mb-1">
+                              <svg className="h-5 w-5 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                              </svg>
+                              <h4 className="font-heading text-sm font-bold text-blue-900">Pack disponível</h4>
+                            </div>
+                            <p className="text-sm text-blue-700 ml-7">
+                              Vais usar o teu pack ({activePack.name} · {activePack.remaining} {activePack.remaining === 1 ? "aula restante" : "aulas restantes"})
+                            </p>
+                          </div>
+                          {bookingError && (
+                            <p className="text-xs text-red-500">{bookingError}</p>
+                          )}
+                        </div>
+                      ) : (
                       <div className="space-y-4 px-2">
                         <h4 className="font-heading text-sm font-bold text-gray-900">Dados do pagador</h4>
                         <div>
@@ -1100,6 +1138,7 @@ export function EscolaView({ data }: Props) {
                           <p className="text-xs text-red-500">{bookingError}</p>
                         )}
                       </div>
+                      )
                     ) : (
                     isRental && bookingStep === 2 ? (
                       (() => {
@@ -1350,13 +1389,26 @@ export function EscolaView({ data }: Props) {
                                   <p className="text-sm font-medium text-gray-900">{day}/{month}/{year}, {time}</p>
                                   <p className="text-xs text-gray-500">{ps} participante{ps !== 1 ? "s" : ""}</p>
                                 </div>
-                                <p className="text-sm font-semibold text-gray-900">{(sessionPrice / 100).toFixed(2).replace(".", ",")} €</p>
+                                {rightSvc?.category === "aula" && activePack ? (
+                                  <p className="text-sm font-semibold text-green-600">Grátis (pack)</p>
+                                ) : (
+                                  <p className="text-sm font-semibold text-gray-900">{(sessionPrice / 100).toFixed(2).replace(".", ",")} €</p>
+                                )}
                               </div>
                             );
                           }))}
                           <div className="flex items-center justify-between pt-2">
-                            <p className="text-sm font-bold text-gray-900">Total</p>
-                            <p className="text-sm font-bold text-accent">{(rentalTotal / 100).toFixed(2).replace(".", ",")} €</p>
+                            {rightSvc?.category === "aula" && activePack ? (
+                              <>
+                                <p className="text-sm font-bold text-gray-900">Total</p>
+                                <p className="text-sm font-bold text-green-600">Pack · {activePack.remaining} {activePack.remaining === 1 ? "aula restante" : "aulas restantes"}</p>
+                              </>
+                            ) : (
+                              <>
+                                <p className="text-sm font-bold text-gray-900">Total</p>
+                                <p className="text-sm font-bold text-accent">{(rentalTotal / 100).toFixed(2).replace(".", ",")} €</p>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1394,8 +1446,8 @@ export function EscolaView({ data }: Props) {
                   });
               const fullPhone = payerPhoneCode.trim() + payerPhone.trim();
               const payerValid = payerName.trim().length >= 2 && payerEmail.trim().includes("@") && payerEmail.trim().includes(".") && fullPhone.replace(/\D/g, "").length >= 6 && termsAccepted;
-              const canContinue = isAula
-                ? (bookingStep === 1 ? selectedSessions.length > 0 : bookingStep === 2 ? allParticipantsValid : payerValid)
+               const canContinue = isAula
+                 ? (bookingStep === 1 ? selectedSessions.length > 0 : bookingStep === 2 ? allParticipantsValid : (activePack ? true : payerValid))
                 : isPack
                   ? (packName.trim().length >= 2 && packEmail.trim().includes("@") && packPhone.trim().length >= 6 && termsAccepted)
                   : isRental
@@ -1414,7 +1466,7 @@ export function EscolaView({ data }: Props) {
                   setPayerEmail(userInfo?.email ?? "");
                   setPayerPhone(userInfo?.phone ?? "");
                   setBookingStep(3);
-                } else if (isAula && bookingStep === 3 && payerValid) {
+                } else if (isAula && bookingStep === 3 && (payerValid || activePack)) {
                   setBookingSubmitting(true);
                   setBookingError(null);
                   const turnstileToken = await turnstileExecute();
@@ -1442,8 +1494,9 @@ export function EscolaView({ data }: Props) {
                       contactName: payerName.trim(),
                       contactEmail: payerEmail.trim().toLowerCase(),
                       contactPhone: payerPhoneCode.trim() + payerPhone.trim(),
-                      termsAccepted,
+                      termsAccepted: activePack ? true : termsAccepted,
                       termsUrl: school.terms_url ?? null,
+                      ...(activePack ? { packPurchaseId: activePack.packPurchaseId } : {}),
                     },
                     turnstileToken ?? undefined
                   );

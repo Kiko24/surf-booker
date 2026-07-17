@@ -459,7 +459,7 @@ export function CalendarioView({ schoolId }: Props) {
         {/* Session detail modal (centered pop-up) */}
         {showSidebar && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-5" onClick={() => setSelectedDay(null)}>
-            <div className="w-full max-w-md max-h-[75vh] rounded-2xl bg-surface flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="w-full max-w-lg max-h-[75vh] rounded-2xl bg-surface flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
               {/* Header */}
               <div className="p-4 lg:p-5 border-b border-white/5 shrink-0">
                 <div className="flex items-start justify-between gap-2">
@@ -610,7 +610,7 @@ export function CalendarioView({ schoolId }: Props) {
                                 </div>
                               </div>
                             )}
-                            <div className="flex flex-nowrap gap-2 pt-1">
+                            <div className="flex flex-wrap gap-2 pt-1">
                               {(() => {
                                 const isPast = new Date(session.starts_at) < new Date();
                                 if (isPast) {

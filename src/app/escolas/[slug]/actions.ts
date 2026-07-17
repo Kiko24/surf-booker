@@ -2,6 +2,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { assertValidOrigin } from "@/lib/csrf";
 import { rateLimitPublic } from "@/lib/rate-limit";
 import { verifyTurnstileToken } from "@/lib/turnstile";
 import { logAudit } from "@/lib/audit";
@@ -948,6 +949,8 @@ export async function toggleFavorite(
   const rl = await rateLimitPublic("toggleFavorite", 10, "60 s");
   if (!rl.ok) return { ok: false, error: "Muitos pedidos. Tenta novamente mais tarde." };
 
+  await assertValidOrigin();
+
   const supabase = await createClient();
   const { data: { user }, error: authErr } = await supabase.auth.getUser();
 
@@ -962,9 +965,9 @@ export async function toggleFavorite(
 
     if (error) {
       if (error.code === "23505") {
-        // Already favorited — treat as success
         return { ok: true, favorited: true };
       }
+      console.error("[toggleFavorite] add error:", error);
       return { ok: false, error: "Erro ao adicionar favorito." };
     }
 
@@ -986,6 +989,7 @@ export async function toggleFavorite(
     .eq("school_id", schoolId);
 
   if (error) {
+    console.error("[toggleFavorite] remove error:", error);
     return { ok: false, error: "Erro ao remover favorito." };
   }
 

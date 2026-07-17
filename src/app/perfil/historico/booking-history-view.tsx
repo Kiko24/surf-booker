@@ -81,8 +81,8 @@ export function BookingHistoryView({ bookings }: { bookings: BookingHistoryItem[
             onClick={() => { setFilter(f); setPage(0); }}
             className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
               filter === f
-                ? "border-accent bg-accent/10 text-accent"
-                : "border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                ? "bg-accent text-white"
+                : "bg-white text-gray-600 border border-gray-200 hover:border-accent"
             }`}
           >
             {f === "all" ? "Todas" : f === "upcoming" ? "Futuras" : "Passadas"}
@@ -146,7 +146,7 @@ export function BookingHistoryView({ bookings }: { bookings: BookingHistoryItem[
           <button
             onClick={() => handlePageChange(safePage - 1)}
             disabled={safePage === 0}
-            className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-gray-300 disabled:opacity-30"
+             className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-accent disabled:opacity-30"
           >
             Anterior
           </button>
@@ -157,7 +157,7 @@ export function BookingHistoryView({ bookings }: { bookings: BookingHistoryItem[
               className={`rounded-lg px-3 py-1.5 text-xs font-medium ${
                 i === safePage
                   ? "bg-accent text-white"
-                  : "border border-gray-200 text-gray-600 hover:border-gray-300"
+                  : "border border-gray-200 text-gray-600 hover:border-accent"
               }`}
             >
               {i + 1}
@@ -166,7 +166,7 @@ export function BookingHistoryView({ bookings }: { bookings: BookingHistoryItem[
           <button
             onClick={() => handlePageChange(safePage + 1)}
             disabled={safePage === totalPages - 1}
-            className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-gray-300 disabled:opacity-30"
+             className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-accent disabled:opacity-30"
           >
             Seguinte
           </button>

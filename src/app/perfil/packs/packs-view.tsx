@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import type { PackSummary } from "../actions";
 
@@ -21,8 +22,8 @@ export function PacksView({ packs }: { packs: PackSummary[] }) {
           onClick={() => setShowUsed(false)}
           className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
             !showUsed
-              ? "border-accent bg-accent/10 text-accent"
-              : "border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700"
+              ? "bg-accent text-white"
+              : "bg-white text-gray-600 border border-gray-200 hover:border-accent"
           }`}
         >
           Ativos
@@ -31,8 +32,8 @@ export function PacksView({ packs }: { packs: PackSummary[] }) {
           onClick={() => setShowUsed(true)}
           className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
             showUsed
-              ? "border-accent bg-accent/10 text-accent"
-              : "border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700"
+              ? "bg-accent text-white"
+              : "bg-white text-gray-600 border border-gray-200 hover:border-accent"
           }`}
         >
           Todos
@@ -47,7 +48,8 @@ export function PacksView({ packs }: { packs: PackSummary[] }) {
         <div className="grid gap-4 sm:grid-cols-2">
           {displayed.map(p => {
             const used = p.totalLessons - p.lessonsRemaining;
-            const pct = p.totalLessons > 0 ? Math.round((used / p.totalLessons) * 100) : 0;
+            const pct = p.totalLessons > 0 ? Math.round((p.lessonsRemaining / p.totalLessons) * 100) : 0;
+            const low = pct <= 25;
             return (
               <div
                 key={p.id}
@@ -70,17 +72,27 @@ export function PacksView({ packs }: { packs: PackSummary[] }) {
                 </div>
 
                 <div className="mb-1 flex items-center justify-between text-sm">
-                  <span className="text-gray-500">Progresso</span>
-                  <span className="text-gray-600">
-                    {p.lessonsRemaining}/{p.totalLessons} restantes
-                  </span>
+                  <span className="text-gray-500">{p.lessonsRemaining}/{p.totalLessons} restantes</span>
+                  <span className={low ? "text-error text-xs font-medium" : "text-gray-400 text-xs"}>{pct}%</span>
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-gray-200">
                   <div
-                    className="h-full rounded-full bg-accent transition-all"
+                    className={`h-full rounded-full transition-all ${low ? "bg-error" : "bg-accent"}`}
                     style={{ width: `${pct}%` }}
                   />
                 </div>
+
+                {p.status === "active" && p.lessonsRemaining > 0 && (
+                  <Link
+                    href={`/escolas/${p.schoolSlug}`}
+                    className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-accent bg-accent px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent/90"
+                  >
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+                    </svg>
+                    Marcar aula
+                  </Link>
+                )}
 
                 {p.usedBookings.length > 0 && (
                   <details className="group mt-3">

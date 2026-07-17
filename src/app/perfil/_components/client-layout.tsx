@@ -32,7 +32,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
                 className={`flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
                   active
                     ? "border-accent bg-accent text-white"
-                    : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:text-gray-800"
+                    : "border-gray-200 bg-white text-gray-600 hover:border-accent"
                 }`}
               >
                 {Icon && <Icon className="h-4 w-4" />}
