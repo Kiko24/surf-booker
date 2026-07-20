@@ -34,11 +34,18 @@ export function SignupOwnerWizard() {
 
   const isFirstStep = step === "email";
 
+  const stepTitles: Record<Step, string> = {
+    email: "Tem o seu negócio?",
+    personal: "Falta só um pouco!",
+    "confirm-email": "Confirma o teu email",
+  };
+
   return (
     <AuthShell
       backHref={isFirstStep ? "/user-flow" : undefined}
       onBack={isFirstStep ? undefined : handleBackInternal}
       image={bgPros}
+      title={stepTitles[step]}
     >
       <StepTransition stepKey={step} direction={direction}>
         {step === "email" && (

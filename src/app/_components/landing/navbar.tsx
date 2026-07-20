@@ -57,7 +57,7 @@ export function Navbar({ user }: { user: UserInfo | null }) {
           </button>
         </nav>
 
-        <Link href="/" className="font-heading text-xl font-bold text-white md:text-accent-light">
+        <Link href="/" className="font-heading text-xl font-bold text-white md:text-accent">
           Alaia
         </Link>
 

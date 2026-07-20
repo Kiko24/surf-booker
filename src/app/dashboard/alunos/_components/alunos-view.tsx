@@ -335,7 +335,7 @@ export function AlunosView({ schoolId }: Props) {
                         <circle cx="12" cy="12" r="9" />
                       </svg>
                     )}
-                    <button type="button" onClick={() => setSelectedStudent(s)} className="flex h-8 w-8 items-center justify-center rounded-full text-text-secondary hover:text-foreground transition-colors">
+                    <button type="button" onClick={() => setSelectedStudent(s)} aria-label="Expandir aluno" className="flex h-8 w-8 items-center justify-center rounded-full text-text-secondary hover:text-foreground transition-colors">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
                       <path d="m9 18 6-6-6-6" />
                     </svg>

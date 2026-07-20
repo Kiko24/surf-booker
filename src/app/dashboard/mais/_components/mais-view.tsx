@@ -561,7 +561,7 @@ export function MaisView({ schoolId }: Props) {
                     <p className="mb-4 text-center font-body text-sm text-text-secondary">{images.length} / 6 imagens</p>
                     {images.length < 6 && (
                     <div className="mb-6 flex justify-center">
-                      <button type="button" onClick={() => imageFileRef.current?.click()} className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border-2 border-dashed border-text-muted bg-[#2A2A2A] transition-colors hover:border-accent hover:bg-accent/10">
+                      <button type="button" onClick={() => imageFileRef.current?.click()} aria-label="Adicionar imagem" className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border-2 border-dashed border-text-muted bg-[#2A2A2A] transition-colors hover:border-accent hover:bg-accent/10">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8 text-text-muted">
                           <line x1="12" x2="12" y1="5" y2="19" /><line x1="5" x2="19" y1="12" y2="12" />
                         </svg>

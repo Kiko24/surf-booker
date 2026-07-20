@@ -40,7 +40,7 @@ export function BottomSheet({
   const containerClass =
     variant === "center"
       ? "w-full max-w-sm rounded-2xl bg-surface p-6"
-      : "w-full max-w-md rounded-t-2xl bg-surface p-6 pb-10 md:rounded-2xl md:pb-6";
+      :       "w-full max-w-md rounded-t-2xl bg-surface p-6 pb-10 max-h-[80vh] overflow-y-auto md:rounded-2xl md:pb-6";
 
   return (
     <div

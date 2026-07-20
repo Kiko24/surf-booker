@@ -20,6 +20,8 @@ export const logger = {
     }
   },
   info(tag: string, message: string, data?: unknown) {
-    console.log(`[${ts()}] [INFO]  [${tag}] ${message}`, data ?? "");
+    if (isDev) {
+      console.log(`[${ts()}] [INFO]  [${tag}] ${message}`, data ?? "");
+    }
   },
 };

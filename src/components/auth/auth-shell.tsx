@@ -14,6 +14,7 @@ type AuthShellProps = {
   showLogo?: boolean;
   image?: StaticImageData;
   mainClassName?: string;
+  title?: string;
 };
 
 function ArrowLeftIcon({ className }: { className?: string }) {
@@ -42,12 +43,13 @@ export function AuthShell({
   showLogo = true,
   image = defaultImage,
   mainClassName,
+  title,
 }: AuthShellProps) {
   const backButtonClasses =
     "inline-flex h-8 w-8 items-center justify-center rounded-full border border-foreground text-foreground hover:bg-surface active:bg-surface transition-colors touch-manipulation cursor-pointer select-none";
 
   const hasBack = Boolean(backHref || onBack);
-  const showTopBar = hasBack || showLogo;
+  const showTopBar = hasBack || Boolean(title);
 
   return (
     <div className="relative min-h-svh min-h-dvh bg-background text-foreground font-body lg:h-svh lg:overflow-hidden">
@@ -80,8 +82,8 @@ export function AuthShell({
         >
           <main
             className={cn(
-              "flex-1 flex justify-center px-3 pb-8",
-              "lg:relative lg:px-10 lg:pt-6 lg:pb-0",
+              "flex-1 flex items-center justify-center px-3 pb-8",
+              "lg:relative lg:items-start lg:px-10 lg:pt-6 lg:pb-0",
               mainClassName
             )}
             style={{
@@ -91,30 +93,30 @@ export function AuthShell({
           >
             {/* Back button absolute SÓ em desktop */}
             {hasBack && (
-              <div className="hidden lg:block lg:absolute lg:top-6 lg:left-6 lg:z-10">
+              <div className="hidden lg:block lg:absolute lg:top-6 lg:left-10 lg:z-10">
                 {backHref ? (
                   <Link
                     href={backHref}
                     aria-label="Voltar"
-                    className={backButtonClasses}
+                    className={cn(backButtonClasses, "lg:h-8 lg:w-8")}
                   >
-                    <ArrowLeftIcon className="h-3.5 w-3.5 pointer-events-none" />
+                    <ArrowLeftIcon className="h-3.5 w-3.5 lg:h-3.5 lg:w-3.5 pointer-events-none" />
                   </Link>
                 ) : (
                   <button
                     type="button"
                     onClick={onBack}
                     aria-label="Voltar"
-                    className={backButtonClasses}
+                    className={cn(backButtonClasses, "lg:h-8 lg:w-8")}
                   >
-                    <ArrowLeftIcon className="h-3.5 w-3.5 pointer-events-none" />
+                    <ArrowLeftIcon className="h-3.5 w-3.5 lg:h-3.5 lg:w-3.5 pointer-events-none" />
                   </button>
                 )}
               </div>
             )}
 
-            {/* Theme toggle absolute SÓ em desktop */}
-            <div className="hidden lg:block lg:absolute lg:top-6 lg:right-6 lg:z-10">
+            {/* Theme toggle absolute SÓ em desktop (lg+) */}
+            <div className="hidden lg:block lg:absolute lg:top-6 lg:right-10 lg:z-10">
               <ThemeToggle />
             </div>
 
@@ -123,14 +125,13 @@ export function AuthShell({
                 className="
                   relative rounded-2xl bg-background px-5 pt-3 pb-5
                   sm:px-6 sm:pt-4 sm:pb-6
-                  lg:bg-transparent lg:p-0 lg:rounded-none
-                  lg:flex lg:flex-1 lg:flex-col
+                  lg:bg-transparent lg:p-0 lg:rounded-none lg:flex lg:flex-1 lg:flex-col
                 "
               >
-                {/* Top bar SÓ em mobile */}
+                {/* Top bar SÓ em mobile (<1024px) */}
                 {showTopBar && (
-                  <div className="mb-2 flex items-center justify-between lg:hidden">
-                    {hasBack ? (
+                  <div className="mb-2 flex items-center gap-3 lg:hidden">
+                    {hasBack && (
                       backHref ? (
                         <Link
                           href={backHref}
@@ -153,19 +154,9 @@ export function AuthShell({
                           <ArrowLeftIcon className="h-3.5 w-3.5 pointer-events-none" />
                         </button>
                       )
-                    ) : (
-                      <span aria-hidden />
                     )}
-
-                    <ThemeToggle />
-
-                    {showLogo && (
-                      <Link
-                        href="/"
-                        className="font-heading text-lg font-medium tracking-wide text-foreground hover:opacity-80 transition-opacity touch-manipulation hidden"
-                      >
-                        SurfBooker
-                      </Link>
+                    {title && (
+                      <h1 className="font-heading text-2xl font-medium">{title}</h1>
                     )}
                   </div>
                 )}

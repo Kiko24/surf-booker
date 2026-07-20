@@ -913,6 +913,7 @@ export function EscolaView({ data }: Props) {
                                   <button
                                     type="button"
                                     onClick={() => setPackQuantity(Math.max(1, packQuantity - 1))}
+                                    aria-label="Diminuir quantidade"
                                     className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 text-gray-600 transition-colors hover:border-accent hover:text-accent"
                                   >
                                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -923,6 +924,7 @@ export function EscolaView({ data }: Props) {
                                   <button
                                     type="button"
                                     onClick={() => setPackQuantity(Math.min(99, packQuantity + 1))}
+                                    aria-label="Aumentar quantidade"
                                     className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 text-gray-600 transition-colors hover:border-accent hover:text-accent"
                                   >
                                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -999,6 +1001,7 @@ export function EscolaView({ data }: Props) {
                                 <button
                                   type="button"
                                   onClick={() => setPackQuantity(Math.max(1, packQuantity - 1))}
+                                  aria-label="Diminuir quantidade"
                                   className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 text-gray-600 transition-colors hover:border-accent hover:text-accent"
                                 >
                                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -1009,6 +1012,7 @@ export function EscolaView({ data }: Props) {
                                 <button
                                   type="button"
                                   onClick={() => setPackQuantity(Math.min(99, packQuantity + 1))}
+                                  aria-label="Aumentar quantidade"
                                   className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 text-gray-600 transition-colors hover:border-accent hover:text-accent"
                                 >
                                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -1047,24 +1051,6 @@ export function EscolaView({ data }: Props) {
                 <div className="flex flex-row gap-6 w-full">
                   <div className="flex-1 space-y-6">
                     {bookingStep === 3 ? (
-                      selSvc?.category === "aula" && activePack ? (
-                        <div className="space-y-4 px-2">
-                          <div className="rounded-2xl border border-blue-100 bg-blue-50 p-5">
-                            <div className="flex items-center gap-2 mb-1">
-                              <svg className="h-5 w-5 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                              </svg>
-                              <h4 className="font-heading text-sm font-bold text-blue-900">Pack disponível</h4>
-                            </div>
-                            <p className="text-sm text-blue-700 ml-7">
-                              Vais usar o teu pack ({activePack.name} · {activePack.remaining} {activePack.remaining === 1 ? "aula restante" : "aulas restantes"})
-                            </p>
-                          </div>
-                          {bookingError && (
-                            <p className="text-xs text-red-500">{bookingError}</p>
-                          )}
-                        </div>
-                      ) : (
                       <div className="space-y-4 px-2">
                         <h4 className="font-heading text-sm font-bold text-gray-900">Dados do pagador</h4>
                         <div>
@@ -1138,7 +1124,6 @@ export function EscolaView({ data }: Props) {
                           <p className="text-xs text-red-500">{bookingError}</p>
                         )}
                       </div>
-                      )
                     ) : (
                     isRental && bookingStep === 2 ? (
                       (() => {

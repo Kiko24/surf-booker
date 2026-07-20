@@ -41,7 +41,7 @@ export function ForgotPasswordForm() {
     return (
       <AuthShell backHref="/login">
         <div className="mt-2 flex flex-col gap-6 text-center">
-          <header>
+          <header className="md:mt-4">
             <h1 className="font-heading text-2xl font-medium">Verifica o teu email</h1>
           </header>
 
@@ -62,8 +62,8 @@ export function ForgotPasswordForm() {
   }
 
   return (
-    <AuthShell backHref="/login">
-      <header className="mt-2 text-center">
+    <AuthShell backHref="/login" title="Recuperar password">
+      <header className="hidden lg:block">
         <h1 className="font-heading text-2xl font-medium">Recuperar password</h1>
         <p className="mt-2 text-sm text-text-secondary">
           Insere o teu email e enviámos-te um link para definir uma nova password.

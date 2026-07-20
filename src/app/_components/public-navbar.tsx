@@ -117,7 +117,7 @@ export function PublicNavbar() {
           {isOpen && (
             <div
               ref={dropdownRef}
-              className="absolute left-0 top-full mt-2 w-[400px] rounded-xl border border-gray-200 bg-white shadow-lg"
+              className="absolute left-0 top-full mt-2 w-[min(400px,85vw)] rounded-xl border border-gray-200 bg-white shadow-lg"
             >
               <div className="flex items-center gap-2 border-b border-gray-100 px-4 py-3">
                 <svg className="h-4 w-4 shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -363,7 +363,7 @@ export function PublicNavbar() {
       {/* Backdrop for desktop search */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-[-1]"
+          className="fixed inset-0 z-30"
           onClick={() => setIsOpen(false)}
         />
       )}
@@ -371,7 +371,7 @@ export function PublicNavbar() {
       {/* Backdrop for mobile menu */}
       {mobileMenuOpen && (
         <div
-          className="fixed inset-0 z-[-1]"
+          className="fixed inset-0 z-30"
           onClick={() => setMobileMenuOpen(false)}
         />
       )}

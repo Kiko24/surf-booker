@@ -44,7 +44,7 @@ export function StepEmail({ defaultEmail = "", onSubmit }: Props) {
 
   return (
     <div className="lg:mt-8">
-      <header className="text-center">
+      <header className="hidden lg:block lg:text-left">
         <h1 className="font-heading text-2xl font-medium">Tem o seu negócio?</h1>
         <p className="mt-2 text-sm text-text-secondary">
           Crie uma conta e deixe-nos ajudar!

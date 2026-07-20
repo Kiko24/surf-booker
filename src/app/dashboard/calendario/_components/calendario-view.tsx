@@ -776,6 +776,7 @@ export function CalendarioView({ schoolId }: Props) {
                   if (dpMonth === 0) { setDpYear((y) => y - 1); setDpMonth(11); }
                   else setDpMonth((m) => m - 1);
                 }}
+                aria-label="Mês anterior"
                 className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 text-text-secondary hover:text-foreground transition-colors"
               >
                 <ChevronLeftIcon className="h-4 w-4" />
@@ -789,6 +790,7 @@ export function CalendarioView({ schoolId }: Props) {
                   if (dpMonth === 11) { setDpYear((y) => y + 1); setDpMonth(0); }
                   else setDpMonth((m) => m + 1);
                 }}
+                aria-label="Mês seguinte"
                 className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 text-text-secondary hover:text-foreground transition-colors"
               >
                 <ChevronRightIcon className="h-4 w-4" />

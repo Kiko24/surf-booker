@@ -83,8 +83,8 @@ export function LoginForm({ nextPath }: Props) {
   }
 
   return (
-      <AuthShell backHref="/user-flow" mainClassName="pb-0">
-      <header className="mt-2 text-center lg:mt-8">
+      <AuthShell backHref="/user-flow" mainClassName="pb-0" title="Bem-vindo de volta!">
+      <header className="hidden lg:block">
         <h1 className="font-heading text-2xl font-medium">Bem-vindo de volta!</h1>
       </header>
 

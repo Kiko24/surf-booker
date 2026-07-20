@@ -83,7 +83,7 @@ export function ResetPasswordForm() {
   if (success) {
     return (
       <AuthShell>
-        <div className="mt-2 flex flex-col gap-4 text-center">
+        <div className="mt-2 flex flex-col gap-4 text-center md:mt-6">
           <h1 className="font-heading text-2xl font-medium">Password actualizada!</h1>
           <p className="text-sm text-text-secondary">
             A redireccionar para o login...
@@ -95,7 +95,7 @@ export function ResetPasswordForm() {
 
   return (
     <AuthShell>
-      <header className="mt-2 text-center">
+      <header className="mt-2 lg:mt-8">
         <h1 className="font-heading text-2xl font-medium">Nova password</h1>
         <p className="mt-2 text-sm text-text-secondary">
           Define uma nova password para a tua conta.

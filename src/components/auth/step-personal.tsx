@@ -95,7 +95,7 @@ export function StepPersonal({ email, onSuccess, onEmailConflict, signupAction }
 
   return (
     <div className="flex flex-col gap-6 lg:mt-8 lg:gap-2">
-      <header className="mt-2">
+      <header className="hidden lg:block">
         <h1 className="font-heading text-2xl font-medium">Falta só um pouco!</h1>
         <p className="mt-1 text-sm text-text-secondary">
           Preencha os restantes passos para associar{" "}

@@ -22,9 +22,9 @@ export default async function UserFlowPage() {
   const backHref = user ? "/dashboard" : "/";
 
   return (
-    <AuthShell backHref={backHref}>
-      <div className="mt-2 lg:flex lg:flex-1 lg:flex-col lg:justify-start lg:mt-8">
-        <h1 className="text-center text-2xl font-heading font-medium lg:text-2xl">
+    <AuthShell backHref={backHref} title="Registe-se / Iniciar sessão">
+      <div className="lg:flex lg:flex-1 lg:flex-col lg:justify-start">
+        <h1 className="hidden lg:block text-center text-2xl font-heading font-medium">
           Registe-se / Iniciar sessão
         </h1>
 

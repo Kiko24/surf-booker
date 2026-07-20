@@ -134,10 +134,10 @@ export function DashboardLayout({ children }: Props) {
       </div>
 
       {/* Mobile Bottom Nav */}
-      <div className="pointer-events-none fixed bottom-[calc(1.75rem+env(safe-area-inset-bottom))] left-0 right-0 z-40 h-16 bg-gradient-to-t from-background to-transparent md:hidden" />
+      <div className="pointer-events-none fixed left-0 right-0 z-40 h-16 bg-gradient-to-t from-background to-transparent md:hidden" style={{ bottom: "calc(max(0.75rem, env(safe-area-inset-bottom)) + 56px)" }} />
 
       <nav
-        className="fixed left-1/2 z-50 flex w-[90%] max-w-md -translate-x-1/2 items-center justify-around rounded-full border border-accent/10 bg-surface-container-high px-2 py-2 shadow-lg backdrop-blur-md md:hidden"
+        className="fixed left-1/2 z-50 flex w-[90%] max-w-md -translate-x-1/2 items-center justify-center gap-2 rounded-full border border-accent/10 bg-surface-container-high px-2 py-2 shadow-lg backdrop-blur-md md:hidden"
         style={{ bottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
       >
         {NAV_ITEMS.map((item) => {
@@ -148,10 +148,11 @@ export function DashboardLayout({ children }: Props) {
               key={item.href}
               href={item.href}
               aria-label={item.label}
+              aria-current={isActive ? "page" : undefined}
               className={
                 isActive
-                  ? "flex h-12 w-12 scale-90 items-center justify-center rounded-full bg-accent text-primary-foreground transition-all duration-200 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
-                  : "flex h-12 w-12 items-center justify-center rounded-full text-text-secondary transition-all hover:bg-accent/10 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+                  ? "flex h-10 w-10 scale-90 items-center justify-center rounded-full bg-accent text-primary-foreground transition-all duration-200 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+                  : "flex h-10 w-10 items-center justify-center rounded-full text-text-secondary transition-all hover:bg-accent/10 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
               }
             >
               <Icon className="h-5 w-5" />

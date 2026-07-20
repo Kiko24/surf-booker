@@ -6,7 +6,7 @@ export function CalendarModal({ open, onClose }: { open: boolean; onClose: () =>
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-5" onClick={onClose}>
       <div className="relative w-full max-w-lg rounded-2xl bg-white p-6 pb-0 pt-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <button onClick={onClose} className="absolute right-4 top-4 text-gray-400 hover:text-gray-600 transition-colors">
+        <button onClick={onClose} aria-label="Fechar" className="absolute right-4 top-4 text-gray-400 hover:text-gray-600 transition-colors">
           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>

@@ -1,7 +1,6 @@
 import { Ratelimit, type Duration } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { headers } from "next/headers";
-import { logger } from "@/lib/logger";
 
 function createRatelimit() {
   return new Ratelimit({
@@ -40,8 +39,7 @@ async function getClientIp(): Promise<string> {
       return ips[ips.length - 1] ?? "unknown";
     }
     return headersList.get("x-real-ip") ?? "unknown";
-  } catch (err) {
-    logger.error("rate-limit", "Failed to get client IP", err);
+  } catch {
     return "unknown";
   }
 }

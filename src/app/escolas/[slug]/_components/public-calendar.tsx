@@ -110,6 +110,7 @@ export function PublicCalendar({ schoolId, classTypeId, selectedSessionIds, onTo
         <button
           type="button"
           onClick={handlePrevMonth}
+          aria-label="Mês anterior"
           className="rounded-full p-1.5 text-gray-500 transition-colors hover:bg-gray-100"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -122,6 +123,7 @@ export function PublicCalendar({ schoolId, classTypeId, selectedSessionIds, onTo
         <button
           type="button"
           onClick={handleNextMonth}
+          aria-label="Mês seguinte"
           className="rounded-full p-1.5 text-gray-500 transition-colors hover:bg-gray-100"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

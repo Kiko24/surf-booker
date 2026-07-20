@@ -69,7 +69,7 @@ export function StepConfirmEmail({ email }: Props) {
 
   return (
     <div className="flex flex-col gap-6 text-center">
-      <header className="mt-2 lg:mt-8">
+      <header className="hidden lg:block">
         <h1 className="font-heading text-2xl font-medium">
           Confirma o teu email
         </h1>
