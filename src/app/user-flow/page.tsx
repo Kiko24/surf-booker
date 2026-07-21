@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AuthHeader } from "@/components/auth/auth-header";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { createClient } from "@/lib/supabase/server";
 
@@ -10,7 +11,7 @@ type Option = {
 
 const options: Option[] = [
   {
-    title: "Surfa para profissionais",
+    title: "Alaia para profissionais",
     description: "Gere o teu negócio mais facilmente",
     href: "/signup-owner",
   },
@@ -22,19 +23,24 @@ export default async function UserFlowPage() {
   const backHref = user ? "/dashboard" : "/";
 
   return (
-    <AuthShell backHref={backHref} title="Registe-se / Iniciar sessão">
-      <div className="lg:flex lg:flex-1 lg:flex-col lg:justify-start">
-        <h1 className="hidden lg:block text-center text-2xl font-heading font-medium">
-          Registe-se / Iniciar sessão
-        </h1>
+    <AuthShell
+      backHref={backHref}
+      title="Registe-se / Iniciar sessão"
+      mainClassName="items-start"
+    >
+      <AuthHeader
+        title="Registe-se / Iniciar sessão"
+        backHref={backHref}
+      />
+      <div className="flex flex-col gap-3 lg:flex-1 lg:justify-start lg:items-center">
 
-        <div className="mt-10 flex flex-col gap-6 lg:mt-8 lg:gap-6">
+        <div className="mt-10 flex flex-col gap-6 lg:self-stretch">
           {options.map((opt) => (
             <Link
               key={opt.title}
               href={opt.href}
               className="
-                rounded-xl border border-border px-4 py-2.5 text-left transition-colors hover:bg-surface
+                w-full rounded-xl border border-border px-4 py-2.5 text-left transition-colors hover:bg-surface
                 lg:px-5 lg:py-3.5
               "
             >
@@ -48,7 +54,7 @@ export default async function UserFlowPage() {
           ))}
         </div>
 
-        <div className="mt-8 text-center text-sm lg:mt-6 lg:text-sm">
+        <div className="text-center text-sm lg:self-stretch lg:text-sm">
           <p className="text-text-secondary">
             Já tens conta?{" "}
             <Link href="/login" className="text-accent hover:underline">

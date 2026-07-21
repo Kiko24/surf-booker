@@ -39,7 +39,7 @@
 
 /* ─── LIGHT MODE ──────────────────────────────────── */
 html.light {
-  --color-background: #F7FAFC;
+  --color-background: #EFF3F6;
   --color-surface: #FFFFFF;
   --color-foreground: #111827;
   --color-text-primary: #111827;

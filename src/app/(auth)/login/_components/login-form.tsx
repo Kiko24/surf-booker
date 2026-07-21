@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Divider } from "@/components/auth/divider";
 import { SocialButtons } from "@/components/auth/social-buttons";
+import { AuthHeader } from "@/components/auth/auth-header";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { loginSchema } from "@/lib/validation/auth";
 import { signIn, resendConfirmationFromLogin } from "../actions";
@@ -83,10 +84,8 @@ export function LoginForm({ nextPath }: Props) {
   }
 
   return (
-      <AuthShell backHref="/user-flow" mainClassName="pb-0" title="Bem-vindo de volta!">
-      <header className="hidden lg:block">
-        <h1 className="font-heading text-2xl font-medium">Bem-vindo de volta!</h1>
-      </header>
+      <AuthShell mainClassName="pb-0" backHref="/user-flow" title="Bem-vindo de volta!">
+      <AuthHeader title="Bem-vindo de volta!" backHref="/user-flow" />
 
       <form onSubmit={handleSubmit} noValidate className="mt-4 flex flex-col gap-4">
         <Input

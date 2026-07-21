@@ -43,46 +43,38 @@ export function StepEmail({ defaultEmail = "", onSubmit }: Props) {
   }, []);
 
   return (
-    <div className="lg:mt-8">
-      <header className="hidden lg:block lg:text-left">
-        <h1 className="font-heading text-2xl font-medium">Tem o seu negócio?</h1>
-        <p className="mt-2 text-sm text-text-secondary">
-          Crie uma conta e deixe-nos ajudar!
-        </p>
-      </header>
-
-      <div className="mt-8 lg:mt-6">
-        <Input
-          type="email"
-          name="email"
-          placeholder="Insira o seu e-mail"
-          autoComplete="email"
-          inputMode="email"
-          value={email}
-          onChange={(e) => {
-            setEmail(e.target.value);
-            if (error) setError(undefined);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              const result = emailStepSchema.safeParse({ email: emailRef.current });
-              if (!result.success) {
-                setError(result.error.issues[0]?.message ?? "Email inválido");
-                return;
-              }
-              setError(undefined);
-              onSubmitRef.current(result.data.email);
+    <>
+      <Input
+        className="mt-6"
+        type="email"
+        name="email"
+        placeholder="Insira o seu e-mail"
+        autoComplete="email"
+        inputMode="email"
+        value={email}
+        onChange={(e) => {
+          setEmail(e.target.value);
+          if (error) setError(undefined);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            const result = emailStepSchema.safeParse({ email: emailRef.current });
+            if (!result.success) {
+              setError(result.error.issues[0]?.message ?? "Email inválido");
+              return;
             }
-          }}
-          error={error}
-        />
+            setError(undefined);
+            onSubmitRef.current(result.data.email);
+          }
+        }}
+        error={error}
+      />
 
-        <div className="mt-10 lg:mt-6">
-          <Button type="button" ref={buttonRef} fullWidth>
-            Continuar
-          </Button>
-        </div>
+      <div className="mt-10 lg:mt-6">
+        <Button type="button" ref={buttonRef} fullWidth>
+          Continuar
+        </Button>
       </div>
 
       <div className="mt-6">
@@ -95,7 +87,6 @@ export function StepEmail({ defaultEmail = "", onSubmit }: Props) {
           }}
         />
       </div>
-
-    </div>
+    </>
   );
 }

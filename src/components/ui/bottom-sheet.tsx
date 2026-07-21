@@ -44,7 +44,7 @@ export function BottomSheet({
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex ${alignClass} justify-center bg-black/50`}
+      className={`fixed inset-0 z-[60] flex ${alignClass} justify-center bg-black/50`}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}

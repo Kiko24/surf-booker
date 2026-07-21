@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AuthHeader } from "@/components/auth/auth-header";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { StepTransition } from "@/components/auth/step-transition";
 import { StepEmail } from "./steps/step-email";
@@ -40,13 +41,27 @@ export function SignupOwnerWizard() {
     "confirm-email": "Confirma o teu email",
   };
 
+  const stepSubtitle: Record<Step, string | undefined> = {
+    email: "Crie uma conta e deixe-nos ajudar!",
+    personal: undefined,
+    "confirm-email": undefined,
+  };
+
   return (
     <AuthShell
+      image={bgPros}
       backHref={isFirstStep ? "/user-flow" : undefined}
       onBack={isFirstStep ? undefined : handleBackInternal}
-      image={bgPros}
       title={stepTitles[step]}
+      subtitle={stepSubtitle[step]}
+      mainClassName="items-start"
     >
+      <AuthHeader
+        title={stepTitles[step]}
+        subtitle={stepSubtitle[step]}
+        backHref={isFirstStep ? "/user-flow" : undefined}
+        onBack={isFirstStep ? undefined : handleBackInternal}
+      />
       <StepTransition stepKey={step} direction={direction}>
         {step === "email" && (
           <StepEmail

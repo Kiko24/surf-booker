@@ -185,7 +185,7 @@ export function MaisView({ schoolId }: Props) {
     setProfilePhone(phone);
     setProfilePassword("");
     setProfileConfirmPassword("");
-    setShowProfile(true);
+    if (window.innerWidth < 1024) setShowProfile(true);
     setSelectedSection("profile");
   }, [fullName, email, phone]);
 
@@ -258,18 +258,18 @@ export function MaisView({ schoolId }: Props) {
               {schoolName}
             </h1>
           )}
-          <div className="hidden md:block h-8 w-px bg-foreground/10" />
-          <h2 className="hidden md:block font-heading text-lg font-bold text-foreground">Definições</h2>
+          <div className="hidden lg:block h-8 w-px bg-foreground/10" />
+          <h2 className="hidden lg:block font-heading text-lg font-bold text-foreground">Definições</h2>
         </div>
 
-        <div className="block md:hidden space-y-1 mb-4">
+        <div className="block lg:hidden space-y-1 mb-4">
           <h2 className="font-heading text-lg font-bold text-foreground">Definições</h2>
         </div>
 
         {/* Grid layout */}
-        <div className="md:grid md:grid-cols-12 md:gap-6 md:items-start">
+        <div className="lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start">
           {/* Left column — setting cards */}
-          <div className="md:col-span-3 min-h-[50vh] flex flex-col justify-center md:min-h-[65vh] 2xl:min-h-0 2xl:block">
+          <div className="lg:col-span-3 min-h-[50vh] flex flex-col justify-center lg:min-h-[65vh] 2xl:min-h-0 2xl:block">
             <div
               role="tablist"
               aria-label="Definições"
@@ -308,7 +308,7 @@ export function MaisView({ schoolId }: Props) {
                 aria-selected={selectedSection === "company"}
                 aria-controls="panel-company"
                 id="tab-company"
-                onClick={() => { setShowCompany(true); setSelectedSection("company"); }}
+                onClick={() => { setSelectedSection("company"); if (window.innerWidth < 1024) setShowCompany(true); }}
                 onKeyDown={(e) => handleTabKeyDown(e, "company")}
                 tabIndex={selectedSection === "company" ? 0 : -1}
                 className={`flex items-center justify-between rounded-xl bg-surface p-4 text-left transition-colors hover:bg-[#2A2A2A] active:scale-[0.99] ${selectedSection === "company" ? "border-l-4 border-accent" : ""}`}
@@ -334,7 +334,7 @@ export function MaisView({ schoolId }: Props) {
                 aria-selected={selectedSection === "instructors"}
                 aria-controls="panel-instructors"
                 id="tab-instructors"
-                onClick={() => { setShowInstructors(true); setSelectedSection("instructors"); }}
+                onClick={() => { setSelectedSection("instructors"); if (window.innerWidth < 1024) setShowInstructors(true); }}
                 onKeyDown={(e) => handleTabKeyDown(e, "instructors")}
                 tabIndex={selectedSection === "instructors" ? 0 : -1}
                 className={`flex items-center justify-between rounded-xl bg-surface p-4 text-left transition-colors hover:bg-[#2A2A2A] active:scale-[0.99] ${selectedSection === "instructors" ? "border-l-4 border-accent" : ""}`}
@@ -362,7 +362,7 @@ export function MaisView({ schoolId }: Props) {
                 aria-selected={selectedSection === "waivers"}
                 aria-controls="panel-waivers"
                 id="tab-waivers"
-                onClick={() => { setShowWaivers(true); setSelectedSection("waivers"); }}
+                onClick={() => { setSelectedSection("waivers"); if (window.innerWidth < 1024) setShowWaivers(true); }}
                 onKeyDown={(e) => handleTabKeyDown(e, "waivers")}
                 tabIndex={selectedSection === "waivers" ? 0 : -1}
                 className={`flex items-center justify-between rounded-xl bg-surface p-4 text-left transition-colors hover:bg-[#2A2A2A] active:scale-[0.99] ${selectedSection === "waivers" ? "border-l-4 border-accent" : ""}`}
@@ -409,7 +409,7 @@ export function MaisView({ schoolId }: Props) {
                 aria-selected={selectedSection === "settings"}
                 aria-controls="panel-settings"
                 id="tab-settings"
-                onClick={() => { setShowSettings(true); setSelectedSection("settings"); }}
+                onClick={() => { setSelectedSection("settings"); if (window.innerWidth < 1024) setShowSettings(true); }}
                 onKeyDown={(e) => handleTabKeyDown(e, "settings")}
                 tabIndex={selectedSection === "settings" ? 0 : -1}
                 className={`flex items-center justify-between rounded-xl bg-surface p-4 text-left transition-colors hover:bg-[#2A2A2A] active:scale-[0.99] ${selectedSection === "settings" ? "border-l-4 border-accent" : ""}`}
@@ -451,7 +451,7 @@ export function MaisView({ schoolId }: Props) {
           </div>
 
           {/* Right column — desktop panel content */}
-          <div className="max-md:hidden md:col-span-9 md:h-[calc(100vh-10rem)]">
+          <div className="max-lg:hidden lg:col-span-9 lg:h-[calc(100vh-10rem)]">
             {!selectedSection && (
               <div className="h-full flex flex-col items-center justify-center text-center">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="h-12 w-12 text-text-muted mb-4">
@@ -581,7 +581,7 @@ export function MaisView({ schoolId }: Props) {
                     {images.length === 0 ? (
                       <p className="py-4 text-center font-body text-sm text-text-secondary">Nenhuma imagem adicionada ainda</p>
                     ) : (
-                      <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+                      <div className="grid grid-cols-3 lg:grid-cols-6 gap-2">
                         {images.map((img) => (
                           <div key={img.id} className="relative aspect-square overflow-hidden rounded-xl bg-[#2A2A2A]">
                             <button type="button" onClick={() => setLightboxImage(img.public_url)} className="h-full w-full">
@@ -882,7 +882,7 @@ export function MaisView({ schoolId }: Props) {
         </div>
 
         {/* Account Info — mobile only */}
-        <div className="mt-8 space-y-4 md:hidden">
+        <div className="mt-8 space-y-4 lg:hidden">
           <h2 className="font-heading text-lg font-bold text-foreground">Conta</h2>
           <div className="rounded-xl bg-surface px-5 py-4">
             <p className="font-body text-sm text-text-secondary">Versão da app</p>

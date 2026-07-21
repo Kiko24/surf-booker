@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import type { PublicSchoolData } from "../actions";
 import { toggleFavorite, comprarPackPublico, criarReservaPublica, criarReservaAluguer, buscarPackAtivo } from "../actions";
@@ -29,13 +29,13 @@ export function EscolaView({ data }: Props) {
     return true;
   });
 
-  const INITIAL_LIMIT = 5;
-  const [showAllModal, setShowAllModal] = useState(false);
+  const SERVICE_PAGE_SIZE = 5;
+  const [servicePage, setServicePage] = useState(0);
+  const [modalServicePage, setModalServicePage] = useState(0);
   const [showServicePicker, setShowServicePicker] = useState(false);
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
   const [selectedSessions, setSelectedSessions] = useState<PublicSchoolData["upcomingSessions"]>([]);
-  const [displayCount, setDisplayCount] = useState(10);
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const totalPages = Math.ceil(filteredServices.length / SERVICE_PAGE_SIZE);
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [favorited, setFavorited] = useState(false);
   const [favoriteLoading, setFavoriteLoading] = useState(false);
@@ -69,6 +69,16 @@ export function EscolaView({ data }: Props) {
   const isRental = selSvc?.category === "aluguer";
   const [activePack, setActivePack] = useState<{ packPurchaseId: string; remaining: number; name: string } | null>(null);
   const [packChecking, setPackChecking] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileSubStep, setMobileSubStep] = useState<"list" | "detail">("list");
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 1023px)");
+    setIsMobile(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
 
   useEffect(() => {
     if (!showServicePicker) return;
@@ -88,6 +98,7 @@ export function EscolaView({ data }: Props) {
       setTermsAccepted(false);
       setBookingError(null);
       setBookingSuccess(false);
+      setMobileSubStep("list");
     });
     return () => cancelAnimationFrame(id);
   }, [showServicePicker, userInfo]);
@@ -160,20 +171,9 @@ export function EscolaView({ data }: Props) {
   }, [school.id, favorited]);
 
   useEffect(() => {
-    if (!showAllModal) return;
-    const el = sentinelRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setDisplayCount((prev) => Math.min(prev + 10, filteredServices.length));
-        }
-      },
-      { rootMargin: "200px" }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [showAllModal, filteredServices.length]);
+    setServicePage(0);
+    setModalServicePage(0);
+  }, [selectedCategory, selectedModality]);
 
   return (
     <div className="bg-[#F7FAFC]">
@@ -360,27 +360,60 @@ export function EscolaView({ data }: Props) {
                   </div>
 
                   <div className="space-y-3">
-                    {filteredServices.slice(0, INITIAL_LIMIT).map((svc) => (
+                    {filteredServices.slice(servicePage * SERVICE_PAGE_SIZE, (servicePage + 1) * SERVICE_PAGE_SIZE).map((svc) => (
                       <ServiceCard
                         key={svc.id}
                         svc={svc}
                         onClick={() => setSelectedService(svc)}
-                        onReservarClick={() => { setSelectedServiceId(svc.id); setShowServicePicker(true); }}
+                        onReservarClick={() => { setSelectedServiceId(svc.id); setModalServicePage(0); setShowServicePicker(true); }}
                         rentalVariantId={svc.rental_options?.length ? (selectedRentalVariantId ?? svc.rental_options[0].id) : undefined}
                         onRentalVariantChange={svc.rental_options?.length ? setSelectedRentalVariantId : undefined}
                       />
                     ))}
-                    {filteredServices.length > INITIAL_LIMIT && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setDisplayCount(10);
-                          setShowAllModal(true);
-                        }}
-                        className="w-full text-center rounded-2xl border-2 border-dashed border-gray-200 bg-white p-4 text-sm font-semibold text-gray-500 transition-colors hover:border-accent hover:text-accent"
-                      >
-                        Ver mais (+{filteredServices.length - INITIAL_LIMIT})
-                      </button>
+                    {filteredServices.length === 0 && (
+                      <p className="py-8 text-center text-sm text-gray-400">
+                        Nenhum serviço disponível para esta categoria.
+                      </p>
+                    )}
+                    {totalPages > 1 && (
+                      <div className="flex items-center justify-center gap-2 pt-4">
+                        <button
+                          type="button"
+                          disabled={servicePage === 0}
+                          onClick={() => setServicePage(p => Math.max(0, p - 1))}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-sm text-gray-600 transition-colors hover:border-accent hover:text-accent disabled:opacity-30 disabled:cursor-not-allowed"
+                          aria-label="Página anterior"
+                        >
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                          </svg>
+                        </button>
+                        {Array.from({ length: totalPages }, (_, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => setServicePage(i)}
+                            className={`flex h-8 min-w-[32px] items-center justify-center rounded-lg px-2 text-sm font-medium transition-colors ${
+                              servicePage === i
+                                ? "bg-accent text-white"
+                                : "text-gray-600 border border-gray-200 hover:border-accent hover:text-accent"
+                            }`}
+                          >
+                            {i + 1}
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          disabled={servicePage >= totalPages - 1}
+                          onClick={() => setServicePage(p => Math.min(totalPages - 1, p + 1))}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-sm text-gray-600 transition-colors hover:border-accent hover:text-accent disabled:opacity-30 disabled:cursor-not-allowed"
+                          aria-label="Página seguinte"
+                        >
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                          </svg>
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -519,57 +552,6 @@ export function EscolaView({ data }: Props) {
         />
       )}
 
-      {/* Modal Ver mais */}
-      {showAllModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/50"
-          onClick={() => setShowAllModal(false)}
-        >
-          <div
-            className="flex w-full max-w-2xl flex-col rounded-t-2xl bg-white p-6 max-h-[75vh]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-4 shrink-0">
-              <h3 className="font-heading text-lg font-bold text-gray-900">
-                Todos os serviços
-              </h3>
-              <button
-                type="button"
-                aria-label="Fechar"
-                onClick={() => setShowAllModal(false)}
-                className="rounded-full bg-gray-100 p-2 text-gray-500 transition-colors hover:bg-gray-200"
-              >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="overflow-y-auto -mx-6 px-6">
-              <div className="space-y-3 pb-4">
-                {filteredServices.slice(0, displayCount).map((svc) => (
-                  <ServiceCard
-                    key={svc.id}
-                    svc={svc}
-                    onClick={() => { setShowAllModal(false); setSelectedService(svc); }}
-                    onReservarClick={() => { setShowAllModal(false); setSelectedServiceId(svc.id); setShowServicePicker(true); }}
-                    rentalVariantId={svc.rental_options?.length ? (selectedRentalVariantId ?? svc.rental_options[0].id) : undefined}
-                    onRentalVariantChange={svc.rental_options?.length ? setSelectedRentalVariantId : undefined}
-                  />
-                ))}
-                {displayCount < filteredServices.length && (
-                  <div ref={sentinelRef} className="h-4" />
-                )}
-                {displayCount >= filteredServices.length && filteredServices.length > INITIAL_LIMIT && (
-                  <p className="text-center text-sm text-gray-400 py-2">
-                    Mostrando todos os {filteredServices.length} serviços
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Modal de Serviço */}
       {selectedService && (
         <div
@@ -624,7 +606,7 @@ export function EscolaView({ data }: Props) {
               </div>
               <button
                 type="button"
-                onClick={() => { setSelectedServiceId(selectedService.id); setSelectedService(null); setShowServicePicker(true); }}
+                onClick={() => { setSelectedServiceId(selectedService.id); setSelectedService(null); setModalServicePage(0); setShowServicePicker(true); }}
                 className="shrink-0 rounded-full border-2 border-accent px-5 py-2 text-sm font-semibold text-black transition-transform hover:scale-105 hover:bg-accent hover:text-white"
               >
                 Reservar
@@ -647,14 +629,28 @@ export function EscolaView({ data }: Props) {
           onClick={() => setShowServicePicker(false)}
         >
           <div
-            className="w-full max-w-5xl rounded-2xl bg-white p-6 shadow-xl h-[85vh] flex flex-col relative"
+            className="w-full max-w-5xl mx-4 rounded-2xl bg-white p-6 shadow-xl max-h-[85vh] flex flex-col relative"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex-1 overflow-y-auto">
             <div className="flex items-center justify-between mb-4 shrink-0">
-              <h3 className="font-heading text-lg font-bold text-gray-900">
-                {bookingStep === 1 ? "Reservar aula" : bookingStep === 3 ? "Confirmação" : "Participantes"}
-              </h3>
+              <div className="flex items-center gap-2">
+                {isMobile && mobileSubStep === "detail" && bookingStep === 1 && (
+                  <button
+                    type="button"
+                    onClick={() => setMobileSubStep("list")}
+                    className="rounded-full bg-gray-100 p-2 text-gray-500 transition-colors hover:bg-gray-200"
+                    aria-label="Voltar"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+                )}
+                <h3 className="font-heading text-lg font-bold text-gray-900">
+                  {bookingStep === 1 ? (isMobile && mobileSubStep === "detail" ? "Detalhes" : "Reservar aula") : bookingStep === 3 ? "Confirmação" : "Participantes"}
+                </h3>
+              </div>
               <button
                 type="button"
                 aria-label="Fechar"
@@ -667,7 +663,7 @@ export function EscolaView({ data }: Props) {
               </button>
             </div>
 
-            {bookingStep === 1 && (
+            {bookingStep === 1 && (!isMobile || mobileSubStep === "list") && (
               <div className="flex flex-wrap items-center gap-2 mb-4 px-2">
                 <button
                   type="button"
@@ -695,7 +691,8 @@ export function EscolaView({ data }: Props) {
                   </button>
                 ))}
                 {allModalities.length > 0 && (
-                  <div className="relative ml-auto">
+                  <div className="ml-auto w-full md:w-auto">
+                    <div className="relative inline-block">
                     <select
                       value={selectedModality ?? ""}
                       onChange={(e) => setSelectedModality(e.target.value || null)}
@@ -709,19 +706,20 @@ export function EscolaView({ data }: Props) {
                     <svg className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                     </svg>
+                    </div>
                   </div>
                 )}
               </div>
             )}
 
             {/* Services + Calendar (Step 1) OR Participant forms (Step 2) */}
-            <div className="flex flex-row gap-6">
+            <div className="flex flex-col lg:flex-row gap-6">
               {bookingStep === 1 ? (
                 <>
                   {/* Services list */}
-            <div className="flex-1 overflow-y-auto p-0.5 -m-0.5">
+            <div className={`flex-1 p-0.5 -m-0.5 ${isMobile && mobileSubStep === "detail" ? "hidden" : ""}`}>
                     <div className="space-y-2">
-                      {filteredServices.map((svc) => {
+                      {filteredServices.slice(modalServicePage * SERVICE_PAGE_SIZE, (modalServicePage + 1) * SERVICE_PAGE_SIZE).map((svc) => {
                         const isSelected = selectedServiceId === svc.id;
                         const ctaLabel =
                           svc.category === "pack" ? "Comprar"
@@ -748,8 +746,10 @@ export function EscolaView({ data }: Props) {
                               onClick={() => {
                                 if (isSelected) {
                                   setSelectedServiceId(null);
+                                  if (isMobile) setMobileSubStep("list");
                                 } else {
                                   setSelectedServiceId(svc.id);
+                                  if (isMobile) setMobileSubStep("detail");
                                 }
                               }}
                               className={`shrink-0 rounded-full border-2 px-4 py-1.5 text-sm transition-all hover:scale-105 ${
@@ -768,11 +768,55 @@ export function EscolaView({ data }: Props) {
                           Nenhum serviço disponível para esta categoria.
                         </p>
                       )}
+                      {(() => {
+                        const total = Math.ceil(filteredServices.length / SERVICE_PAGE_SIZE);
+                        if (total <= 1) return null;
+                        return (
+                          <div className="flex items-center justify-center gap-2 pt-2">
+                            <button
+                              type="button"
+                              disabled={modalServicePage === 0}
+                              onClick={() => setModalServicePage(p => Math.max(0, p - 1))}
+                              className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-sm text-gray-600 transition-colors hover:border-accent hover:text-accent disabled:opacity-30 disabled:cursor-not-allowed"
+                              aria-label="Página anterior"
+                            >
+                              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                              </svg>
+                            </button>
+                            {Array.from({ length: total }, (_, i) => (
+                              <button
+                                key={i}
+                                type="button"
+                                onClick={() => setModalServicePage(i)}
+                                className={`flex h-8 min-w-[32px] items-center justify-center rounded-lg px-2 text-sm font-medium transition-colors ${
+                                  modalServicePage === i
+                                    ? "bg-accent text-white"
+                                    : "text-gray-600 border border-gray-200 hover:border-accent hover:text-accent"
+                                }`}
+                              >
+                                {i + 1}
+                              </button>
+                            ))}
+                            <button
+                              type="button"
+                              disabled={modalServicePage >= total - 1}
+                              onClick={() => setModalServicePage(p => Math.min(total - 1, p + 1))}
+                              className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-sm text-gray-600 transition-colors hover:border-accent hover:text-accent disabled:opacity-30 disabled:cursor-not-allowed"
+                              aria-label="Página seguinte"
+                            >
+                              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                              </svg>
+                            </button>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
 
                   {/* Right column — calendar for aulas, form for packs/aluguer */}
-                  <div className="w-[320px] shrink-0">
+                  <div className={`w-full lg:w-[320px] lg:shrink-0 ${isMobile && mobileSubStep === "list" ? "hidden" : ""}`}>
                     {(() => {
                       const rightSvc = services.find(s => s.id === selectedServiceId);
                       if (!rightSvc) return <div />;
@@ -1048,7 +1092,7 @@ export function EscolaView({ data }: Props) {
                 </>
               ) : (
                 /* Step 2/3 — left: participant forms, right: summary or payer */
-                <div className="flex flex-row gap-6 w-full">
+                <div className="flex flex-col lg:flex-row gap-6 w-full">
                   <div className="flex-1 space-y-6">
                     {bookingStep === 3 ? (
                       <div className="space-y-4 px-2">
@@ -1348,7 +1392,7 @@ export function EscolaView({ data }: Props) {
                     const rentalTotal = isRental ? packQuantity * effPriceCents : effPriceCents * totParticipants;
 
                     return (
-                      <div className="w-[320px] shrink-0">
+                      <div className="w-full lg:w-[320px] lg:shrink-0">
                         <div className="sticky top-0 space-y-4">
                           <h4 className="font-heading text-sm font-bold text-gray-900">{isRental ? "Resumo" : "Sessões selecionadas"}</h4>
                           {isRental && (bookingStep === 2 || bookingStep === 3) ? (

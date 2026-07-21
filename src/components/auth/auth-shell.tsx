@@ -9,12 +9,13 @@ import { cn } from "@/lib/utils/cn";
 
 type AuthShellProps = {
   children: React.ReactNode;
-  backHref?: string;
-  onBack?: () => void;
   showLogo?: boolean;
   image?: StaticImageData;
   mainClassName?: string;
+  backHref?: string;
+  onBack?: () => void;
   title?: string;
+  subtitle?: string;
 };
 
 function ArrowLeftIcon({ className }: { className?: string }) {
@@ -36,20 +37,19 @@ function ArrowLeftIcon({ className }: { className?: string }) {
   );
 }
 
+const backButtonClasses =
+  "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-foreground text-foreground hover:bg-surface active:bg-surface transition-colors touch-manipulation cursor-pointer select-none";
+
 export function AuthShell({
   children,
-  backHref,
-  onBack,
   showLogo = true,
   image = defaultImage,
   mainClassName,
+  backHref,
+  onBack,
   title,
+  subtitle,
 }: AuthShellProps) {
-  const backButtonClasses =
-    "inline-flex h-8 w-8 items-center justify-center rounded-full border border-foreground text-foreground hover:bg-surface active:bg-surface transition-colors touch-manipulation cursor-pointer select-none";
-
-  const hasBack = Boolean(backHref || onBack);
-  const showTopBar = hasBack || Boolean(title);
 
   return (
     <div className="relative min-h-svh min-h-dvh bg-background text-foreground font-body lg:h-svh lg:overflow-hidden">
@@ -82,8 +82,8 @@ export function AuthShell({
         >
           <main
             className={cn(
-              "flex-1 flex items-center justify-center px-3 pb-8",
-              "lg:relative lg:items-start lg:px-10 lg:pt-6 lg:pb-0",
+              "relative flex-1 flex items-center justify-center px-3 pb-8",
+              "lg:flex lg:flex-col lg:items-stretch lg:px-10 lg:pb-0",
               mainClassName
             )}
             style={{
@@ -91,36 +91,42 @@ export function AuthShell({
               paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))",
             }}
           >
-            {/* Back button absolute SÓ em desktop */}
-            {hasBack && (
-              <div className="hidden lg:block lg:absolute lg:top-6 lg:left-10 lg:z-10">
-                {backHref ? (
-                  <Link
-                    href={backHref}
-                    aria-label="Voltar"
-                    className={cn(backButtonClasses, "lg:h-8 lg:w-8")}
-                  >
-                    <ArrowLeftIcon className="h-3.5 w-3.5 lg:h-3.5 lg:w-3.5 pointer-events-none" />
-                  </Link>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={onBack}
-                    aria-label="Voltar"
-                    className={cn(backButtonClasses, "lg:h-8 lg:w-8")}
-                  >
-                    <ArrowLeftIcon className="h-3.5 w-3.5 lg:h-3.5 lg:w-3.5 pointer-events-none" />
-                  </button>
-                )}
+            {/* Topo desktop: back + theme, título abaixo (normal flow) */}
+            <div className="hidden lg:flex lg:flex-col lg:gap-3 lg:pt-6 lg:shrink-0">
+              <div className="flex items-center justify-between">
+                <div>
+                  {Boolean(backHref || onBack) && (backHref ? (
+                    <Link
+                      href={backHref}
+                      aria-label="Voltar"
+                      className={backButtonClasses}
+                    >
+                      <ArrowLeftIcon className="h-3.5 w-3.5 pointer-events-none" />
+                    </Link>
+                  ) : onBack ? (
+                    <button
+                      type="button"
+                      onClick={onBack}
+                      aria-label="Voltar"
+                      className={backButtonClasses}
+                    >
+                      <ArrowLeftIcon className="h-3.5 w-3.5 pointer-events-none" />
+                    </button>
+                  ) : null)}
+                </div>
+                <ThemeToggle />
               </div>
-            )}
-
-            {/* Theme toggle absolute SÓ em desktop (lg+) */}
-            <div className="hidden lg:block lg:absolute lg:top-6 lg:right-10 lg:z-10">
-              <ThemeToggle />
+              {title && (
+                <div className="min-w-0">
+                  <h1 className="font-heading text-2xl font-medium">{title}</h1>
+                  {subtitle && (
+                    <p className="mt-1 text-sm text-text-secondary">{subtitle}</p>
+                  )}
+                </div>
+              )}
             </div>
 
-            <div className="w-full max-w-md lg:max-w-md lg:h-full lg:flex lg:flex-col">
+            <div className="w-full max-w-md lg:max-w-md lg:flex-1 lg:flex lg:flex-col lg:self-center">
               <div
                 className="
                   relative rounded-2xl bg-background px-5 pt-3 pb-5
@@ -128,38 +134,6 @@ export function AuthShell({
                   lg:bg-transparent lg:p-0 lg:rounded-none lg:flex lg:flex-1 lg:flex-col
                 "
               >
-                {/* Top bar SÓ em mobile (<1024px) */}
-                {showTopBar && (
-                  <div className="mb-2 flex items-center gap-3 lg:hidden">
-                    {hasBack && (
-                      backHref ? (
-                        <Link
-                          href={backHref}
-                          aria-label="Voltar"
-                          className={backButtonClasses}
-                        >
-                          <ArrowLeftIcon className="h-3.5 w-3.5 pointer-events-none" />
-                        </Link>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={onBack}
-                          onTouchEnd={(e) => {
-                            e.preventDefault();
-                            onBack?.();
-                          }}
-                          aria-label="Voltar"
-                          className={backButtonClasses}
-                        >
-                          <ArrowLeftIcon className="h-3.5 w-3.5 pointer-events-none" />
-                        </button>
-                      )
-                    )}
-                    {title && (
-                      <h1 className="font-heading text-2xl font-medium">{title}</h1>
-                    )}
-                  </div>
-                )}
                 {children}
               </div>
             </div>

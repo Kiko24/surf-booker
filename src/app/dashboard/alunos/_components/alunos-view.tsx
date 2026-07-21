@@ -463,7 +463,7 @@ export function AlunosView({ schoolId }: Props) {
 
       {/* Student popup */}
       {selectedStudent && !showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-5" onClick={() => setSelectedStudent(null)}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-5" onClick={() => setSelectedStudent(null)}>
           <div className="flex max-h-[95vh] w-full max-w-2xl flex-col rounded-2xl bg-surface" onClick={(e) => e.stopPropagation()}>
             <div className="overflow-y-auto px-6 py-6 [&::-webkit-scrollbar]:hidden">
               <div className="flex items-center gap-4 mb-6">

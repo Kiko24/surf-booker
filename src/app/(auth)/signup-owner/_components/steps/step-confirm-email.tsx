@@ -69,11 +69,6 @@ export function StepConfirmEmail({ email }: Props) {
 
   return (
     <div className="flex flex-col gap-6 text-center">
-      <header className="hidden lg:block">
-        <h1 className="font-heading text-2xl font-medium">
-          Confirma o teu email
-        </h1>
-      </header>
 
       <Image
         src={gmailImg}

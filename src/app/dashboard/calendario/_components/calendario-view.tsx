@@ -195,6 +195,8 @@ export function CalendarioView({ schoolId }: Props) {
   const [groupError, setGroupError] = useState("");
   const [attendanceLoading, setAttendanceLoading] = useState<Record<string, boolean>>({});
   const [closingSession, setClosingSession] = useState<string | null>(null);
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+  const [closeConfirmSessionId, setCloseConfirmSessionId] = useState<string | null>(null);
   const [addingToSession, setAddingToSession] = useState<number | null>(null);
   const [draggedSessionId, setDraggedSessionId] = useState<string | null>(null);
   const [selectingStudents, setSelectingStudents] = useState(false);
@@ -458,7 +460,7 @@ export function CalendarioView({ schoolId }: Props) {
 
         {/* Session detail modal (centered pop-up) */}
         {showSidebar && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-5" onClick={() => setSelectedDay(null)}>
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-5" onClick={() => setSelectedDay(null)}>
             <div className="w-full max-w-lg max-h-[75vh] rounded-2xl bg-surface flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
               {/* Header */}
               <div className="p-4 lg:p-5 border-b border-white/5 shrink-0">
@@ -634,13 +636,14 @@ export function CalendarioView({ schoolId }: Props) {
                                                       e.stopPropagation();
                                                       if (!aluno.bookingId || loading) return;
                                                       setAttendanceLoading((prev) => ({ ...prev, [aluno.bookingId]: true }));
-                                                      await markAttendance(session.id, aluno.id, "attended");
+                                                      const action = isAttended ? "confirmed" : "attended";
+                                                      await markAttendance(session.id, aluno.id, action);
                                                       setAttendanceLoading((prev) => ({ ...prev, [aluno.bookingId]: false }));
                                                       fetchSessions(currentDate);
                                                     }}
                                                     className={`rounded-lg px-2.5 py-1 font-body text-xs font-semibold transition-colors ${isAttended ? "bg-success/20 text-success" : "bg-[#1A1A1A] text-text-muted hover:text-success hover:bg-success/10"}`}
                                                   >
-                                                    Presente
+                                                    {isAttended ? "Reverter" : "Presente"}
                                                   </button>
                                                   <button
                                                     type="button"
@@ -649,13 +652,14 @@ export function CalendarioView({ schoolId }: Props) {
                                                       e.stopPropagation();
                                                       if (!aluno.bookingId || loading) return;
                                                       setAttendanceLoading((prev) => ({ ...prev, [aluno.bookingId]: true }));
-                                                      await markAttendance(session.id, aluno.id, "no_show");
+                                                      const action = isNoShow ? "confirmed" : "no_show";
+                                                      await markAttendance(session.id, aluno.id, action);
                                                       setAttendanceLoading((prev) => ({ ...prev, [aluno.bookingId]: false }));
                                                       fetchSessions(currentDate);
                                                     }}
                                                     className={`rounded-lg px-2.5 py-1 font-body text-xs font-semibold transition-colors ${isNoShow ? "bg-error/20 text-error" : "bg-[#1A1A1A] text-text-muted hover:text-error hover:bg-error/10"}`}
                                                   >
-                                                    Falta
+                                                    {isNoShow ? "Reverter" : "Falta"}
                                                   </button>
                                                 </div>
                                               </div>
@@ -666,12 +670,10 @@ export function CalendarioView({ schoolId }: Props) {
                                       <button
                                         type="button"
                                         disabled={closingSession === session.id}
-                                        onClick={async (e) => {
+                                        onClick={(e) => {
                                           e.stopPropagation();
-                                          setClosingSession(session.id);
-                                          await closeSession(session.id);
-                                          setClosingSession(null);
-                                          fetchSessions(currentDate);
+                                          setCloseConfirmSessionId(session.id);
+                                          setShowCloseConfirm(true);
                                         }}
                                         className="flex-1 rounded-lg bg-success/20 py-2 lg:py-2.5 font-body text-xs lg:text-sm font-semibold text-success transition-colors hover:bg-success/30 disabled:opacity-50"
                                       >
@@ -760,7 +762,7 @@ export function CalendarioView({ schoolId }: Props) {
 
       {/* Date picker modal */}
       {showDatePicker && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50" onClick={() => setShowDatePicker(false)}>
+        <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center bg-black/50" onClick={() => setShowDatePicker(false)}>
           <div className="w-full max-w-sm rounded-t-2xl md:rounded-2xl bg-surface p-6" onClick={(e) => e.stopPropagation()}>
             <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted md:hidden" />
 
@@ -899,9 +901,28 @@ export function CalendarioView({ schoolId }: Props) {
         variant="danger"
       />
 
+      <ConfirmDialog
+        isOpen={showCloseConfirm}
+        onClose={() => { setShowCloseConfirm(false); setCloseConfirmSessionId(null); }}
+        onConfirm={async () => {
+          if (!closeConfirmSessionId) return;
+          setShowCloseConfirm(false);
+          setClosingSession(closeConfirmSessionId);
+          await closeSession(closeConfirmSessionId);
+          setClosingSession(null);
+          setCloseConfirmSessionId(null);
+          fetchSessions(currentDate);
+        }}
+        title="Fechar sessão"
+        message="Os alunos que ainda não foram marcados vão ser registados como falta. Queres fechar a sessão?"
+        confirmLabel="Sim, fechar"
+        cancelLabel="Voltar"
+        variant="default"
+      />
+
       {/* Guest modal */}
       {showGuestModal && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50">
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50">
           <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-24">
             <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted" />
             <h3 className="font-heading text-2xl font-bold text-foreground mb-6">Novo convidado</h3>
@@ -949,7 +970,7 @@ export function CalendarioView({ schoolId }: Props) {
 
       {/* Group modal */}
       {showGroupModal && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50">
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50">
           <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-24">
             <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted" />
             <h3 className="font-heading text-2xl font-bold text-foreground mb-6">Adicionar grupo</h3>
@@ -1066,7 +1087,7 @@ export function CalendarioView({ schoolId }: Props) {
 
       {/* Pack choice modal */}
       {pendingPackStudent && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50">
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50">
           <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 pb-24">
             <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-text-muted" />
             <h3 className="font-heading text-lg font-bold text-foreground mb-1">Método de pagamento</h3>

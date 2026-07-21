@@ -448,7 +448,7 @@ export async function cancelSession(sessionId: string): Promise<{ ok: boolean; e
 export async function markAttendance(
   sessionId: string,
   studentId: string,
-  status: "attended" | "no_show",
+  status: "attended" | "no_show" | "confirmed",
 ): Promise<{ ok: boolean; error?: string }> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -489,6 +489,18 @@ export async function markAttendance(
 
     if (booking.payment_method === "pack" && booking.pack_purchase_id) {
       await supabase.rpc("decrement_pack_credit", {
+        p_purchase_id: booking.pack_purchase_id,
+      });
+    }
+  }
+
+  if (status === "confirmed") {
+    if (booking.payment_method === "single" && booking.payment_status === "paid_offline") {
+      updates.payment_status = "unpaid";
+    }
+
+    if (booking.payment_method === "pack" && booking.pack_purchase_id) {
+      await supabase.rpc("increment_pack_credit", {
         p_purchase_id: booking.pack_purchase_id,
       });
     }

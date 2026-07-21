@@ -311,7 +311,7 @@ export function DashboardView({ schoolId }: Props) {
           role="dialog"
           aria-modal="true"
           aria-label="Sessões de hoje"
-          className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 md:px-5"
+          className="fixed inset-0 z-[60] flex items-end md:items-center justify-center bg-black/50 md:px-5"
         >
           <div className="w-full max-w-md rounded-t-2xl md:rounded-2xl bg-surface pb-10 md:pb-4">
             <div className="flex items-center justify-between border-b border-accent/10 px-6 py-4">
@@ -367,7 +367,7 @@ export function DashboardView({ schoolId }: Props) {
           role="dialog"
           aria-modal="true"
           aria-label="Alertas"
-          className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 md:px-5"
+          className="fixed inset-0 z-[60] flex items-end md:items-center justify-center bg-black/50 md:px-5"
         >
           <div className="w-full max-w-md rounded-t-2xl md:rounded-2xl bg-surface pb-10 md:pb-4">
             <div className="flex items-center justify-between border-b border-accent/10 px-6 py-4">

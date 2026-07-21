@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { uuidSchema, priceCentsSchema } from "./helpers";
 
-export const sessionStatusSchema = z.enum(["scheduled", "cancelled"]);
+export const sessionStatusSchema = z.enum(["scheduled", "cancelled", "completed"]);
 
 export const sessionSchema = z
   .object({

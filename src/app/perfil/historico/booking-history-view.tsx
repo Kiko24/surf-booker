@@ -21,14 +21,14 @@ function formatDate(iso: string) {
 const STATUS_LABELS: Record<string, string> = {
   confirmed: "Confirmada",
   cancelled: "Cancelada",
-  completed: "Realizada",
+  attended: "Realizada",
   no_show: "Não compareceu",
 };
 
 const STATUS_COLORS: Record<string, string> = {
   confirmed: "text-blue-600 bg-blue-50 border-blue-200",
   cancelled: "text-red-600 bg-red-50 border-red-200",
-  completed: "text-green-600 bg-green-50 border-green-200",
+  attended: "text-green-600 bg-green-50 border-green-200",
   no_show: "text-yellow-600 bg-yellow-50 border-yellow-200",
 };
 

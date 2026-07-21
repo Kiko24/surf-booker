@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
+import { AuthHeader } from "@/components/auth/auth-header";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,7 +40,7 @@ export function ForgotPasswordForm() {
 
   if (submitted) {
     return (
-      <AuthShell backHref="/login">
+      <AuthShell>
         <div className="mt-2 flex flex-col gap-6 text-center">
           <header className="md:mt-4">
             <h1 className="font-heading text-2xl font-medium">Verifica o teu email</h1>
@@ -62,13 +63,12 @@ export function ForgotPasswordForm() {
   }
 
   return (
-    <AuthShell backHref="/login" title="Recuperar password">
-      <header className="hidden lg:block">
-        <h1 className="font-heading text-2xl font-medium">Recuperar password</h1>
-        <p className="mt-2 text-sm text-text-secondary">
-          Insere o teu email e enviámos-te um link para definir uma nova password.
-        </p>
-      </header>
+    <AuthShell backHref="/login" title="Recuperar password" subtitle="Insere o teu email e enviámos-te um link para definir uma nova password.">
+      <AuthHeader
+        title="Recuperar password"
+        subtitle="Insere o teu email e enviámos-te um link para definir uma nova password."
+        backHref="/login"
+      />
 
       <form onSubmit={handleSubmit} noValidate className="mt-8 flex flex-col gap-4">
         <Input

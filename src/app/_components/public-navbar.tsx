@@ -179,7 +179,7 @@ export function PublicNavbar() {
           )}
         </div>
 
-        <Link href="/" className="font-heading text-lg font-bold text-accent-light md:text-accent-light">
+        <Link href="/" className="font-heading text-lg font-bold text-accent md:text-accent">
           Alaia
         </Link>
 
@@ -248,7 +248,7 @@ export function PublicNavbar() {
 
       {/* Mobile — transparent header (igual landing page) */}
       <div className="flex md:hidden items-center justify-between">
-        <Link href="/" className="font-heading text-xl font-bold text-accent-light">
+        <Link href="/" className="font-heading text-xl font-bold text-accent">
           Alaia
         </Link>
         <button

@@ -40,7 +40,7 @@ export function ClientOverviewView({ overview }: { overview: ClientOverview | nu
     );
   }
 
-  const { profile, upcomingBookings, activePacks, totalBookings, totalAttended, totalNoShow, favoriteSchools, pendingWaivers } = overview;
+  const { profile, upcomingBookings, activePacks } = overview;
 
   return (
     <div className="space-y-6">
@@ -48,29 +48,6 @@ export function ClientOverviewView({ overview }: { overview: ClientOverview | nu
         <h1 className="text-2xl font-bold text-gray-900">
           Olá, {profile?.fullName?.split(" ")[0] ?? "Cliente"}
         </h1>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border border-gray-200 bg-white px-5 py-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-400">Aulas realizadas</p>
-          <p className="mt-1 text-2xl font-bold text-gray-900">{totalAttended}</p>
-        </div>
-        <div className="rounded-xl border border-gray-200 bg-white px-5 py-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-400">Total de aulas concluídas</p>
-          <p className="mt-1 text-2xl font-bold text-gray-900">{totalBookings}</p>
-        </div>
-        <div className="rounded-xl border border-gray-200 bg-white px-5 py-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-400">Faltas</p>
-          <p className="mt-1 text-2xl font-bold text-gray-900">{totalNoShow}</p>
-        </div>
-        <div className="rounded-xl border border-gray-200 bg-white px-5 py-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-400">Escolas favoritas</p>
-          <p className="mt-1 text-2xl font-bold text-gray-900">{favoriteSchools.length}</p>
-        </div>
-        <div className="rounded-xl border border-gray-200 bg-white px-5 py-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-400">Waivers pendentes</p>
-          <p className="mt-1 text-2xl font-bold text-gray-900">{pendingWaivers}</p>
-        </div>
       </div>
 
       <div className="grid gap-8 lg:grid-cols-2">
@@ -171,11 +148,11 @@ export function ClientOverviewView({ overview }: { overview: ClientOverview | nu
       </div>
 
       {confirmId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-5">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-5">
           <div className="w-full max-w-sm rounded-2xl border border-gray-200 bg-white p-6 text-center shadow-xl">
             <h3 className="text-lg font-bold text-gray-900 mb-2">Cancelar aula?</h3>
             <p className="text-sm text-gray-500 mb-6">
-              Tens a certeza que queres cancelar esta aula? O owner será notificado.
+              Tens a certeza que queres cancelar esta aula? O dono da escola será notificado.
             </p>
             <div className="flex gap-3">
               <button
